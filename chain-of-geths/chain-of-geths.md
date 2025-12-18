@@ -19,63 +19,26 @@ This chain ensures every adjacent pair shares at least one protocol version, all
 
 ## Detailed Implementation Plan
 
-### 1. Binary Acquisition
+### 1. Automated Setup
 
-Download the pre-built binaries for each required Geth version from the official Ethereum Go repository releases or gethstore. Run Linux binaries on Ubuntu VMs and Windows binaries on Windows VMs.
+The entire setup is automated using the scripts in the `/chain-of-geths/` directory:
 
-- [Geth v1.16.7](https://hub.docker.com/layers/ethereum/client-go/v1.16.7/images/sha256-9dc2db05933ea9b359b4c07960931ef75f42f8f411018c825eb95d882e82fdc1) - Official Docker image ethereum/client-go:v1.16.7 (released 2025-11-04)
-- [Geth v1.10.23](https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.10.23-d901d853.tar.gz) - geth-linux-amd64-1.10.23-d901d853.tar.gz (released 2022-08-24)
-- [Geth v1.8.27](https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.8.27-4bcc0a37.tar.gz) - geth-linux-amd64-1.8.27-4bcc0a37.tar.gz (released 2019-04-17)
-- [Geth v1.6.7](https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.6.7-ab5646c5.tar.gz) - geth-linux-amd64-1.6.7-ab5646c5.tar.gz (released 2017-07-12)
-- [Geth v1.3.6](https://github.com/ethereum/go-ethereum/releases/download/v1.3.6/geth-Linux64-20160402135800-1.3.6-9e323d6.tar.bz2) - geth-Linux64-20160402135800-1.3.6-9e323d6.tar.bz2 (released 2016-04-02)
-- [Geth v1.0.0](https://github.com/ethereum/go-ethereum/releases/download/v1.0.0/Geth-Win64-20150729141955-1.0.0-0cdc764.zip) - Geth-Win64-20150729141955-1.0.0-0cdc764.zip (released 2015-07-29, run on Windows VM in AWS)
+- `generate-keys.sh`: Generates node keys and static nodes for automatic peering
+- `build-images.sh`: Builds Docker images with downloaded binaries
+- `deploy.sh`: Deploys everything to AWS VMs
 
-### 2. Docker Compose Setup
+### 2. AWS Deployment
 
-Use the `docker-compose.yml` in the `/chain-of-geths/` directory to run the chain. Each service uses an appropriate Ubuntu base image for compatibility.
+Deployment is fully automated using the `deploy.sh` script from your local machine. It handles:
 
-### 3. AWS Deployment
+- Pregenerating node keys and static nodes for consistent enode IDs and automatic peering
+- Building Docker images locally
+- Deploying to the Ubuntu AWS EC2 instance (m6a.xlarge at 13.220.218.223)
+- Starting the Docker Compose chain (v1.16.7 through v1.3.6) with automatic container wiring via static nodes
+- Remotely setting up Geth v1.0.0 on the Windows VM (t2.large at 18.232.131.32) via AWS Systems Manager
 
-Deploy on the AWS EC2 instance (m6a.xlarge, Ubuntu 24.04 LTS at 13.220.218.223) for the Linux-based Geth nodes. Create a separate Windows VM in AWS for Geth v1.0.0 using Windows Server 2016 Base Datacenter edition (AMI: ami-0c6fdd9faf0d80ecb) on t2.large instance (2 vCPUs, 8 GiB RAM, suitable for Geth v1.0.0) at 18.232.131.32.
+Run `./chain-of-geths/deploy.sh` after updating `SSH_KEY_PATH` and ensuring AWS CLI is configured.
 
-1. Run the `generate-keys.sh` script on a machine with Geth installed to pregenerate node keys and static nodes for consistent enode IDs and automatic peering. This creates the `data/` directory with `nodekey` and `static-nodes.json` files for each version.
-2. Install Docker and Docker Compose on the Ubuntu instance.
-3. Clone the repository.
-4. Navigate to `/chain-of-geths/` and run `docker-compose up -d` (this starts v1.16.7 through v1.3.6).
-5. On the Windows VM, install and run Geth v1.0.0 with the pregenerated key, --nodiscover, and --bootnodes with the enode of v1.3.6. Access the Windows VM via RDP: Get the administrator password from the AWS EC2 console, then connect using an RDP client like Remmina (install with `sudo apt install remmina`) on Ubuntu, or Microsoft Remote Desktop on other systems, to the public IP 18.232.131.32.
-6. The Docker containers will automatically connect via static nodes.
-
-#### Node Connection Setup
-
-After starting the containers, manually connect them using `admin.addPeer()` via the HTTP RPC interface. Each node needs to peer with the next newer version in the chain to receive blocks.
-
-1. Get the enode URLs from each running node using `admin.nodeInfo.enode`
-2. Add peers in reverse chronological order (newer to older)
-
-Example script to wire all containers:
-```bash
-#!/bin/bash
-
-# v1.10.23 -> v1.16.7
-ENODE_1167=$(curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}' http://localhost:8545 | jq -r '.result.enode')
-curl -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"method\":\"admin_addPeer\",\"params\":[\"$ENODE_1167\"],\"id\":1}" http://localhost:8546
-
-# v1.8.27 -> v1.10.23
-ENODE_11023=$(curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}' http://localhost:8546 | jq -r '.result.enode')
-curl -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"method\":\"admin_addPeer\",\"params\":[\"$ENODE_11023\"],\"id\":1}" http://localhost:8547
-
-# v1.6.7 -> v1.8.27
-ENODE_1827=$(curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}' http://localhost:8547 | jq -r '.result.enode')
-curl -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"method\":\"admin_addPeer\",\"params\":[\"$ENODE_1827\"],\"id\":1}" http://localhost:8548
-
-# v1.3.6 -> v1.6.7
-ENODE_167=$(curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}' http://localhost:8548 | jq -r '.result.enode')
-curl -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"method\":\"admin_addPeer\",\"params\":[\"$ENODE_167\"],\"id\":1}" http://localhost:8549
-
-# v1.0.0 -> v1.3.6 (on Windows VM, adjust URLs accordingly)
-ENODE_136=$(curl -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}' http://localhost:8549 | jq -r '.result.enode')
-# Run on Windows VM: geth --admin.addPeer $ENODE_136
-```
 
 ### 5. Validation and Monitoring
 
