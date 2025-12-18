@@ -5,6 +5,37 @@
 
 set -e
 
+# Install prerequisites if not present
+if ! command -v aws &> /dev/null || ! command -v docker &> /dev/null || ! command -v docker-compose &> /dev/null; then
+    echo "Installing prerequisites..."
+    sudo apt update
+    sudo apt install -y unzip ca-certificates curl gnupg lsb-release
+
+    # AWS CLI
+    if ! command -v aws &> /dev/null; then
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
+        rm -rf aws awscliv2.zip
+    fi
+
+    # Docker
+    if ! command -v docker &> /dev/null; then
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt update
+        sudo apt install -y docker-ce docker-ce-cli containerd.io
+        sudo systemctl start docker
+        sudo usermod -aG docker $USER
+    fi
+
+    # Docker Compose
+    if ! command -v docker-compose &> /dev/null; then
+        sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+    fi
+fi
+
 VM_IP="13.220.218.223"
 VM_USER="ubuntu"
 SSH_KEY_PATH="~/Downloads/chain-of-geths.pem"  # Update this to your PEM key path

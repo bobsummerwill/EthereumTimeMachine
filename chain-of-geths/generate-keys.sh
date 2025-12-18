@@ -18,17 +18,17 @@ declare -A versions=(
 EXTERNAL_IP="13.220.218.223"
 WINDOWS_PORT="30308"
 
-# Function to generate nodekey and get enode
+# Function to generate nodekey and get enode using Docker
 generate_enode() {
     local version=$1
     local datadir="data/$version"
     mkdir -p "$datadir"
 
-    # Start geth briefly to generate nodekey
-    timeout 10s geth --datadir "$datadir" --http --http.api admin 2>/dev/null || true
+    # Start geth briefly to generate nodekey using Docker
+    timeout 10s docker run --rm -v "$(pwd)/$datadir:/data" ethereum/client-go:v1.16.7 --datadir /data --http --http.api admin 2>/dev/null || true
 
-    # Get enode
-    enode=$(geth --nodekey "$datadir/nodekey" dump-enode 2>/dev/null)
+    # Get enode using Docker
+    enode=$(docker run --rm -v "$(pwd)/$datadir:/data" ethereum/client-go:v1.16.7 --nodekey /data/nodekey dump-enode 2>/dev/null)
     echo "$enode"
 }
 
