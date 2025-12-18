@@ -1,0 +1,154 @@
+version: '3.8'
+
+services:
+  geth-v1-16-7:
+    image: ethereum/client-go:v1.16.7
+    container_name: geth-v1-16-7
+    command: |
+      --datadir /data
+      --http
+      --http.addr 0.0.0.0
+      --http.api eth,net,web3,personal,admin
+      --allow-insecure-unlock
+      --syncmode full
+      --networkid 1
+      --port 30303
+      --discovery.port 30303
+    ports:
+      - "8545:8545"
+      - "30303:30303"
+    volumes:
+      - ./data/v1.16.7:/data
+    networks:
+      ethereum:
+        ipv4_address: 172.20.0.10
+
+  geth-v1-10-23:
+    image: ethereumtimemachine/geth:v1.10.23
+    container_name: geth-v1-10-23
+    command: |
+      --datadir /data
+      --http
+      --http.addr 0.0.0.0
+      --http.api eth,net,web3,personal,admin
+      --allow-insecure-unlock
+      --syncmode full
+      --networkid 1
+      --port 30304
+      --nodiscover
+      --staticnodes /data/static-nodes.json
+    ports:
+      - "8546:8545"
+      - "30304:30303"
+    volumes:
+      - ./data/v1.10.23:/data
+    depends_on:
+      - geth-v1-16-7
+    networks:
+      ethereum:
+        ipv4_address: 172.20.0.11
+
+  geth-v1-8-27:
+    image: ethereumtimemachine/geth:v1.8.27
+    container_name: geth-v1-8-27
+    command: |
+      --datadir /data
+      --http
+      --http.addr 0.0.0.0
+      --http.api eth,net,web3,personal,admin
+      --allow-insecure-unlock
+      --syncmode full
+      --networkid 1
+      --port 30305
+      --nodiscover
+      --staticnodes /data/static-nodes.json
+    ports:
+      - "8547:8545"
+      - "30305:30303"
+    volumes:
+      - ./data/v1.8.27:/data
+    depends_on:
+      - geth-v1-10-23
+    networks:
+      ethereum:
+        ipv4_address: 172.20.0.12
+
+  geth-v1-6-7:
+    image: ethereumtimemachine/geth:v1.6.7
+    container_name: geth-v1-6-7
+    command: |
+      --datadir /data
+      --http
+      --http.addr 0.0.0.0
+      --http.api eth,net,web3,personal,admin
+      --allow-insecure-unlock
+      --syncmode full
+      --networkid 1
+      --port 30306
+      --nodiscover
+      --staticnodes /data/static-nodes.json
+    ports:
+      - "8548:8545"
+      - "30306:30303"
+    volumes:
+      - ./data/v1.6.7:/data
+    depends_on:
+      - geth-v1-8-27
+    networks:
+      ethereum:
+        ipv4_address: 172.20.0.13
+
+  geth-v1-3-6:
+    image: ethereumtimemachine/geth:v1.3.6
+    container_name: geth-v1-3-6
+    command: |
+      --datadir /data
+      --http
+      --http.addr 0.0.0.0
+      --http.api eth,net,web3,personal,admin
+      --allow-insecure-unlock
+      --syncmode full
+      --networkid 1
+      --port 30307
+      --nodiscover
+      --staticnodes /data/static-nodes.json
+    ports:
+      - "8549:8545"
+      - "30307:30303"
+    volumes:
+      - ./data/v1.3.6:/data
+    depends_on:
+      - geth-v1-6-7
+    networks:
+      ethereum:
+        ipv4_address: 172.20.0.14
+
+  geth-v1-0-0:
+    image: ethereumtimemachine/geth:v1.0.0
+    container_name: geth-v1-0-0
+    command: |
+      --datadir /data
+      --http
+      --http.addr 0.0.0.0
+      --http.api eth,net,web3,personal,admin
+      --allow-insecure-unlock
+      --syncmode full
+      --networkid 1
+      --port 30308
+      --discovery.port 30308
+    ports:
+      - "8550:8545"
+      - "30308:30303"
+    volumes:
+      - ./data/v1.0.0:/data
+    depends_on:
+      - geth-v1-3-6
+    networks:
+      - ethereum
+
+networks:
+  ethereum:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
