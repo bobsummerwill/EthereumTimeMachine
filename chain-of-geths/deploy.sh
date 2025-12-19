@@ -36,7 +36,7 @@ else
     exit 1
 fi
 
-VM_IP="13.220.218.223"
+VM_IP="54.81.90.194"
 VM_USER="ubuntu"
 
 # Update this to your PEM key path. Note: don't quote ~ (tilde expansion doesn't happen in quotes).
@@ -52,7 +52,7 @@ echo "Building Docker images locally..."
 
 echo "Saving Docker images..."
 mkdir -p images
-for version in v1.16.7 v1.10.23 v1.8.27 v1.6.7 v1.3.6; do
+for version in v1.16.7 v1.11.6 v1.10.0 v1.9.25 v1.3.6; do
     docker save ethereumtimemachine/geth:$version > images/geth-$version.tar
 done
 

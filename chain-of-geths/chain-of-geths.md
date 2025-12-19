@@ -2,20 +2,25 @@
 
 ## Goal
 
-The goal of the EthereumTimeMachine project is to sync a Geth 1.0 node by chaining together successively older Geth versions that share overlapping ETH protocols. This allows bridging from the latest PoW-capable Geth (v1.10.23) down to Frontier-era Geth (v1.0.x), enabling historical blockchain data access without requiring every intermediate version.
+The goal of the EthereumTimeMachine project is to sync a Geth 1.0 node by chaining together successively older Geth versions that share overlapping ETH protocols. This allows bridging from the latest PoS-capable node down to Frontier-era Geth (v1.0.x), enabling historical blockchain data access without requiring every intermediate version.
 
 ## Minimal Version Chain
 
 To sync a Geth 1.0 node from the current Ethereum mainnet, we need to bridge from the latest ETH protocol (68) down to ETH 60. The minimal set of versions needed for complete protocol compatibility is:
 
-- **Geth v1.16.7** (ETH 63-68) - Latest version, can peer with current mainnet
-- **Geth v1.10.23** (ETH 63) - Latest PoW version, bridges to v1.16 via eth/63
-- **Geth v1.8.27** (ETH 62, 63) - Bridges to v1.10 via eth/63, to v1.6 via eth/62
-- **Geth v1.6.7** (ETH 61, 62, 63) - Overlaps with v1.8 (eth/62/63) and early versions (eth/61)
-- **Geth v1.3.6** (ETH 60, 61, 62) - Bridges to v1.6 (eth/61) and Frontier (eth/60/61)
+- **Geth v1.16.7** (ETH 68, 69) - Latest version, can peer with current mainnet
+- **Geth v1.11.6** (ETH 66, 67, 68) - Bridges `v1.16.7` ↔ `v1.10.0`
+- **Geth v1.10.0** (ETH 64, 65, 66) - Bridges `v1.11.6` ↔ `v1.9.25`
+- **Geth v1.9.25** (ETH 63, 64, 65) - Bridges `v1.10.0` ↔ `v1.3.6`
+- **Geth v1.3.6** (ETH 61, 62, 63) - Oldest Linux node in the Compose stack
 - **Geth v1.0.x** (ETH 60, 61) - Original Frontier client
 
 This chain ensures every adjacent pair shares at least one protocol version, allowing the top node to sync from mainnet and propagate data down to Geth 1.0.
+
+Notes on protocol compatibility:
+- `v1.16.7` supports `eth/68` and `eth/69`, so it cannot peer directly with `v1.10.0` (`eth/64`, `eth/65`, `eth/66`).
+- `v1.11.6` is inserted specifically because it supports `eth/66`, `eth/67`, and `eth/68`.
+- `v1.10.0` also cannot peer directly with `v1.3.6` (`eth/61`, `eth/62`, `eth/63`), so `v1.9.25` is used to bridge `eth/65 → eth/63`.
 
 ## Detailed Implementation Plan
 
@@ -37,7 +42,7 @@ Deployment is fully automated using the `deploy.sh` script from your local machi
 
 - Pregenerating node keys and static nodes for consistent enode IDs and automatic peering
 - Building Docker images locally
-- Deploying to the Ubuntu AWS EC2 instance (m6a.xlarge at 13.220.218.223)
+- Deploying to the Ubuntu AWS EC2 instance (m6a.2xlarge at 54.81.90.194)
 - Starting the Docker Compose chain (v1.16.7 through v1.3.6) with automatic container wiring via static nodes
 - Remotely setting up Geth v1.0.0 on the Windows VM (t2.large at 18.232.131.32) via AWS Systems Manager
 

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   geth-v1-16-7:
     image: ethereumtimemachine/geth:v1.16.7
@@ -28,9 +26,12 @@ services:
       ethereum:
         ipv4_address: 172.20.0.10
 
-  geth-v1-10-23:
-    image: ethereumtimemachine/geth:v1.10.23
-    container_name: geth-v1-10-23
+  # Bridge node: eth/68<->eth/66 compatibility.
+  # Geth v1.11.x supports ETH66/67/68, allowing peering with v1.16.7 (ETH68/69)
+  # and v1.10.0 (ETH64/65/66) via eth/68 and eth/66.
+  geth-v1-11-6:
+    image: ethereumtimemachine/geth:v1.11.6
+    container_name: geth-v1-11-6
     command: |
       --datadir /data
       --http
@@ -40,22 +41,51 @@ services:
       --allow-insecure-unlock
       --syncmode full
       --networkid 1
-      --port 30304
+      --port 30308
       --nodiscover
     ports:
-      - "8546:8545"
-      - "30304:30304"
+      - "8550:8545"
+      - "30308:30308"
     volumes:
-      - ./output/data/v1.10.23:/data
+      - ./output/data/v1.11.6:/data
     depends_on:
       - geth-v1-16-7
     networks:
       ethereum:
-        ipv4_address: 172.20.0.11
+        ipv4_address: 172.20.0.15
 
-  geth-v1-8-27:
-    image: ethereumtimemachine/geth:v1.8.27
-    container_name: geth-v1-8-27
+  # Bridge node: eth/66<->eth/65 compatibility.
+  # Geth v1.10.0 supports ETH64/65/66.
+  geth-v1-10-0:
+    image: ethereumtimemachine/geth:v1.10.0
+    container_name: geth-v1-10-0
+    command: |
+      --datadir /data
+      --http
+      --http.addr 0.0.0.0
+      --http.vhosts *
+      --http.api eth,net,web3,personal,admin
+      --allow-insecure-unlock
+      --syncmode full
+      --networkid 1
+      --port 30309
+      --nodiscover
+    ports:
+      - "8551:8545"
+      - "30309:30309"
+    volumes:
+      - ./output/data/v1.10.0:/data
+    depends_on:
+      - geth-v1-11-6
+    networks:
+      ethereum:
+        ipv4_address: 172.20.0.16
+
+  # Bridge node: eth/65<->eth/63 compatibility.
+  # Geth v1.9.25 supports eth/63, eth/64, eth/65.
+  geth-v1-9-25:
+    image: ethereumtimemachine/geth:v1.9.25
+    container_name: geth-v1-9-25
     command: |
       --datadir /data
       --rpc
@@ -63,40 +93,18 @@ services:
       --rpcvhosts *
       --rpcapi eth,net,web3
       --networkid 1
-      --port 30305
+      --port 30310
       --nodiscover
     ports:
-      - "8547:8545"
-      - "30305:30305"
+      - "8552:8545"
+      - "30310:30310"
     volumes:
-      - ./output/data/v1.8.27:/data
+      - ./output/data/v1.9.25:/data
     depends_on:
-      - geth-v1-10-23
+      - geth-v1-10-0
     networks:
       ethereum:
-        ipv4_address: 172.20.0.12
-
-  geth-v1-6-7:
-    image: ethereumtimemachine/geth:v1.6.7
-    container_name: geth-v1-6-7
-    command: |
-      --datadir /data
-      --rpc
-      --rpcaddr 0.0.0.0
-      --rpcapi eth,net,web3
-      --networkid 1
-      --port 30306
-      --nodiscover
-    ports:
-      - "8548:8545"
-      - "30306:30306"
-    volumes:
-      - ./output/data/v1.6.7:/data
-    depends_on:
-      - geth-v1-8-27
-    networks:
-      ethereum:
-        ipv4_address: 172.20.0.13
+        ipv4_address: 172.20.0.17
 
   geth-v1-3-6:
     image: ethereumtimemachine/geth:v1.3.6
@@ -115,7 +123,7 @@ services:
     volumes:
       - ./output/data/v1.3.6:/data
     depends_on:
-      - geth-v1-6-7
+      - geth-v1-9-25
     networks:
       ethereum:
         ipv4_address: 172.20.0.14
@@ -157,18 +165,18 @@ services:
       # First node is treated as the “top” reference for lag metrics.
       NODE_URLS: >-
         v1.16.7=http://geth-v1-16-7:8545,
-        v1.10.23=http://geth-v1-10-23:8545,
-        v1.8.27=http://geth-v1-8-27:8545,
-        v1.6.7=http://geth-v1-6-7:8545,
+        v1.11.6=http://geth-v1-11-6:8545,
+        v1.10.0=http://geth-v1-10-0:8545,
+        v1.9.25=http://geth-v1-9-25:8545,
         v1.3.6=http://geth-v1-3-6:8545
       POLL_INTERVAL_SECONDS: "10"
     ports:
       - "9100:9100"
     depends_on:
       - geth-v1-16-7
-      - geth-v1-10-23
-      - geth-v1-8-27
-      - geth-v1-6-7
+      - geth-v1-11-6
+      - geth-v1-10-0
+      - geth-v1-9-25
       - geth-v1-3-6
     networks:
       - ethereum

@@ -37,24 +37,29 @@ DATA_ROOT="$OUTPUT_DIR/data"
 mkdir -p "$DATA_ROOT"
 
 # Versions and their (docker-network) IPs/ports. Must match docker-compose.yml.
-versions=(v1.16.7 v1.10.23 v1.8.27 v1.6.7 v1.3.6)
+# NOTE: Some adjacent releases don't overlap in `eth/*` protocol versions.
+# These bridge nodes are required for stable peering:
+# - v1.11.6: ETH66/67/68 (bridges v1.16.7 <-> v1.10.0)
+# - v1.10.0: ETH64/65/66 (bridges v1.11.6 <-> v1.9.25)
+# - v1.9.25:  eth63/64/65 (bridges v1.10.0 <-> v1.3.6)
+versions=(v1.16.7 v1.11.6 v1.10.0 v1.9.25 v1.3.6)
 declare -A ip_by_version=(
     ["v1.16.7"]="172.20.0.10"
-    ["v1.10.23"]="172.20.0.11"
-    ["v1.8.27"]="172.20.0.12"
-    ["v1.6.7"]="172.20.0.13"
+    ["v1.11.6"]="172.20.0.15"
+    ["v1.10.0"]="172.20.0.16"
+    ["v1.9.25"]="172.20.0.17"
     ["v1.3.6"]="172.20.0.14"
 )
 declare -A port_by_version=(
     ["v1.16.7"]="30303"
-    ["v1.10.23"]="30304"
-    ["v1.8.27"]="30305"
-    ["v1.6.7"]="30306"
+    ["v1.11.6"]="30308"
+    ["v1.10.0"]="30309"
+    ["v1.9.25"]="30310"
     ["v1.3.6"]="30307"
 )
 
 # Ubuntu external IP for connecting to v1.3.6 from Windows
-EXTERNAL_IP="13.220.218.223"
+EXTERNAL_IP="54.81.90.194"
 WINDOWS_PORT="${port_by_version[v1.3.6]}"
 
 # Windows VM public IP and p2p port for Geth v1.0.0.
@@ -173,13 +178,13 @@ fi
 v1_0_0_enode="enode://$windows_pubkey@$WINDOWS_IP:$WINDOWS_P2P_PORT"
 echo "$v1_0_0_enode" > "$OUTPUT_DIR/v1.0.0_enode.txt"
 
-# Create static-nodes.json for each older version
-for version in v1.10.23 v1.8.27 v1.6.7 v1.3.6; do
+# Create static-nodes.json for each non-top version
+for version in v1.11.6 v1.10.0 v1.9.25 v1.3.6; do
     case $version in
-        v1.10.23) next="v1.16.7" ;;
-        v1.8.27) next="v1.10.23" ;;
-        v1.6.7) next="v1.8.27" ;;
-        v1.3.6) next="v1.6.7" ;;
+        v1.11.6) next="v1.16.7" ;;
+        v1.10.0) next="v1.11.6" ;;
+        v1.9.25) next="v1.10.0" ;;
+        v1.3.6) next="v1.9.25" ;;
     esac
 
     datadir="$DATA_ROOT/$version"

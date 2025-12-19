@@ -35,7 +35,7 @@ def parse_node_urls(spec: str) -> List[Tuple[str, str]]:
     Format:
       name=url,name=url
     Example:
-      v1.16.7=http://geth-v1-16-7:8545,v1.10.23=http://geth-v1-10-23:8545
+      v1.16.7=http://geth-v1-16-7:8545,v1.10.0=http://geth-v1-10-0:8545
     """
     spec = (spec or "").strip()
     if not spec:
@@ -195,4 +195,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

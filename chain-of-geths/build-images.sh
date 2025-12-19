@@ -27,27 +27,27 @@ RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth
     rm -rf /tmp/*
 EOF
             ;;
-        v1.10.23)
+        v1.11.6)
             cat >> Dockerfile << 'EOF'
-RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.10.23-d901d853.tar.gz && \
+RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.11.6-ea9e62ca.tar.gz && \
     tar -xzf /tmp/geth.tar.gz -C /tmp && \
-    mv /tmp/geth-linux-amd64-1.10.23-d901d853/geth /usr/local/bin/geth && \
+    mv /tmp/geth-linux-amd64-1.11.6-ea9e62ca/geth /usr/local/bin/geth && \
     rm -rf /tmp/*
 EOF
             ;;
-        v1.8.27)
+        v1.10.0)
             cat >> Dockerfile << 'EOF'
-RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.8.27-4bcc0a37.tar.gz && \
+RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.10.0-56dec25a.tar.gz && \
     tar -xzf /tmp/geth.tar.gz -C /tmp && \
-    mv /tmp/geth-linux-amd64-1.8.27-4bcc0a37/geth /usr/local/bin/geth && \
+    mv /tmp/geth-linux-amd64-1.10.0-56dec25a/geth /usr/local/bin/geth && \
     rm -rf /tmp/*
 EOF
             ;;
-        v1.6.7)
+        v1.9.25)
             cat >> Dockerfile << 'EOF'
-RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.6.7-ab5646c5.tar.gz && \
+RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.9.25-e7872729.tar.gz && \
     tar -xzf /tmp/geth.tar.gz -C /tmp && \
-    mv /tmp/geth-linux-amd64-1.6.7-ab5646c5/geth /usr/local/bin/geth && \
+    mv /tmp/geth-linux-amd64-1.9.25-e7872729/geth /usr/local/bin/geth && \
     rm -rf /tmp/*
 EOF
             ;;
@@ -78,9 +78,9 @@ EOF
 # Build images
 versions=(
     "v1.16.7"
-    "v1.10.23"
-    "v1.8.27"
-    "v1.6.7"
+    "v1.11.6"
+    "v1.10.0"
+    "v1.9.25"
     "v1.3.6"
 )
 
