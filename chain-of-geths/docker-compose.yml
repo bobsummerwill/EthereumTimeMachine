@@ -36,7 +36,6 @@ services:
       --networkid 1
       --port 30304
       --nodiscover
-      --staticnodes /data/static-nodes.json
     ports:
       - "8546:8545"
       - "30304:30304"
@@ -61,7 +60,6 @@ services:
       --networkid 1
       --port 30305
       --nodiscover
-      --staticnodes /data/static-nodes.json
     ports:
       - "8547:8545"
       - "30305:30305"
@@ -86,7 +84,6 @@ services:
       --networkid 1
       --port 30306
       --nodiscover
-      --staticnodes /data/static-nodes.json
     ports:
       - "8548:8545"
       - "30306:30306"
@@ -111,7 +108,6 @@ services:
       --networkid 1
       --port 30307
       --nodiscover
-      --staticnodes /data/static-nodes.json
     ports:
       - "8549:8545"
       - "30307:30307"
