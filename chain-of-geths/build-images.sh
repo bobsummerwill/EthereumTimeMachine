@@ -8,12 +8,13 @@ set -e
 # Create Dockerfile for each version
 create_dockerfile() {
     local version=$1
-    local alpine_version=$2
     cat > Dockerfile << EOF
-FROM alpine:$alpine_version
+FROM debian:bullseye-slim
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates wget
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates wget bzip2 xz-utils \
+    && rm -rf /var/lib/apt/lists/*
 
 # Download and install geth binary
 EOF
@@ -67,17 +68,16 @@ EOF
 }
 
 # Build images
-versions_alpine=(
-    "v1.10.23:3.17"
-    "v1.8.27:3.11"
-    "v1.6.7:3.7"
-    "v1.3.6:3.5"
+versions=(
+    "v1.10.23"
+    "v1.8.27"
+    "v1.6.7"
+    "v1.3.6"
 )
 
-for item in "${versions_alpine[@]}"; do
-    IFS=':' read -r version alpine_version <<< "$item"
-    echo "Building image for $version using Alpine $alpine_version..."
-    create_dockerfile "$version" "$alpine_version"
+for version in "${versions[@]}"; do
+    echo "Building image for $version using Debian bullseye-slim..."
+    create_dockerfile "$version"
     docker build -t ethereumtimemachine/geth:$version .
     rm Dockerfile
 done
