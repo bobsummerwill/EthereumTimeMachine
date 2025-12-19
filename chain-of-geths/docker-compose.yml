@@ -52,11 +52,9 @@ services:
     container_name: geth-v1-8-27
     command: |
       --datadir /data
-      --http
-      --http.addr 0.0.0.0
-      --http.api eth,net,web3,personal,admin
-      --allow-insecure-unlock
-      --syncmode full
+      --rpc
+      --rpcaddr 0.0.0.0
+      --rpcapi eth,net,web3
       --networkid 1
       --port 30305
       --nodiscover
@@ -76,11 +74,9 @@ services:
     container_name: geth-v1-6-7
     command: |
       --datadir /data
-      --http
-      --http.addr 0.0.0.0
-      --http.api eth,net,web3,personal,admin
-      --allow-insecure-unlock
-      --syncmode full
+      --rpc
+      --rpcaddr 0.0.0.0
+      --rpcapi eth,net,web3
       --networkid 1
       --port 30306
       --nodiscover
@@ -100,11 +96,9 @@ services:
     container_name: geth-v1-3-6
     command: |
       --datadir /data
-      --http
-      --http.addr 0.0.0.0
-      --http.api eth,net,web3,personal,admin
-      --allow-insecure-unlock
-      --syncmode full
+      --rpc
+      --rpcaddr 0.0.0.0
+      --rpcapi eth,net,web3
       --networkid 1
       --port 30307
       --nodiscover
