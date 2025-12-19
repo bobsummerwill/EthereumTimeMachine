@@ -66,7 +66,7 @@ echo "Copying files to VM..."
 # Ensure remote directory exists before copying.
 ssh -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" "mkdir -p /home/$VM_USER/chain-of-geths"
 
-scp -i "$SSH_KEY_PATH" -r data images generate-keys.sh build-images.sh docker-compose.yml "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
+scp -i "$SSH_KEY_PATH" -r data images monitoring generate-keys.sh build-images.sh docker-compose.yml "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
 
 echo "Running setup on Ubuntu VM..."
 ssh -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" << 'EOF'
