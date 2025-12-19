@@ -93,6 +93,7 @@ services:
       --rpcvhosts *
       --rpcapi eth,net,web3
       --networkid 1
+      --syncmode full
       --port 30310
       --nodiscover
     ports:
