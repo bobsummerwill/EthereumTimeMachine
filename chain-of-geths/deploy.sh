@@ -5,6 +5,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Install prerequisites if not present
 if ! command -v aws &> /dev/null || ! command -v docker &> /dev/null || ! command -v docker-compose &> /dev/null; then
     echo "Installing prerequisites..."
@@ -38,7 +41,10 @@ fi
 
 VM_IP="13.220.218.223"
 VM_USER="ubuntu"
-SSH_KEY_PATH="~/Downloads/chain-of-geths.pem"  # Update this to your PEM key path
+
+# Update this to your PEM key path. Note: don't quote ~ (tilde expansion doesn't happen in quotes).
+SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/Downloads/chain-of-geths.pem}"
+
 WINDOWS_IP="18.232.131.32"
 # Get Windows instance ID from IP
 WINDOWS_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=network-interface.addresses.association.public-ip,Values=$WINDOWS_IP" --query 'Reservations[].Instances[].InstanceId' --output text)
@@ -56,10 +62,14 @@ for version in v1.10.23 v1.8.27 v1.6.7 v1.3.6; do
 done
 
 echo "Copying files to VM..."
-scp -i $SSH_KEY_PATH -r data images generate-keys.sh build-images.sh docker-compose.yml ubuntu@$VM_IP:/home/ubuntu/chain-of-geths/
+
+# Ensure remote directory exists before copying.
+ssh -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" "mkdir -p /home/$VM_USER/chain-of-geths"
+
+scp -i "$SSH_KEY_PATH" -r data images generate-keys.sh build-images.sh docker-compose.yml "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
 
 echo "Running setup on Ubuntu VM..."
-ssh -i $SSH_KEY_PATH ubuntu@$VM_IP << 'EOF'
+ssh -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" << 'EOF'
 cd /home/ubuntu/chain-of-geths
 
 # Load Docker images

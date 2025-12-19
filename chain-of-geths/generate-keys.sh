@@ -1,40 +1,58 @@
 #!/bin/bash
 
 # Script to generate node keys and static nodes for Geth chain
-# Run this on a machine with geth installed
+# Run this on a machine with Docker installed (it uses a recent geth container to run dump-enode)
 
 set -e
 
-# Versions and their IPs
-declare -A versions=(
-    ["v1.16.7"]="172.20.0.10:30303"
-    ["v1.10.23"]="172.20.0.11:30304"
-    ["v1.8.27"]="172.20.0.12:30305"
-    ["v1.6.7"]="172.20.0.13:30306"
-    ["v1.3.6"]="172.20.0.14:30307"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Versions and their (docker-network) IPs/ports. Must match docker-compose.yml.
+versions=(v1.16.7 v1.10.23 v1.8.27 v1.6.7 v1.3.6)
+declare -A ip_by_version=(
+    ["v1.16.7"]="172.20.0.10"
+    ["v1.10.23"]="172.20.0.11"
+    ["v1.8.27"]="172.20.0.12"
+    ["v1.6.7"]="172.20.0.13"
+    ["v1.3.6"]="172.20.0.14"
+)
+declare -A port_by_version=(
+    ["v1.16.7"]="30303"
+    ["v1.10.23"]="30304"
+    ["v1.8.27"]="30305"
+    ["v1.6.7"]="30306"
+    ["v1.3.6"]="30307"
 )
 
 # Ubuntu external IP for connecting to v1.3.6 from Windows
 EXTERNAL_IP="13.220.218.223"
-WINDOWS_PORT="30308"
+WINDOWS_PORT="${port_by_version[v1.3.6]}"
 
 # Function to generate nodekey and get enode using Docker
 generate_enode() {
     local version=$1
     local datadir="data/$version"
+    local ip="${ip_by_version[$version]}"
+    local port="${port_by_version[$version]}"
     mkdir -p "$datadir"
 
     # Start geth briefly to generate nodekey using Docker
     timeout 10s docker run --rm -v "$(pwd)/$datadir:/data" ethereum/client-go:v1.16.7 --datadir /data --http --http.api admin 2>/dev/null || true
 
     # Get enode using Docker
-    enode=$(docker run --rm -v "$(pwd)/$datadir:/data" ethereum/client-go:v1.16.7 --nodekey /data/nodekey dump-enode 2>/dev/null)
-    echo "$enode"
+    local raw
+    raw=$(docker run --rm -v "$(pwd)/$datadir:/data" ethereum/client-go:v1.16.7 --nodekey /data/nodekey --port "$port" dump-enode 2>/dev/null)
+    # dump-enode returns something like: enode://<pubkey>@[::]:30303
+    # Normalize to a usable address in our docker-compose network.
+    local pubkey
+    pubkey=$(echo "$raw" | sed -E 's#^enode://([^@]+)@.*#\1#')
+    echo "enode://$pubkey@$ip:$port"
 }
 
 # Generate for each version
 declare -A enodes
-for version in "${!versions[@]}"; do
+for version in "${versions[@]}"; do
     echo "Generating key for $version..."
     enode=$(generate_enode "$version")
     enodes[$version]="$enode"
@@ -51,14 +69,15 @@ for version in v1.10.23 v1.8.27 v1.6.7 v1.3.6; do
     esac
 
     datadir="data/$version"
-    echo "[\"${enodes[$next]}\"]" > "$datadir/static-nodes.json"
+    printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
     echo "Created static-nodes.json for $version pointing to $next"
 done
 
 # For v1.0.0 (Windows), output the enode of v1.3.6 for connection
 v1_3_6_enode="${enodes[v1.3.6]}"
-# Replace the IP with external IP
-windows_enode=$(echo "$v1_3_6_enode" | sed "s/@[^:]*:/@$EXTERNAL_IP:/")
+# Replace the docker-network IP with the VM's public IP so the Windows VM can reach it.
+# Port remains the published p2p port for v1.3.6.
+windows_enode=$(echo "$v1_3_6_enode" | sed -E "s/@[^:]+:/@$EXTERNAL_IP:/")
 echo "$windows_enode" > windows_enode.txt
 echo ""
 echo "For Windows Geth v1.0.0, use this enode to connect to v1.3.6:"

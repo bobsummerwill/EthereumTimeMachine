@@ -27,6 +27,10 @@ The entire setup is automated using the scripts in the `/chain-of-geths/` direct
 - `build-images.sh`: Builds Docker images with downloaded binaries
 - `deploy.sh`: Deploys everything to AWS VMs
 
+Notes:
+- The Docker Compose stack runs **v1.16.7 → v1.3.6** only. Geth **v1.0.x is run on Windows**, since there are no maintained pre-built Linux binaries.
+- The bridge from Windows (v1.0.x) into the chain is done by pointing v1.0.x at the Ubuntu host's **v1.3.6 p2p port** via `--bootnodes`.
+
 ### 2. AWS Deployment
 
 Deployment is fully automated using the `deploy.sh` script from your local machine. It handles:
