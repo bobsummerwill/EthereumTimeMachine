@@ -52,7 +52,7 @@ echo "Building Docker images locally..."
 
 echo "Saving Docker images..."
 mkdir -p images
-for version in v1.10.23 v1.8.27 v1.6.7 v1.3.6; do
+for version in v1.16.7 v1.10.23 v1.8.27 v1.6.7 v1.3.6; do
     docker save ethereumtimemachine/geth:$version > images/geth-$version.tar
 done
 
