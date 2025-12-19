@@ -10,6 +10,11 @@ services:
       --http.addr 0.0.0.0
       --http.vhosts *
       --http.api eth,net,web3,personal,admin
+      # Engine API (auth RPC) for the consensus client (post-Merge)
+      --authrpc.addr 0.0.0.0
+      --authrpc.port 8551
+      --authrpc.vhosts *
+      --authrpc.jwtsecret /data/jwtsecret
       --allow-insecure-unlock
       --syncmode full
       --networkid 1
@@ -116,6 +121,28 @@ services:
       ethereum:
         ipv4_address: 172.20.0.14
 
+  # Consensus client (beacon node) for post-Merge mainnet.
+  # Runs in non-validating mode; uses checkpoint sync.
+  lighthouse:
+    image: sigp/lighthouse:latest
+    container_name: lighthouse
+    command: >-
+      lighthouse
+      bn
+      --network mainnet
+      --datadir /data
+      --execution-endpoint http://geth-v1-16-7:8551
+      --execution-jwt /jwt/jwtsecret
+      --checkpoint-sync-url https://mainnet.checkpoint.sigp.io
+      --disable-deposit-contract-sync
+    volumes:
+      - lighthouse-data:/data
+      - ./output/data/v1.16.7/jwtsecret:/jwt/jwtsecret:ro
+    depends_on:
+      - geth-v1-16-7
+    networks:
+      - ethereum
+
   # --- Monitoring (Prometheus + Grafana) ---
   # This is intentionally JSON-RPC based (not geth --metrics) so it works across older versions.
 
@@ -193,3 +220,4 @@ networks:
 volumes:
   prometheus-data:
   grafana-data:
+  lighthouse-data:

@@ -113,6 +113,23 @@ generate_enode() {
     echo "enode://$pubkey@$ip:$port"
 }
 
+# Ensure the Engine API JWT secret exists for the *top* node (v1.16.7).
+# Post-Merge execution clients require a consensus client connected over the Engine API,
+# which uses a shared JWT secret file.
+ensure_jwtsecret() {
+    local datadir="$DATA_ROOT/v1.16.7"
+    mkdir -p "$datadir"
+    if [[ ! -f "$datadir/jwtsecret" ]]; then
+        if command -v openssl >/dev/null 2>&1; then
+            openssl rand -hex 32 | tr -d '\n' > "$datadir/jwtsecret"
+        else
+            od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$datadir/jwtsecret"
+        fi
+        chmod 600 "$datadir/jwtsecret" || true
+        echo "Created JWT secret for Engine API: $datadir/jwtsecret"
+    fi
+}
+
 # Generate for each version
 declare -A enodes
 for version in "${versions[@]}"; do
@@ -121,6 +138,8 @@ for version in "${versions[@]}"; do
     enodes[$version]="$enode"
     echo "Enode for $version: $enode"
 done
+
+ensure_jwtsecret
 
 # Generate a deterministic nodekey + enode for the Windows Geth v1.0.0 node.
 # Note: this does NOT require running v1.0.0; it just derives the enode from the nodekey.
