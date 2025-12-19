@@ -79,7 +79,6 @@ services:
       --datadir /data
       --rpc
       --rpcaddr 0.0.0.0
-      --rpcvhosts *
       --rpcapi eth,net,web3
       --networkid 1
       --port 30306
@@ -102,7 +101,6 @@ services:
       --datadir /data
       --rpc
       --rpcaddr 0.0.0.0
-      --rpcvhosts *
       --rpcapi eth,net,web3
       --networkid 1
       --port 30307
