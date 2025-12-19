@@ -25,3 +25,11 @@ The pre-provisioned dashboard is **“Chain of Geths – Sync Progress”**, wit
 - lag vs the top node (v1.16.7)
 - remaining blocks while syncing
 - peer count
+
+## Generated artifacts
+
+[`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh:1) writes its outputs under `chain-of-geths/output/` (ignored by git via [`.gitignore`](.gitignore:1)).
+
+Example outputs:
+- [`chain-of-geths/output/windows_enode.txt`](chain-of-geths/output/windows_enode.txt:1)
+- [`chain-of-geths/output/data/v1.10.23/static-nodes.json`](chain-of-geths/output/data/v1.10.23/static-nodes.json:1)

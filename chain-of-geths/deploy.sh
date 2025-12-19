@@ -66,7 +66,7 @@ echo "Copying files to VM..."
 # Ensure remote directory exists before copying.
 ssh -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" "mkdir -p /home/$VM_USER/chain-of-geths"
 
-scp -i "$SSH_KEY_PATH" -r data images monitoring generate-keys.sh build-images.sh docker-compose.yml "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
+scp -i "$SSH_KEY_PATH" -r output images monitoring generate-keys.sh build-images.sh docker-compose.yml "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
 
 echo "Running setup on Ubuntu VM..."
 ssh -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" << 'EOF'
@@ -84,16 +84,21 @@ echo "Chain started. Check logs with: docker-compose logs -f"
 EOF
 
 echo "Setting up Windows VM..."
-WINDOWS_ENODE=$(cat windows_enode.txt)
+WINDOWS_ENODE=$(cat output/windows_enode.txt)
+
+# Optional: enforce a deterministic enode for Windows Geth v1.0.0
+# by supplying a pre-generated nodekey.
+WINDOWS_NODEKEY=$(cat output/data/v1.0.0/nodekey)
 aws ssm send-command \
     --instance-ids $WINDOWS_INSTANCE_ID \
     --document-name AWS-RunPowerShellScript \
     --parameters commands="[
         'mkdir C:\\geth-data',
+        'Set-Content -Path C:\\geth-data\\nodekey -Value \"$WINDOWS_NODEKEY\" -NoNewline',
         'Invoke-WebRequest -Uri https://github.com/ethereum/go-ethereum/releases/download/v1.0.0/Geth-Win64-20150729141955-1.0.0-0cdc764.zip -OutFile C:\\geth.zip',
         'Expand-Archive C:\\geth.zip C:\\geth',
         'cd C:\\geth',
-        'Start-Process -FilePath .\\geth.exe -ArgumentList \"--datadir C:\\geth-data --nodiscover --bootnodes $WINDOWS_ENODE --http --http.api eth,net,web3 --syncmode full --networkid 1\" -NoNewWindow'
+        'Start-Process -FilePath .\\geth.exe -ArgumentList \"--datadir C:\\geth-data --nodekey C:\\geth-data\\nodekey --port 30308 --nodiscover --bootnodes $WINDOWS_ENODE --http --http.api eth,net,web3 --syncmode full --networkid 1\" -NoNewWindow'
     ]" \
     --output text
 

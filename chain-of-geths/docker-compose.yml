@@ -18,7 +18,7 @@ services:
       - "8545:8545"
       - "30303:30303"
     volumes:
-      - ./data/v1.16.7:/data
+      - ./output/data/v1.16.7:/data
     networks:
       ethereum:
         ipv4_address: 172.20.0.10
@@ -41,7 +41,7 @@ services:
       - "8546:8545"
       - "30304:30304"
     volumes:
-      - ./data/v1.10.23:/data
+      - ./output/data/v1.10.23:/data
     depends_on:
       - geth-v1-16-7
     networks:
@@ -66,7 +66,7 @@ services:
       - "8547:8545"
       - "30305:30305"
     volumes:
-      - ./data/v1.8.27:/data
+      - ./output/data/v1.8.27:/data
     depends_on:
       - geth-v1-10-23
     networks:
@@ -91,7 +91,7 @@ services:
       - "8548:8545"
       - "30306:30306"
     volumes:
-      - ./data/v1.6.7:/data
+      - ./output/data/v1.6.7:/data
     depends_on:
       - geth-v1-8-27
     networks:
@@ -116,7 +116,7 @@ services:
       - "8549:8545"
       - "30307:30307"
     volumes:
-      - ./data/v1.3.6:/data
+      - ./output/data/v1.3.6:/data
     depends_on:
       - geth-v1-6-7
     networks:
