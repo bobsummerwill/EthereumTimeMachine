@@ -123,6 +123,69 @@ services:
       ethereum:
         ipv4_address: 172.20.0.14
 
+  # --- Monitoring (Prometheus + Grafana) ---
+  # This is intentionally JSON-RPC based (not geth --metrics) so it works across older versions.
+
+  geth-exporter:
+    build:
+      context: ./monitoring/exporter
+    container_name: geth-exporter
+    environment:
+      # First node is treated as the “top” reference for lag metrics.
+      NODE_URLS: >-
+        v1.16.7=http://geth-v1-16-7:8545,
+        v1.10.23=http://geth-v1-10-23:8545,
+        v1.8.27=http://geth-v1-8-27:8545,
+        v1.6.7=http://geth-v1-6-7:8545,
+        v1.3.6=http://geth-v1-3-6:8545
+      POLL_INTERVAL_SECONDS: "10"
+    ports:
+      - "9100:9100"
+    depends_on:
+      - geth-v1-16-7
+      - geth-v1-10-23
+      - geth-v1-8-27
+      - geth-v1-6-7
+      - geth-v1-3-6
+    networks:
+      - ethereum
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - geth-exporter
+    networks:
+      - ethereum
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      # For quick local use; change for any exposed deployment.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - ethereum
+
   # NOTE: Geth v1.0.0 is intentionally NOT part of this Compose stack.
   # There are no maintained Linux binaries for v1.0.0; the project runs it on a Windows VM
   # and points it at geth-v1-3-6 via --bootnodes.
@@ -133,3 +196,7 @@ networks:
     ipam:
       config:
         - subnet: 172.20.0.0/16
+
+volumes:
+  prometheus-data:
+  grafana-data:

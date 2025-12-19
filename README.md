@@ -11,3 +11,17 @@ Start here:
 - Automation scripts: `chain-of-geths/generate-keys.sh`, `chain-of-geths/build-images.sh`, `chain-of-geths/deploy.sh`
 
 Note: **Geth v1.0.x is run on Windows** (no maintained pre-built Linux binaries). The Windows node is bootstrapped to the chain by connecting to the Ubuntu host's Geth v1.3.6 via `--bootnodes`.
+
+## Visual sync progress (Grafana)
+
+The Compose stack includes Prometheus + Grafana and a small JSON-RPC exporter.
+
+- Grafana: http://localhost:3000 (default `admin` / `admin`) via [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:1)
+- Prometheus: http://localhost:9090
+- Exporter metrics: http://localhost:9100/metrics
+
+The pre-provisioned dashboard is **“Chain of Geths – Sync Progress”**, with panels for:
+- block height per node
+- lag vs the top node (v1.16.7)
+- remaining blocks while syncing
+- peer count
