@@ -75,20 +75,30 @@ generate_enode() {
     local port="${port_by_version[$version]}"
     mkdir -p "$datadir"
 
-    # Generate nodekey at a stable location (data/<version>/nodekey).
-    # For geth --nodekey, the file is expected to contain 64 hex characters (32 bytes) (no 0x prefix).
-    if [[ ! -f "$datadir/nodekey" ]]; then
-        if command -v openssl >/dev/null 2>&1; then
-            openssl rand -hex 32 | tr -d '\n' > "$datadir/nodekey"
-        else
-            # Fallback: hex-encode 32 bytes from /dev/urandom.
-            od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$datadir/nodekey"
-        fi
-        chmod 600 "$datadir/nodekey" || true
+    # v1.11.x expects node identity resources under <datadir>/geth/.
+    # If a nodekey exists at the datadir root, Geth warns that it is deprecated.
+    local nodekey_path
+    if [[ "$version" == "v1.11.6" ]]; then
+        mkdir -p "$datadir/geth"
+        nodekey_path="$datadir/geth/nodekey"
+    else
+        nodekey_path="$datadir/nodekey"
     fi
 
-    if [[ ! -f "$datadir/nodekey" ]]; then
-        echo "Expected nodekey to exist at $datadir/nodekey, but it was not found." >&2
+    # Generate nodekey at a stable location (data/<version>/nodekey).
+    # For geth --nodekey, the file is expected to contain 64 hex characters (32 bytes) (no 0x prefix).
+    if [[ ! -f "$nodekey_path" ]]; then
+        if command -v openssl >/dev/null 2>&1; then
+            openssl rand -hex 32 | tr -d '\n' > "$nodekey_path"
+        else
+            # Fallback: hex-encode 32 bytes from /dev/urandom.
+            od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$nodekey_path"
+        fi
+        chmod 600 "$nodekey_path" || true
+    fi
+
+    if [[ ! -f "$nodekey_path" ]]; then
+        echo "Expected nodekey to exist at $nodekey_path, but it was not found." >&2
         exit 1
     fi
 
@@ -97,7 +107,7 @@ generate_enode() {
     local raw
     # Mount only the nodekey file (read-only) and use an ephemeral container datadir,
     # so we don't create root-owned artifacts in the host output directory.
-    raw=$(docker run --rm -v "$datadir/nodekey:/nodekey:ro" ethereum/client-go:v1.16.7 \
+    raw=$(docker run --rm -v "$nodekey_path:/nodekey:ro" ethereum/client-go:v1.16.7 \
         --datadir /tmp \
         --nodekey /nodekey \
         --port "$port" \
@@ -118,23 +128,6 @@ generate_enode() {
     echo "enode://$pubkey@$ip:$port"
 }
 
-# Ensure the Engine API JWT secret exists for the *top* node (v1.16.7).
-# Post-Merge execution clients require a consensus client connected over the Engine API,
-# which uses a shared JWT secret file.
-ensure_jwtsecret() {
-    local datadir="$DATA_ROOT/v1.16.7"
-    mkdir -p "$datadir"
-    if [[ ! -f "$datadir/jwtsecret" ]]; then
-        if command -v openssl >/dev/null 2>&1; then
-            openssl rand -hex 32 | tr -d '\n' > "$datadir/jwtsecret"
-        else
-            od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$datadir/jwtsecret"
-        fi
-        chmod 600 "$datadir/jwtsecret" || true
-        echo "Created JWT secret for Engine API: $datadir/jwtsecret"
-    fi
-}
-
 # Generate for each version
 declare -A enodes
 for version in "${versions[@]}"; do
@@ -144,7 +137,26 @@ for version in "${versions[@]}"; do
     echo "Enode for $version: $enode"
 done
 
-ensure_jwtsecret
+# Ensure Engine API JWT secrets exist for post-Merge-capable nodes.
+# Lighthouse connects to the execution client's authenticated RPC endpoint (authrpc) using this shared secret.
+ensure_jwtsecret() {
+    local version=$1
+    local jwt_dir="$DATA_ROOT/$version/geth"
+    local jwt_path="$jwt_dir/jwtsecret"
+    mkdir -p "$jwt_dir"
+    if [[ ! -f "$jwt_path" ]]; then
+        if command -v openssl >/dev/null 2>&1; then
+            openssl rand -hex 32 | tr -d '\n' > "$jwt_path"
+        else
+            od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$jwt_path"
+        fi
+        chmod 600 "$jwt_path" || true
+        echo "Created JWT secret for $version Engine API: $jwt_path"
+    fi
+}
+
+ensure_jwtsecret v1.16.7
+ensure_jwtsecret v1.11.6
 
 # Generate a deterministic nodekey + enode for the Windows Geth v1.0.0 node.
 # Note: this does NOT require running v1.0.0; it just derives the enode from the nodekey.
@@ -188,8 +200,36 @@ for version in v1.11.6 v1.10.0 v1.9.25 v1.3.6; do
     esac
 
     datadir="$DATA_ROOT/$version"
-    printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
-    echo "Created static-nodes.json for $version pointing to $next"
+
+    # NOTE: Geth v1.11.6 ignores static-nodes.json (deprecated).
+    # Use config.toml with Node.P2P.StaticNodes instead.
+    if [[ "$version" == "v1.11.6" ]]; then
+        cat > "$datadir/config.toml" <<EOF
+[Node]
+DataDir = "/data"
+
+[Node.P2P]
+NoDiscovery = false
+ListenAddr = ":${port_by_version[$version]}"
+# Explicitly set mainnet bootnodes.
+# When using --config, relying on implicit defaults is brittle across versions.
+BootstrapNodes = [
+  "enode://d860a01f9722d78051619d1e2351aba3f43f943f6f00718d1b9baa4101932a1f5011f16bb2b1bb35db20d6fe28fa0bf09636d26a87d31de9ec6203eeedb1f666@18.138.108.67:30303",
+  "enode://22a8232c3abc76a16ae9d6c3b164f98775fe226f0917b0ca871128a74a8e9630b458460865bab457221f1d448dd9791d24c4e5d88786180ac185df813a68d4de@3.209.45.79:30303",
+  "enode://2b252ab6a1d0f971d9722cb839a42cb81db019ba44c08754628ab4a823487071b5695317c8ccd085219c3a03af063495b2f1da8d18218da2d6a82981b45e6ffc@65.108.70.101:30303",
+  "enode://4aeb4ab6c14b23e2c4cfdce879c04b0748a20d8e9b59e25ded2a08143e265c6c25936e74cbc8e641e3312ca288673d91f2f93f8e277de3cfa444ecdaaf982052@157.90.35.166:30303"
+]
+StaticNodes = ["${enodes[$next]}"]
+EOF
+
+        # Ensure no stale static-nodes.json lingers (v1.11.x ignores it and logs noisy warnings).
+        rm -f "$datadir/static-nodes.json"
+
+        echo "Created config.toml for $version with Node.P2P.StaticNodes pointing to $next"
+    else
+        printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
+        echo "Created static-nodes.json for $version pointing to $next"
+    fi
 done
 
 # For v1.0.0 (Windows), output the enode of v1.3.6 for connection

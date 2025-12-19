@@ -54,7 +54,7 @@ echo "Saving Docker images..."
 mkdir -p images
 # Avoid carrying forward stale tarballs for versions that are no longer in the stack.
 rm -f images/*.tar
-for version in v1.16.7 v1.11.6 v1.10.0 v1.9.25 v1.3.6; do
+for version in v1.11.6 v1.10.0 v1.9.25 v1.3.6; do
     docker save ethereumtimemachine/geth:$version > images/geth-$version.tar
 done
 
@@ -62,6 +62,14 @@ echo "Copying files to VM..."
 
 # Ensure remote directory exists before copying.
 ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" "mkdir -p /home/$VM_USER/chain-of-geths"
+
+# If the compose stack has been run before, bind-mounted directories under output/ may be root-owned
+# (because containers often run as root). That breaks `scp -r output ...`.
+#
+# Fix by stopping any running stack and chown'ing output/ back to the SSH user before copying.
+ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
+  "cd /home/$VM_USER/chain-of-geths 2>/dev/null && sudo docker-compose down --remove-orphans || true; \
+   sudo chown -R $VM_USER:$VM_USER /home/$VM_USER/chain-of-geths/output 2>/dev/null || true"
 
 scp $SSH_OPTS -i "$SSH_KEY_PATH" -r output images monitoring generate-keys.sh build-images.sh docker-compose.yml "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
 
@@ -85,9 +93,16 @@ if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev
 fi
 
 # Stop and remove any prior compose stack containers before re-deploying.
-# (Keeps named volumes like prometheus-data/grafana-data unless you add -v.)
+# (We intentionally wipe Grafana's volume so dashboards/users don't get stuck in a bad state.)
 echo "Stopping any prior docker compose stack..."
 sudo docker compose down --remove-orphans 2>/dev/null || sudo docker-compose down --remove-orphans || true
+
+echo "Deleting Grafana data volume (grafana-data)..."
+# docker-compose names volumes as <project>_<volume>. Match both raw and project-prefixed names.
+sudo docker volume ls -q | grep -E '(^|_)grafana-data$' | xargs -r sudo docker volume rm -f || true
+
+echo "Deleting Lighthouse data volumes (to avoid schema-version mismatches across Lighthouse upgrades/downgrades)..."
+sudo docker volume ls -q | grep -E '(^|_)lighthouse-(16-7|11-6)-data$' | xargs -r sudo docker volume rm -f || true
 
 # Load Docker images
 for img in images/*.tar; do

@@ -19,14 +19,6 @@ RUN apt-get update \
 # Download and install geth binary
 EOF
     case $version in
-        v1.16.7)
-            cat >> Dockerfile << 'EOF'
-RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.16.7-b9f3a3d9.tar.gz && \
-    tar -xzf /tmp/geth.tar.gz -C /tmp && \
-    mv /tmp/geth-linux-amd64-1.16.7-b9f3a3d9/geth /usr/local/bin/geth && \
-    rm -rf /tmp/*
-EOF
-            ;;
         v1.11.6)
             cat >> Dockerfile << 'EOF'
 RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.11.6-ea9e62ca.tar.gz && \
@@ -77,7 +69,6 @@ EOF
 
 # Build images
 versions=(
-    "v1.16.7"
     "v1.11.6"
     "v1.10.0"
     "v1.9.25"
