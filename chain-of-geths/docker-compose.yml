@@ -8,6 +8,7 @@ services:
       --datadir /data
       --http
       --http.addr 0.0.0.0
+      --http.vhosts *
       --http.api eth,net,web3,personal,admin
       --allow-insecure-unlock
       --syncmode full
@@ -30,6 +31,7 @@ services:
       --datadir /data
       --http
       --http.addr 0.0.0.0
+      --http.vhosts *
       --http.api eth,net,web3,personal,admin
       --allow-insecure-unlock
       --syncmode full
@@ -54,6 +56,7 @@ services:
       --datadir /data
       --rpc
       --rpcaddr 0.0.0.0
+      --rpcvhosts *
       --rpcapi eth,net,web3
       --networkid 1
       --port 30305
@@ -76,6 +79,7 @@ services:
       --datadir /data
       --rpc
       --rpcaddr 0.0.0.0
+      --rpcvhosts *
       --rpcapi eth,net,web3
       --networkid 1
       --port 30306
@@ -98,6 +102,7 @@ services:
       --datadir /data
       --rpc
       --rpcaddr 0.0.0.0
+      --rpcvhosts *
       --rpcapi eth,net,web3
       --networkid 1
       --port 30307
