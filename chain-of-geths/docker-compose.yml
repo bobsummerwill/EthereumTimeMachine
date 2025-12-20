@@ -48,7 +48,7 @@ services:
       --authrpc.vhosts *
       --authrpc.jwtsecret /data/geth/jwtsecret
       --allow-insecure-unlock
-      --syncmode snap
+      --syncmode full
       --networkid 1
       --port 30308
     ports:
@@ -124,6 +124,7 @@ services:
       --rpcaddr 0.0.0.0
       --rpcapi eth,net,web3
       --networkid 1
+      --syncmode full
       --port 30307
       --nodiscover
     ports:
@@ -154,7 +155,7 @@ services:
       - --execution-jwt
       - /jwt/jwtsecret
       - --checkpoint-sync-url
-      - https://mainnet.checkpoint.sigp.io
+      - https://checkpoint-sync.p2p.org
     volumes:
       - lighthouse-16-7-data:/data
       - ./output/data/v1.16.7/geth/jwtsecret:/jwt/jwtsecret:ro
@@ -164,7 +165,7 @@ services:
       - ethereum
 
   lighthouse-11-6:
-    image: sigp/lighthouse:v8.0.1
+    image: sigp/lighthouse:v4.6.0
     container_name: lighthouse-11-6
     command:
       - lighthouse
