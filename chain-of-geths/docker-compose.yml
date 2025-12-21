@@ -151,13 +151,16 @@ services:
       - --jwt-secret
       - /jwt/jwtsecret
       - --checkpoint-sync-url
-      - https://checkpoint.prysmaticlabs.com
+      - https://checkpoint-sync.prysmaticlabs.com
       - --accept-terms-of-use
     volumes:
       - prysm-16-7-data:/data
       - ./output/data/v1.16.7/geth/jwtsecret:/jwt/jwtsecret:ro
     depends_on:
       - geth-v1-16-7
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     networks:
       - ethereum
 
@@ -172,13 +175,16 @@ services:
       - --jwt-secret
       - /jwt/jwtsecret
       - --checkpoint-sync-url
-      - https://checkpoint.prysmaticlabs.com
+      - https://checkpoint-sync.prysmaticlabs.com
       - --accept-terms-of-use
     volumes:
       - prysm-11-6-data:/data
       - ./output/data/v1.11.6/geth/jwtsecret:/jwt/jwtsecret:ro
     depends_on:
       - geth-v1-11-6
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     networks:
       - ethereum
 
