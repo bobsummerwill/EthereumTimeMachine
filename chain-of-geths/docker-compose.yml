@@ -140,48 +140,42 @@ services:
 
   # Consensus clients (beacon nodes) for post-Merge mainnet.
   # Runs in non-validating mode; uses checkpoint sync.
-  lighthouse-16-7:
-    image: sigp/lighthouse:v8.0.1
-    container_name: lighthouse-16-7
+  prysm-16-7:
+    image: gcr.io/prysmaticlabs/prysm/beacon-chain:v5.0.0
+    container_name: prysm-16-7
     command:
-      - lighthouse
-      - beacon_node
-      - --network
-      - mainnet
       - --datadir
       - /data
       - --execution-endpoint
       - http://geth-v1-16-7:8551
-      - --execution-jwt
+      - --jwt-secret
       - /jwt/jwtsecret
       - --checkpoint-sync-url
-      - https://checkpoint-sync.p2p.org
+      - https://checkpoint.prysmaticlabs.com
+      - --accept-terms-of-use
     volumes:
-      - lighthouse-16-7-data:/data
+      - prysm-16-7-data:/data
       - ./output/data/v1.16.7/geth/jwtsecret:/jwt/jwtsecret:ro
     depends_on:
       - geth-v1-16-7
     networks:
       - ethereum
 
-  lighthouse-11-6:
-    image: sigp/lighthouse:v4.6.0
-    container_name: lighthouse-11-6
+  prysm-11-6:
+    image: gcr.io/prysmaticlabs/prysm/beacon-chain:v4.0.0
+    container_name: prysm-11-6
     command:
-      - lighthouse
-      - beacon_node
-      - --network
-      - mainnet
       - --datadir
       - /data
       - --execution-endpoint
       - http://geth-v1-11-6:8551
-      - --execution-jwt
+      - --jwt-secret
       - /jwt/jwtsecret
       - --checkpoint-sync-url
-      - https://mainnet.checkpoint.sigp.io
+      - https://checkpoint.prysmaticlabs.com
+      - --accept-terms-of-use
     volumes:
-      - lighthouse-11-6-data:/data
+      - prysm-11-6-data:/data
       - ./output/data/v1.11.6/geth/jwtsecret:/jwt/jwtsecret:ro
     depends_on:
       - geth-v1-11-6
@@ -265,5 +259,5 @@ networks:
 volumes:
   prometheus-data:
   grafana-data:
-  lighthouse-16-7-data:
-  lighthouse-11-6-data:
+  prysm-16-7-data:
+  prysm-11-6-data:
