@@ -158,11 +158,7 @@ services:
       - ./output/data/v1.16.7/geth/jwtsecret:/jwt/jwtsecret:ro
     depends_on:
       - geth-v1-16-7
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    networks:
-      - ethereum
+    network_mode: host
 
   prysm-11-6:
     image: gcr.io/prysmaticlabs/prysm/beacon-chain:v4.0.0
@@ -182,11 +178,7 @@ services:
       - ./output/data/v1.11.6/geth/jwtsecret:/jwt/jwtsecret:ro
     depends_on:
       - geth-v1-11-6
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    networks:
-      - ethereum
+    network_mode: host
 
   # --- Monitoring (Prometheus + Grafana) ---
   # This is intentionally JSON-RPC based (not geth --metrics) so it works across older versions.
