@@ -145,9 +145,39 @@ services:
       ethereum:
         ipv4_address: 172.20.0.14
 
-  # NOTE: Consensus clients (beacon nodes) intentionally omitted.
-  # This stack’s goal is syncing historical execution clients (Frontier/Homestead-era).
-  # A consensus client is not required to obtain historical PoW-era blocks.
+  # Consensus client (beacon node) for the *modern feeder* execution node.
+  # We keep this single CL instance so the modern EL can progress on post-Merge mainnet
+  # and continue serving historical blocks to older nodes.
+  lighthouse-16-7:
+    image: sigp/lighthouse:latest
+    container_name: lighthouse-16-7
+    command: |
+      lighthouse beacon_node
+      --datadir /data
+      --execution-endpoint http://geth-v1-16-7:8551
+      --execution-jwt /jwt/jwtsecret
+      --checkpoint-sync-url https://mainnet-checkpoint-sync.stakely.io
+      --http
+      --http-address 0.0.0.0
+      --http-port 5052
+      --metrics
+      --metrics-address 0.0.0.0
+      --metrics-port 8080
+      --port 9000
+      --discovery-port 9000
+      --quic-port 9001
+    ports:
+      - "8080:8080"
+      - "9000:9000/tcp"
+      - "9000:9000/udp"
+      - "9001:9001/udp"
+    volumes:
+      - lighthouse-16-7-data:/data
+      - ./output/data/v1.16.7/geth/jwtsecret:/jwt/jwtsecret:ro
+    depends_on:
+      - geth-v1-16-7
+    networks:
+      - ethereum
 
   # --- Monitoring (Prometheus + Grafana) ---
   # This is intentionally JSON-RPC based (not geth --metrics) so it works across older versions.
@@ -226,3 +256,4 @@ networks:
 volumes:
   prometheus-data:
   grafana-data:
+  lighthouse-16-7-data:
