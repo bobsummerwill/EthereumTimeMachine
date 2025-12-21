@@ -151,8 +151,12 @@ services:
       - --jwt-secret
       - /jwt/jwtsecret
       - --checkpoint-sync-url
-      - https://checkpoint-sync.prysmaticlabs.com
+      - https://checkpoint-sync.p2p.org
       - --accept-terms-of-use
+      - --monitoring-host
+      - 0.0.0.0
+      - --monitoring-port
+      - 8080
     volumes:
       - prysm-16-7-data:/data
       - ./output/data/v1.16.7/geth/jwtsecret:/jwt/jwtsecret:ro
@@ -170,9 +174,11 @@ services:
       - http://geth-v1-11-6:8551
       - --jwt-secret
       - /jwt/jwtsecret
-      - --checkpoint-sync-url
-      - https://checkpoint-sync.prysmaticlabs.com
       - --accept-terms-of-use
+      - --monitoring-host
+      - 0.0.0.0
+      - --monitoring-port
+      - 8081
     volumes:
       - prysm-11-6-data:/data
       - ./output/data/v1.11.6/geth/jwtsecret:/jwt/jwtsecret:ro
