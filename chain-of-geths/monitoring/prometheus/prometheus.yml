@@ -11,10 +11,10 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - localhost:8080
+          - 54.81.90.194:8080
   - job_name: prysm_11_6
     metrics_path: /metrics
     static_configs:
       - targets:
-          - localhost:8081
+          - 54.81.90.194:8081
 
