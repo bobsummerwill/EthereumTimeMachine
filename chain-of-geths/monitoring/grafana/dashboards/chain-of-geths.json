@@ -409,7 +409,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "beacon_head_slot",
+          "expr": "lighthouse_beacon_head_slot",
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
@@ -495,7 +495,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "beacon_current_finalized_epoch",
+          "expr": "lighthouse_beacon_finalized_epoch",
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
@@ -569,13 +569,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sync_beacon_sync_distance{job=~\"prysm_.*\"}",
+          "expr": "lighthouse_sync_distance{job=~\"lighthouse-.*\"}",
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Prysm Sync Distance (slots)",
+      "title": "Lighthouse Sync Distance (slots)",
       "type": "timeseries"
     },
     {
@@ -639,13 +639,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sync_beacon_synced{job=~\"prysm_.*\"}",
+          "expr": "lighthouse_synced{job=~\"lighthouse-.*\"}",
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Prysm Sync Status",
+      "title": "Lighthouse Sync Status",
       "type": "stat"
     }
   ],

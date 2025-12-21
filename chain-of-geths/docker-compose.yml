@@ -140,40 +140,53 @@ services:
 
   # Consensus clients (beacon nodes) for post-Merge mainnet.
   # Runs in non-validating mode; uses checkpoint sync.
-  prysm-16-7:
-    image: gcr.io/prysmaticlabs/prysm/beacon-chain:v5.0.0
-    container_name: prysm-16-7
+  lighthouse-16-7:
+    image: sigp/lighthouse:v4.6.0
+    container_name: lighthouse-16-7
     command: |
+      lighthouse beacon_node
       --datadir /data
       --execution-endpoint http://geth-v1-16-7:8551
-      --jwt-secret /jwt/jwtsecret
-      --checkpoint-sync-url https://checkpoint-sync.p2p.org
-      --accept-terms-of-use
-      --monitoring-host 0.0.0.0
-      --monitoring-port 8080
+      --execution-jwt /jwt/jwtsecret
+      --http
+      --http-address 0.0.0.0
+      --http-port 5052
+      --metrics
+      --metrics-address 0.0.0.0
+      --metrics-port 8080
+    ports:
+      - "8080:8080"
     volumes:
-      - prysm-16-7-data:/data
+      - lighthouse-16-7-data:/data
       - ./output/data/v1.16.7/geth/jwtsecret:/jwt/jwtsecret:ro
     depends_on:
       - geth-v1-16-7
-    network_mode: host
+    networks:
+      - ethereum
 
-  prysm-11-6:
-    image: gcr.io/prysmaticlabs/prysm/beacon-chain:v4.0.0
-    container_name: prysm-11-6
+  lighthouse-11-6:
+    image: sigp/lighthouse:v4.5.0
+    container_name: lighthouse-11-6
     command: |
+      lighthouse beacon_node
       --datadir /data
       --execution-endpoint http://geth-v1-11-6:8551
-      --jwt-secret /jwt/jwtsecret
-      --accept-terms-of-use
-      --monitoring-host 0.0.0.0
-      --monitoring-port 8081
+      --execution-jwt /jwt/jwtsecret
+      --http
+      --http-address 0.0.0.0
+      --http-port 5053
+      --metrics
+      --metrics-address 0.0.0.0
+      --metrics-port 8081
+    ports:
+      - "8081:8081"
     volumes:
-      - prysm-11-6-data:/data
+      - lighthouse-11-6-data:/data
       - ./output/data/v1.11.6/geth/jwtsecret:/jwt/jwtsecret:ro
     depends_on:
       - geth-v1-11-6
-    network_mode: host
+    networks:
+      - ethereum
 
   # --- Monitoring (Prometheus + Grafana) ---
   # This is intentionally JSON-RPC based (not geth --metrics) so it works across older versions.
@@ -252,5 +265,5 @@ networks:
 volumes:
   prometheus-data:
   grafana-data:
-  prysm-16-7-data:
-  prysm-11-6-data:
+  lighthouse-16-7-data:
+  lighthouse-11-6-data:
