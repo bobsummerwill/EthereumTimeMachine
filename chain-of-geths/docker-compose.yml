@@ -4,6 +4,8 @@ services:
     # current mainnet + the consensus client (Engine API / fork support).
     image: ethereum/client-go:stable
     container_name: geth-v1-16-7
+    # Snap sync is dramatically faster and still provides historical blocks needed
+    # to feed older nodes (state pruning does not remove block bodies/headers).
     command: |
       --datadir /data
       --nodekey /data/nodekey
@@ -16,13 +18,14 @@ services:
       --authrpc.vhosts *
       --authrpc.jwtsecret /data/geth/jwtsecret
       --allow-insecure-unlock
-      --syncmode full
+      --syncmode snap
       --networkid 1
       --port 30303
       --discovery.port 30303
     ports:
       - "8545:8545"
-      - "30303:30303"
+      - "30303:30303/tcp"
+      - "30303:30303/udp"
     volumes:
       - ./output/data/v1.16.7:/data
     networks:
@@ -53,7 +56,8 @@ services:
       --port 30308
     ports:
       - "8550:8545"
-      - "30308:30308"
+      - "30308:30308/tcp"
+      - "30308:30308/udp"
     volumes:
       - ./output/data/v1.11.6:/data
     depends_on:
@@ -80,7 +84,8 @@ services:
       --nodiscover
     ports:
       - "8551:8545"
-      - "30309:30309"
+      - "30309:30309/tcp"
+      - "30309:30309/udp"
     volumes:
       - ./output/data/v1.10.0:/data
     depends_on:
@@ -106,7 +111,8 @@ services:
       --nodiscover
     ports:
       - "8552:8545"
-      - "30310:30310"
+      - "30310:30310/tcp"
+      - "30310:30310/udp"
     volumes:
       - ./output/data/v1.9.25:/data
     depends_on:
@@ -129,7 +135,8 @@ services:
       --nodiscover
     ports:
       - "8549:8545"
-      - "30307:30307"
+      - "30307:30307/tcp"
+      - "30307:30307/udp"
     volumes:
       - ./output/data/v1.3.6:/data
     depends_on:
@@ -138,56 +145,9 @@ services:
       ethereum:
         ipv4_address: 172.20.0.14
 
-  # Consensus clients (beacon nodes) for post-Merge mainnet.
-  # Runs in non-validating mode; uses checkpoint sync.
-  lighthouse-16-7:
-    image: sigp/lighthouse:v4.6.0
-    container_name: lighthouse-16-7
-    command: |
-      lighthouse beacon_node
-      --datadir /data
-      --execution-endpoint http://geth-v1-16-7:8551
-      --execution-jwt /jwt/jwtsecret
-      --checkpoint-sync-url https://mainnet-checkpoint-sync.stakely.io
-      --http
-      --http-address 0.0.0.0
-      --http-port 5052
-      --metrics
-      --metrics-address 0.0.0.0
-      --metrics-port 8080
-    ports:
-      - "8080:8080"
-    volumes:
-      - lighthouse-16-7-data:/data
-      - ./output/data/v1.16.7/geth/jwtsecret:/jwt/jwtsecret:ro
-    depends_on:
-      - geth-v1-16-7
-    networks:
-      - ethereum
-
-  lighthouse-11-6:
-    image: sigp/lighthouse:v4.5.0
-    container_name: lighthouse-11-6
-    command: |
-      lighthouse beacon_node
-      --datadir /data
-      --execution-endpoint http://geth-v1-11-6:8551
-      --execution-jwt /jwt/jwtsecret
-      --http
-      --http-address 0.0.0.0
-      --http-port 5053
-      --metrics
-      --metrics-address 0.0.0.0
-      --metrics-port 8081
-    ports:
-      - "8081:8081"
-    volumes:
-      - lighthouse-11-6-data:/data
-      - ./output/data/v1.11.6/geth/jwtsecret:/jwt/jwtsecret:ro
-    depends_on:
-      - geth-v1-11-6
-    networks:
-      - ethereum
+  # NOTE: Consensus clients (beacon nodes) intentionally omitted.
+  # This stack’s goal is syncing historical execution clients (Frontier/Homestead-era).
+  # A consensus client is not required to obtain historical PoW-era blocks.
 
   # --- Monitoring (Prometheus + Grafana) ---
   # This is intentionally JSON-RPC based (not geth --metrics) so it works across older versions.
@@ -266,5 +226,3 @@ networks:
 volumes:
   prometheus-data:
   grafana-data:
-  lighthouse-16-7-data:
-  lighthouse-11-6-data:

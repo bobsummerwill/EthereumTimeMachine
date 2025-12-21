@@ -7,14 +7,3 @@ scrape_configs:
     static_configs:
       - targets:
           - geth-exporter:9100
-  - job_name: lighthouse_16_7
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - 54.81.90.194:8080
-  - job_name: lighthouse_11_6
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - 54.81.90.194:8081
-

@@ -101,8 +101,7 @@ echo "Deleting Grafana data volume (grafana-data)..."
 # docker-compose names volumes as <project>_<volume>. Match both raw and project-prefixed names.
 sudo docker volume ls -q | grep -E '(^|_)grafana-data$' | xargs -r sudo docker volume rm -f || true
 
-echo "Deleting Lighthouse data volumes (to avoid schema-version mismatches across Lighthouse upgrades/downgrades)..."
-sudo docker volume ls -q | grep -E '(^|_)lighthouse-(16-7|11-6)-data$' | xargs -r sudo docker volume rm -f || true
+echo "Consensus client volumes: none (consensus clients are not part of this stack)."
 
 # Load Docker images
 for img in images/*.tar; do
