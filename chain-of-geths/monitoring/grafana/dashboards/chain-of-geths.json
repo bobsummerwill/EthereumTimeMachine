@@ -550,7 +550,7 @@
       },
       "id": 7,
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "horizontal",
@@ -562,124 +562,48 @@
           "values": false
         },
         "showPercentChange": false,
-        "textMode": "value_and_name"
+        "textMode": "name",
+        "wideLayout": true
       },
       "targets": [
         {
           "editorMode": "code",
-          "expr": "geth_effective_head_block{node=\"v1.16.7\"}",
-          "legendFormat": "v1.16.7",
+          "expr": "geth_sync_progress_info{node=\"v1.16.7\"}",
+          "legendFormat": "v1.16.7 {{progress}}",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "geth_effective_head_block{node=\"v1.11.6\"}",
-          "legendFormat": "v1.11.6",
+          "expr": "geth_sync_progress_info{node=\"v1.11.6\"}",
+          "legendFormat": "v1.11.6 {{progress}}",
           "range": true,
           "refId": "B"
         },
         {
           "editorMode": "code",
-          "expr": "geth_effective_head_block{node=\"v1.10.0\"}",
-          "legendFormat": "v1.10.0",
+          "expr": "geth_sync_progress_info{node=\"v1.10.0\"}",
+          "legendFormat": "v1.10.0 {{progress}}",
           "range": true,
           "refId": "C"
         },
         {
           "editorMode": "code",
-          "expr": "geth_effective_head_block{node=\"v1.9.25\"}",
-          "legendFormat": "v1.9.25",
+          "expr": "geth_sync_progress_info{node=\"v1.9.25\"}",
+          "legendFormat": "v1.9.25 {{progress}}",
           "range": true,
           "refId": "D"
         },
         {
           "editorMode": "code",
-          "expr": "geth_effective_head_block{node=\"v1.3.6\"}",
-          "legendFormat": "v1.3.6",
+          "expr": "geth_sync_progress_info{node=\"v1.3.6\"}",
+          "legendFormat": "v1.3.6 {{progress}}",
           "range": true,
           "refId": "E"
         }
       ],
-      "title": "Effective head height (per node)",
+      "title": "Sync progress (N/M (P%))",
       "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "Prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 0
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 33
-      },
-      "id": 8,
-      "options": {
-        "showHeader": true
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "geth_effective_head_block",
-          "instant": true,
-          "legendFormat": "effective",
-          "refId": "A"
-        },
-        {
-          "editorMode": "code",
-          "expr": "(0 * geth_effective_head_block) + scalar(max(geth_sync_highest_block{node=\"v1.16.7\"} or geth_effective_head_block{node=\"v1.16.7\"}))",
-          "instant": true,
-          "legendFormat": "target",
-          "refId": "B"
-        },
-        {
-          "editorMode": "code",
-          "expr": "100 * geth_effective_head_block / clamp_min((0 * geth_effective_head_block) + scalar(max(geth_sync_highest_block{node=\"v1.16.7\"} or geth_effective_head_block{node=\"v1.16.7\"})), 1)",
-          "instant": true,
-          "legendFormat": "percent",
-          "refId": "C"
-        }
-      ],
-      "title": "Sync progress (effective / target / percent)",
-      "transformations": [
-        {
-          "id": "labelsToFields",
-          "options": {
-            "mode": "columns"
-          }
-        },
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "node",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "indexByName": {
-              "node": 0
-            },
-            "renameByName": {
-              "node": "version"
-            }
-          }
-        }
-      ],
-      "type": "table"
     }
   ],
   "refresh": "10s",

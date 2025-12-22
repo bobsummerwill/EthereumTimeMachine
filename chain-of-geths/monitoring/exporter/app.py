@@ -107,6 +107,15 @@ g_sync_remaining = Gauge(
 )
 g_lag_vs_top = Gauge("geth_lag_vs_top_blocks", "Block lag vs the top node", ["node"])
 
+# A human-friendly, pre-formatted progress label for Grafana “stat list” panels.
+# This deliberately encodes the changing progress string into a label, but the
+# cardinality remains bounded by the number of nodes (we clear and re-set each poll).
+g_sync_progress_info = Gauge(
+    "geth_sync_progress_info",
+    "Sync progress info as a label: progress=\"<effective>/<target> (<pct>%)\" (value is always 1)",
+    ["node", "progress"],
+)
+
 
 class Poller:
     def __init__(self, nodes: List[Tuple[str, str]], interval_seconds: float) -> None:
@@ -128,6 +137,8 @@ class Poller:
         # first node is the “top” reference
         top_name, _ = self.nodes[0]
         while not self._stop.is_set():
+            # Clear dynamic label series each round so we don't accumulate stale values.
+            g_sync_progress_info.clear()
             blocks: Dict[str, int] = {}
 
             for name, url in self.nodes:
@@ -150,6 +161,8 @@ class Poller:
                         g_sync_highest.labels(node=name).set(0)
                         g_sync_remaining.labels(node=name).set(0)
                         g_effective_head.labels(node=name).set(block_num)
+                        progress = f"{block_num}/{block_num} (100.0%)" if block_num > 0 else "0/0 (0.0%)"
+                        g_sync_progress_info.labels(node=name, progress=progress).set(1)
                     else:
                         # Some clients return a dict with hex values.
                         cur = hex_to_int(syncing.get("currentBlock"))
@@ -158,7 +171,12 @@ class Poller:
                         g_sync_current.labels(node=name).set(cur)
                         g_sync_highest.labels(node=name).set(hi)
                         g_sync_remaining.labels(node=name).set(max(0, hi - cur))
-                        g_effective_head.labels(node=name).set(max(block_num, cur))
+                        eff = max(block_num, cur)
+                        target = max(hi, eff)
+                        g_effective_head.labels(node=name).set(eff)
+                        pct = (eff * 100.0 / target) if target > 0 else 0.0
+                        progress = f"{eff}/{target} ({pct:.1f}%)"
+                        g_sync_progress_info.labels(node=name, progress=progress).set(1)
 
                 except Exception:
                     # Mark node as down, keep last-seen metrics for block/peers.
@@ -168,6 +186,7 @@ class Poller:
                     g_sync_highest.labels(node=name).set(0)
                     g_sync_remaining.labels(node=name).set(0)
                     g_effective_head.labels(node=name).set(0)
+                    g_sync_progress_info.labels(node=name, progress="down").set(0)
 
             # Lag metrics: compute after all blocks are fetched.
             if top_name in blocks:
