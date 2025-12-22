@@ -540,70 +540,127 @@
           "unit": "none",
           "decimals": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Percentage"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 6,
+        "h": 7,
         "w": 24,
         "x": 0,
         "y": 27
       },
       "id": 7,
       "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "name",
-        "wideLayout": true
+        "showHeader": true,
+        "cellHeight": "md"
       },
       "targets": [
         {
           "editorMode": "code",
-          "expr": "geth_sync_progress_info{node=\"v1.16.7\"}",
-          "legendFormat": "v1.16.7 {{progress}}",
-          "range": true,
+          "expr": "geth_node_sort_key",
+          "instant": true,
+          "legendFormat": "sort",
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "geth_sync_progress_info{node=\"v1.11.6\"}",
-          "legendFormat": "v1.11.6 {{progress}}",
-          "range": true,
+          "expr": "geth_effective_head_block",
+          "instant": true,
+          "legendFormat": "Block",
           "refId": "B"
         },
         {
           "editorMode": "code",
-          "expr": "geth_sync_progress_info{node=\"v1.10.0\"}",
-          "legendFormat": "v1.10.0 {{progress}}",
-          "range": true,
+          "expr": "geth_sync_target_block",
+          "instant": true,
+          "legendFormat": "Head",
           "refId": "C"
         },
         {
           "editorMode": "code",
-          "expr": "geth_sync_progress_info{node=\"v1.9.25\"}",
-          "legendFormat": "v1.9.25 {{progress}}",
-          "range": true,
+          "expr": "geth_sync_percent",
+          "instant": true,
+          "legendFormat": "Percentage",
           "refId": "D"
-        },
-        {
-          "editorMode": "code",
-          "expr": "geth_sync_progress_info{node=\"v1.3.6\"}",
-          "legendFormat": "v1.3.6 {{progress}}",
-          "range": true,
-          "refId": "E"
         }
       ],
-      "title": "Sync progress (N/M (P%))",
-      "type": "stat"
+      "title": "Sync progress",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "node",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "instance": true,
+              "instance 1": true,
+              "instance 2": true,
+              "instance 3": true,
+              "job": true,
+              "job 1": true,
+              "job 2": true,
+              "job 3": true,
+              "__name__": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "__name__ 3": true
+            },
+            "indexByName": {
+              "node": 0
+            },
+            "renameByName": {
+              "node": "Version",
+              "geth_node_sort_key": "_sort",
+              "geth_effective_head_block": "Block",
+              "geth_sync_target_block": "Head",
+              "geth_sync_percent": "Percentage"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "_sort",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "_sort": true
+            }
+          }
+        }
+      ],
+      "type": "table"
     }
   ],
   "refresh": "10s",

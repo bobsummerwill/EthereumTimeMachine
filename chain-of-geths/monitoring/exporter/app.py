@@ -107,6 +107,25 @@ g_sync_remaining = Gauge(
 )
 g_lag_vs_top = Gauge("geth_lag_vs_top_blocks", "Block lag vs the top node", ["node"])
 
+# Stable ordering for dashboards (matches NODE_URLS order).
+g_sort_key = Gauge(
+    "geth_node_sort_key",
+    "Stable sort key for nodes (matches NODE_URLS order; lower is earlier)",
+    ["node"],
+)
+
+# Derived progress signals for clearer dashboards.
+g_sync_target = Gauge(
+    "geth_sync_target_block",
+    "Best-effort target head height for progress calculations (max(eth_syncing.highestBlock, effective head))",
+    ["node"],
+)
+g_sync_percent = Gauge(
+    "geth_sync_percent",
+    "Best-effort sync completion percentage (effective head / target * 100)",
+    ["node"],
+)
+
 # A human-friendly, pre-formatted progress label for Grafana “stat list” panels.
 # This deliberately encodes the changing progress string into a label, but the
 # cardinality remains bounded by the number of nodes (we clear and re-set each poll).
@@ -141,7 +160,8 @@ class Poller:
             g_sync_progress_info.clear()
             blocks: Dict[str, int] = {}
 
-            for name, url in self.nodes:
+            for idx, (name, url) in enumerate(self.nodes, start=1):
+                g_sort_key.labels(node=name).set(idx)
                 try:
                     block_hex = rpc_call(url, "eth_blockNumber")
                     peers_hex = rpc_call(url, "net_peerCount")
@@ -161,7 +181,11 @@ class Poller:
                         g_sync_highest.labels(node=name).set(0)
                         g_sync_remaining.labels(node=name).set(0)
                         g_effective_head.labels(node=name).set(block_num)
-                        progress = f"{block_num}/{block_num} (100.0%)" if block_num > 0 else "0/0 (0.0%)"
+                        target = block_num
+                        pct = 100.0 if target > 0 else 0.0
+                        progress = f"{block_num}/{target} ({pct:.1f}%)" if target > 0 else "0/0 (0.0%)"
+                        g_sync_target.labels(node=name).set(target)
+                        g_sync_percent.labels(node=name).set(pct)
                         g_sync_progress_info.labels(node=name, progress=progress).set(1)
                     else:
                         # Some clients return a dict with hex values.
@@ -176,6 +200,8 @@ class Poller:
                         g_effective_head.labels(node=name).set(eff)
                         pct = (eff * 100.0 / target) if target > 0 else 0.0
                         progress = f"{eff}/{target} ({pct:.1f}%)"
+                        g_sync_target.labels(node=name).set(target)
+                        g_sync_percent.labels(node=name).set(pct)
                         g_sync_progress_info.labels(node=name, progress=progress).set(1)
 
                 except Exception:
@@ -187,6 +213,8 @@ class Poller:
                     g_sync_remaining.labels(node=name).set(0)
                     g_effective_head.labels(node=name).set(0)
                     g_sync_progress_info.labels(node=name, progress="down").set(0)
+                    g_sync_target.labels(node=name).set(0)
+                    g_sync_percent.labels(node=name).set(0)
 
             # Lag metrics: compute after all blocks are fetched.
             if top_name in blocks:
