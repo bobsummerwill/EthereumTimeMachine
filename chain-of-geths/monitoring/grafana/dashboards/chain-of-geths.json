@@ -222,80 +222,6 @@
           },
           "custom": {
             "axisBorderShow": false,
-            "axisCenteredZero": true,
-            "axisColorMode": "text",
-            "axisLabel": "blocks",
-            "axisPlacement": "auto",
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 2,
-            "showPoints": "never",
-            "spanNulls": true
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 100
-              },
-              {
-                "color": "red",
-                "value": 1000
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 9
-      },
-      "id": 2,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "geth_lag_vs_top_blocks",
-          "legendFormat": "{{node}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Lag vs top node (blocks)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "Prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisLabel": "blocks",
             "axisPlacement": "auto",
@@ -331,7 +257,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 9
+        "y": 19
       },
       "id": 3,
       "options": {
@@ -404,7 +330,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 19
       },
       "id": 4,
       "options": {
@@ -477,7 +403,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 28
       },
       "id": 5,
       "options": {
@@ -561,7 +487,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 27
+        "y": 28
       },
       "id": 6,
       "options": {
@@ -653,7 +579,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 9
        },
       "id": 7,
        "options": {
