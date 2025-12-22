@@ -46,14 +46,11 @@ services:
       --http.addr 0.0.0.0
       --http.vhosts *
       --http.api eth,net,web3,personal,admin
-      --authrpc.addr 0.0.0.0
-      --authrpc.port 8551
-      --authrpc.vhosts *
-      --authrpc.jwtsecret /data/geth/jwtsecret
       --allow-insecure-unlock
       --syncmode full
       --networkid 1
       --port 30308
+      --nodiscover
     ports:
       - "8550:8545"
       - "30308:30308/tcp"
