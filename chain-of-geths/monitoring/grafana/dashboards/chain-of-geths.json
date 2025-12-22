@@ -573,7 +573,7 @@
        "targets": [
          {
            "editorMode": "code",
-           "expr": "geth_node_sort_key",
+           "expr": "geth_node_sort_key{node!=\"Lighthouse\"}",
            "format": "table",
            "instant": true,
            "legendFormat": "sort",
@@ -581,7 +581,7 @@
          },
          {
            "editorMode": "code",
-           "expr": "geth_effective_head_block",
+           "expr": "geth_effective_head_block{node!=\"Lighthouse\"}",
            "format": "table",
            "instant": true,
            "legendFormat": "Block",
@@ -589,7 +589,7 @@
          },
          {
            "editorMode": "code",
-           "expr": "geth_sync_target_block",
+           "expr": "geth_sync_target_block{node!=\"Lighthouse\"}",
            "format": "table",
            "instant": true,
            "legendFormat": "Head",
@@ -597,7 +597,7 @@
          },
          {
            "editorMode": "code",
-           "expr": "geth_sync_percent",
+           "expr": "geth_sync_percent{node!=\"Lighthouse\"}",
            "format": "table",
            "instant": true,
            "legendFormat": "Percentage",

@@ -199,6 +199,9 @@ class Poller:
                     ver = _http_get_json(f"{self.lighthouse_api_url}/eth/v1/node/version")
                     raw_ver = ((ver or {}).get("data") or {}).get("version")
                     node_label = _lighthouse_display_version(str(raw_ver or ""))
+                    # If we can't confidently identify the version, don't emit a generic "Lighthouse" row.
+                    if node_label == "Lighthouse":
+                        raise ValueError("Missing/unknown Lighthouse version")
 
                     syncing = _http_get_json(f"{self.lighthouse_api_url}/eth/v1/node/syncing")
                     data = (syncing or {}).get("data") or {}
@@ -219,18 +222,9 @@ class Poller:
                     progress = f"{head_slot}/{target_slot} ({pct:.1f}%)" if target_slot > 0 else "0/0 (0.0%)"
                     g_sync_progress_info.labels(node=node_label, progress=progress).set(1)
                 except Exception:
-                    # Best effort: surface a row if we can, otherwise ignore.
-                    node_label = "Lighthouse"
-                    g_sort_key.labels(node=node_label).set(0)
-                    g_up.labels(node=node_label).set(0)
-                    g_syncing.labels(node=node_label).set(0)
-                    g_sync_current.labels(node=node_label).set(0)
-                    g_sync_highest.labels(node=node_label).set(0)
-                    g_sync_remaining.labels(node=node_label).set(0)
-                    g_effective_head.labels(node=node_label).set(0)
-                    g_sync_target.labels(node=node_label).set(0)
-                    g_sync_percent.labels(node=node_label).set(0)
-                    g_sync_progress_info.labels(node=node_label, progress="down").set(0)
+                    # Best effort: if Lighthouse is temporarily unreachable, omit the row entirely.
+                    # (Grafana table queries also exclude the generic node label "Lighthouse".)
+                    pass
 
             for idx, (name, url) in enumerate(self.nodes, start=1):
                 g_sort_key.labels(node=name).set(idx)
