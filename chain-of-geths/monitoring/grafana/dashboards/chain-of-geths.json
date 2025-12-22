@@ -493,36 +493,36 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "geth_up{node=\"v1.16.7\"}",
-          "legendFormat": "v1.16.7 RPC",
+          "expr": "geth_up{node=\"Geth v1.16.7\"}",
+          "legendFormat": "Geth v1.16.7 RPC",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "geth_up{node=\"v1.11.6\"}",
-          "legendFormat": "v1.11.6 RPC",
+          "expr": "geth_up{node=\"Geth v1.11.6\"}",
+          "legendFormat": "Geth v1.11.6 RPC",
           "range": true,
           "refId": "B"
         },
         {
           "editorMode": "code",
-          "expr": "geth_up{node=\"v1.10.0\"}",
-          "legendFormat": "v1.10.0 RPC",
+          "expr": "geth_up{node=\"Geth v1.10.0\"}",
+          "legendFormat": "Geth v1.10.0 RPC",
           "range": true,
           "refId": "C"
         },
         {
           "editorMode": "code",
-          "expr": "geth_up{node=\"v1.9.25\"}",
-          "legendFormat": "v1.9.25 RPC",
+          "expr": "geth_up{node=\"Geth v1.9.25\"}",
+          "legendFormat": "Geth v1.9.25 RPC",
           "range": true,
           "refId": "D"
         },
         {
           "editorMode": "code",
-          "expr": "geth_up{node=\"v1.3.6\"}",
-          "legendFormat": "v1.3.6 RPC",
+          "expr": "geth_up{node=\"Geth v1.3.6\"}",
+          "legendFormat": "Geth v1.3.6 RPC",
           "range": true,
           "refId": "E"
         }
@@ -544,7 +544,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Percentage"
+              "options": "%"
             },
             "properties": [
               {
@@ -559,112 +559,126 @@
           }
         ]
       },
-      "gridPos": {
-        "h": 7,
+       "gridPos": {
+        "h": 10,
         "w": 24,
         "x": 0,
         "y": 27
-      },
+       },
       "id": 7,
-      "options": {
-        "showHeader": true,
-        "cellHeight": "md"
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "geth_node_sort_key",
-          "instant": true,
-          "legendFormat": "sort",
-          "refId": "A"
-        },
-        {
-          "editorMode": "code",
-          "expr": "geth_effective_head_block",
-          "instant": true,
-          "legendFormat": "Block",
-          "refId": "B"
-        },
-        {
-          "editorMode": "code",
-          "expr": "geth_sync_target_block",
-          "instant": true,
-          "legendFormat": "Head",
-          "refId": "C"
-        },
-        {
-          "editorMode": "code",
-          "expr": "geth_sync_percent",
-          "instant": true,
-          "legendFormat": "Percentage",
-          "refId": "D"
-        }
-      ],
-      "title": "Sync progress",
-      "transformations": [
-        {
-          "id": "labelsToFields",
-          "options": {
-            "mode": "columns"
-          }
-        },
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "node",
-            "mode": "outer"
-          }
-        },
-        {
+       "options": {
+         "showHeader": true,
+         "cellHeight": "sm"
+       },
+       "targets": [
+         {
+           "editorMode": "code",
+           "expr": "geth_node_sort_key",
+           "format": "table",
+           "instant": true,
+           "legendFormat": "sort",
+           "refId": "A"
+         },
+         {
+           "editorMode": "code",
+           "expr": "geth_effective_head_block",
+           "format": "table",
+           "instant": true,
+           "legendFormat": "Block",
+           "refId": "B"
+         },
+         {
+           "editorMode": "code",
+           "expr": "geth_sync_target_block",
+           "format": "table",
+           "instant": true,
+           "legendFormat": "Head",
+           "refId": "C"
+         },
+         {
+           "editorMode": "code",
+           "expr": "geth_sync_percent",
+           "format": "table",
+           "instant": true,
+           "legendFormat": "Percentage",
+           "refId": "D"
+         }
+       ],
+       "title": "Sync progress",
+       "transformations": [
+         {
+           "id": "joinByField",
+           "options": {
+             "byField": "node",
+             "mode": "outer"
+           }
+         },
+         {
           "id": "organize",
           "options": {
-            "excludeByName": {
-              "Time": true,
-              "instance": true,
-              "instance 1": true,
-              "instance 2": true,
-              "instance 3": true,
-              "job": true,
-              "job 1": true,
-              "job 2": true,
-              "job 3": true,
-              "__name__": true,
-              "__name__ 1": true,
-              "__name__ 2": true,
-              "__name__ 3": true
-            },
-            "indexByName": {
-              "node": 0
-            },
+             "excludeByName": {
+               "Time": true,
+               "Time 1": true,
+               "Time 2": true,
+               "Time 3": true,
+               "instance": true,
+               "instance 1": true,
+               "instance 2": true,
+               "instance 3": true,
+               "job": true,
+               "job 1": true,
+               "job 2": true,
+               "job 3": true,
+               "__name__": true,
+               "__name__ 1": true,
+               "__name__ 2": true,
+               "__name__ 3": true,
+               "node 1": true,
+               "node 2": true,
+               "node 3": true
+             },
+             "indexByName": {
+               "node": 0
+             },
             "renameByName": {
               "node": "Version",
+
               "Value": "_sort",
-              "Value 1": "Block",
-              "Value 2": "Head",
-              "Value 3": "Percentage"
+              "Value 1": "Current",
+              "Value 2": "Target",
+              "Value 3": "%",
+              "Value #A": "_sort",
+              "Value #B": "Current",
+              "Value #C": "Target",
+              "Value #D": "%",
+
+              "geth_node_sort_key": "_sort",
+              "geth_effective_head_block": "Current",
+              "geth_sync_target_block": "Target",
+              "geth_sync_percent": "%"
             }
           }
         },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "_sort",
-                "desc": false
-              }
-            ]
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "_sort": true
-            }
-          }
-        }
+         {
+           "id": "sortBy",
+           "options": {
+             "fields": {},
+             "sort": [
+               {
+                 "field": "_sort",
+                 "desc": false
+               }
+             ]
+           }
+         },
+         {
+           "id": "organize",
+           "options": {
+             "excludeByName": {
+               "_sort": true
+             }
+           }
+         }
       ],
       "type": "table"
     }

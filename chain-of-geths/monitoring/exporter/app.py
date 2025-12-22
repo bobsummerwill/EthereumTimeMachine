@@ -71,6 +71,31 @@ def rpc_call(url: str, method: str, params: Optional[list] = None, timeout: floa
     return body.get("result")
 
 
+def _http_get_json(url: str, timeout: float = 5.0) -> Any:
+    r = requests.get(url, timeout=timeout)
+    r.raise_for_status()
+    return r.json()
+
+
+def _lighthouse_display_version(raw: str) -> str:
+    """Convert Lighthouse version strings into a stable display label.
+
+    Examples:
+      Lighthouse/v8.0.1-ced49dd -> Lighthouse v8.0.1
+      Lighthouse/v5.3.0-d6ba8c3 -> Lighthouse v5.3.0
+    """
+    s = (raw or "").strip()
+    if not s:
+        return "Lighthouse"
+    if s.lower().startswith("lighthouse/"):
+        s = s.split("/", 1)[1]
+    # Drop build metadata/hash.
+    s = s.split("-", 1)[0]
+    if not s.startswith("v"):
+        s = f"v{s}"
+    return f"Lighthouse {s}"
+
+
 def hex_to_int(value: Any) -> int:
     if value is None:
         return 0
@@ -137,11 +162,17 @@ g_sync_progress_info = Gauge(
 
 
 class Poller:
-    def __init__(self, nodes: List[Tuple[str, str]], interval_seconds: float) -> None:
+    def __init__(
+        self,
+        nodes: List[Tuple[str, str]],
+        interval_seconds: float,
+        lighthouse_api_url: str = "",
+    ) -> None:
         if not nodes:
             raise ValueError("No nodes configured. Set NODE_URLS.")
         self.nodes = nodes
         self.interval_seconds = interval_seconds
+        self.lighthouse_api_url = (lighthouse_api_url or "").strip().rstrip("/")
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="poller", daemon=True)
 
@@ -159,6 +190,47 @@ class Poller:
             # Clear dynamic label series each round so we don't accumulate stale values.
             g_sync_progress_info.clear()
             blocks: Dict[str, int] = {}
+
+            # Add a Lighthouse row into the same progress metrics (using slots, not blocks).
+            if self.lighthouse_api_url:
+                # Keep this row sorted above Geth entries.
+                lighthouse_sort_key = 0
+                try:
+                    ver = _http_get_json(f"{self.lighthouse_api_url}/eth/v1/node/version")
+                    raw_ver = ((ver or {}).get("data") or {}).get("version")
+                    node_label = _lighthouse_display_version(str(raw_ver or ""))
+
+                    syncing = _http_get_json(f"{self.lighthouse_api_url}/eth/v1/node/syncing")
+                    data = (syncing or {}).get("data") or {}
+                    head_slot = int(data.get("head_slot") or 0)
+                    distance = int(data.get("sync_distance") or 0)
+                    target_slot = head_slot + distance
+
+                    g_sort_key.labels(node=node_label).set(lighthouse_sort_key)
+                    g_up.labels(node=node_label).set(1)
+                    g_syncing.labels(node=node_label).set(1 if data.get("is_syncing") else 0)
+                    g_sync_current.labels(node=node_label).set(head_slot)
+                    g_sync_highest.labels(node=node_label).set(target_slot)
+                    g_sync_remaining.labels(node=node_label).set(max(0, distance))
+                    g_effective_head.labels(node=node_label).set(head_slot)
+                    g_sync_target.labels(node=node_label).set(target_slot)
+                    pct = (head_slot * 100.0 / target_slot) if target_slot > 0 else 0.0
+                    g_sync_percent.labels(node=node_label).set(pct)
+                    progress = f"{head_slot}/{target_slot} ({pct:.1f}%)" if target_slot > 0 else "0/0 (0.0%)"
+                    g_sync_progress_info.labels(node=node_label, progress=progress).set(1)
+                except Exception:
+                    # Best effort: surface a row if we can, otherwise ignore.
+                    node_label = "Lighthouse"
+                    g_sort_key.labels(node=node_label).set(0)
+                    g_up.labels(node=node_label).set(0)
+                    g_syncing.labels(node=node_label).set(0)
+                    g_sync_current.labels(node=node_label).set(0)
+                    g_sync_highest.labels(node=node_label).set(0)
+                    g_sync_remaining.labels(node=node_label).set(0)
+                    g_effective_head.labels(node=node_label).set(0)
+                    g_sync_target.labels(node=node_label).set(0)
+                    g_sync_percent.labels(node=node_label).set(0)
+                    g_sync_progress_info.labels(node=node_label, progress="down").set(0)
 
             for idx, (name, url) in enumerate(self.nodes, start=1):
                 g_sort_key.labels(node=name).set(idx)
@@ -243,8 +315,9 @@ def main() -> None:
     port = _env_int("PORT", 9100)
     interval = _env_float("POLL_INTERVAL_SECONDS", 10.0)
     node_urls = parse_node_urls(os.environ.get("NODE_URLS", ""))
+    lighthouse_api_url = os.environ.get("LIGHTHOUSE_API_URL", "")
 
-    poller = Poller(node_urls, interval_seconds=interval)
+    poller = Poller(node_urls, interval_seconds=interval, lighthouse_api_url=lighthouse_api_url)
     poller.start()
 
     # Flask dev server is fine here (internal-only in docker network).

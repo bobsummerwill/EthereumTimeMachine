@@ -1,14 +1,13 @@
 services:
+  # Modern top node: follows current mainnet and is paired with a consensus client (Lighthouse below).
+  # This is the head-syncing node in the chain.
   geth-v1-16-7:
-    # Use the official upstream image for the top node so it stays compatible with
-    # current mainnet + the consensus client (Engine API / fork support).
-    image: ethereum/client-go:stable
+    image: ethereum/client-go:v1.16.7
     container_name: geth-v1-16-7
-    # Snap sync is dramatically faster and still provides historical blocks needed
-    # to feed older nodes (state pruning does not remove block bodies/headers).
     command: |
+      --config /data/config.toml
       --datadir /data
-      --nodekey /data/nodekey
+      --nodekey /data/geth/nodekey
       --http
       --http.addr 0.0.0.0
       --http.vhosts *
@@ -20,21 +19,20 @@ services:
       --allow-insecure-unlock
       --syncmode snap
       --networkid 1
-      --port 30303
-      --discovery.port 30303
+      --port 30306
     ports:
       - "8545:8545"
-      - "30303:30303/tcp"
-      - "30303:30303/udp"
+      - "30306:30306/tcp"
+      - "30306:30306/udp"
     volumes:
       - ./output/data/v1.16.7:/data
     networks:
       ethereum:
-        ipv4_address: 172.20.0.10
+        ipv4_address: 172.20.0.18
 
-  # Bridge node: eth/68<->eth/66 compatibility.
-  # Geth v1.11.x supports ETH66/67/68, allowing peering with v1.16.7 (ETH68/69)
-  # and v1.10.0 (ETH64/65/66) via eth/68 and eth/66.
+  # Bridge node: eth/66-68 compatibility.
+  # This node is NOT paired with a consensus client. It should peer to geth-v1-16-7 via static-nodes,
+  # and serves as the protocol bridge to v1.10.0.
   geth-v1-11-6:
     image: ethereumtimemachine/geth:v1.11.6
     container_name: geth-v1-11-6
@@ -52,7 +50,7 @@ services:
       --port 30308
       --nodiscover
     ports:
-      - "8550:8545"
+      - "8546:8545"
       - "30308:30308/tcp"
       - "30308:30308/udp"
     volumes:
@@ -186,11 +184,13 @@ services:
     environment:
       # First node is treated as the “top” reference for lag metrics.
       NODE_URLS: >-
-        v1.16.7=http://geth-v1-16-7:8545,
-        v1.11.6=http://geth-v1-11-6:8545,
-        v1.10.0=http://geth-v1-10-0:8545,
-        v1.9.25=http://geth-v1-9-25:8545,
-        v1.3.6=http://geth-v1-3-6:8545
+        Geth v1.16.7=http://geth-v1-16-7:8545,
+        Geth v1.11.6=http://geth-v1-11-6:8545,
+        Geth v1.10.0=http://geth-v1-10-0:8545,
+        Geth v1.9.25=http://geth-v1-9-25:8545,
+        Geth v1.3.6=http://geth-v1-3-6:8545
+      # Used to add a Lighthouse row in the same “Sync progress” table.
+      LIGHTHOUSE_API_URL: http://lighthouse-16-7:5052
       POLL_INTERVAL_SECONDS: "10"
     ports:
       - "9100:9100"
