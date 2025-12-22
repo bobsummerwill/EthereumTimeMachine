@@ -130,7 +130,7 @@ services:
       --rpcaddr 0.0.0.0
       --rpcapi eth,net,web3
       --networkid 1
-      --syncmode full
+      --fast
       --port 30307
       --nodiscover
     ports:
@@ -156,7 +156,7 @@ services:
       --datadir /data
       --execution-endpoint http://geth-v1-16-7:8551
       --execution-jwt /jwt/jwtsecret
-      --checkpoint-sync-url https://mainnet-checkpoint-sync.stakely.io
+      --checkpoint-sync-url https://mainnet.checkpoint.sigp.io
       --http
       --http-address 0.0.0.0
       --http-port 5052

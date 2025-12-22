@@ -44,6 +44,10 @@ SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/Downloads/chain-of-geths-keys.pem}"
 
 WINDOWS_IP="18.232.131.32"
 
+# Optional: wipe Lighthouse (consensus client) data volumes on the Ubuntu VM.
+# This is useful when Lighthouse upgrades introduce DB incompatibilities.
+RESET_LIGHTHOUSE_VOLUMES="${RESET_LIGHTHOUSE_VOLUMES:-0}"
+
 echo "Generating keys locally..."
 ./generate-keys.sh
 
@@ -68,13 +72,14 @@ ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" "mkdir -p /home/$VM_USER/chai
 #
 # Fix by stopping any running stack and chown'ing output/ back to the SSH user before copying.
 ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
-  "cd /home/$VM_USER/chain-of-geths 2>/dev/null && sudo docker-compose down --remove-orphans || true; \
+  "cd /home/$VM_USER/chain-of-geths 2>/dev/null && (sudo docker compose down --remove-orphans 2>/dev/null || sudo docker-compose down --remove-orphans 2>/dev/null || true); \
    sudo chown -R $VM_USER:$VM_USER /home/$VM_USER/chain-of-geths/output 2>/dev/null || true"
 
 scp $SSH_OPTS -i "$SSH_KEY_PATH" -r output images monitoring generate-keys.sh build-images.sh docker-compose.yml "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
 
 echo "Running setup on Ubuntu VM..."
-ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" << 'EOF'
+# Pass RESET_LIGHTHOUSE_VOLUMES through to the remote shell explicitly.
+ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" "RESET_LIGHTHOUSE_VOLUMES=$RESET_LIGHTHOUSE_VOLUMES bash -s" << 'EOF'
 cd /home/ubuntu/chain-of-geths
 
 # Install Docker + Compose on the VM if missing.
@@ -86,8 +91,16 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 # Ensure some compose implementation exists.
+# Prefer Compose v2 (docker compose) since legacy docker-compose (v1) is often incompatible with newer Docker Engines.
+if ! docker compose version >/dev/null 2>&1; then
+    echo "Installing Docker Compose v2 on VM (docker-compose-v2)..."
+    sudo apt-get update
+    sudo apt-get install -y docker-compose-v2 || sudo apt-get install -y docker-compose-plugin || true
+fi
+
+# Final fallback: legacy docker-compose.
 if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
-    echo "Installing docker-compose on VM (legacy)..."
+    echo "Installing docker-compose on VM (legacy fallback)..."
     sudo apt-get update
     sudo apt-get install -y docker-compose
 fi
