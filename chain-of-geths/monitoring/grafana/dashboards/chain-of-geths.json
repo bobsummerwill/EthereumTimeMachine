@@ -348,39 +348,9 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 5,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
+          "custom": {},
           "mappings": [
             {
               "options": {
@@ -433,7 +403,8 @@
           "values": false
         },
         "showPercentChange": false,
-        "textMode": "value_and_name"
+        "textMode": "value_and_name",
+        "wideLayout": true
       },
       "targets": [
         {
@@ -461,6 +432,9 @@
       },
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [
             {
               "options": {
@@ -513,7 +487,8 @@
           "values": false
         },
         "showPercentChange": false,
-        "textMode": "value_and_name"
+        "textMode": "value_and_name",
+        "wideLayout": true
       },
       "targets": [
         {
@@ -564,10 +539,38 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "geth_effective_head_block",
-          "legendFormat": "{{node}}",
+          "expr": "geth_effective_head_block{node=\"v1.16.7\"}",
+          "legendFormat": "v1.16.7",
           "range": true,
           "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "geth_effective_head_block{node=\"v1.11.6\"}",
+          "legendFormat": "v1.11.6",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "geth_effective_head_block{node=\"v1.10.0\"}",
+          "legendFormat": "v1.10.0",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "editorMode": "code",
+          "expr": "geth_effective_head_block{node=\"v1.9.25\"}",
+          "legendFormat": "v1.9.25",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "editorMode": "code",
+          "expr": "geth_effective_head_block{node=\"v1.3.6\"}",
+          "legendFormat": "v1.3.6",
+          "range": true,
+          "refId": "E"
         }
       ],
       "title": "Effective head height (per node)",
