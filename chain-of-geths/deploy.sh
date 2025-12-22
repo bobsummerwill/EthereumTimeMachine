@@ -48,6 +48,10 @@ WINDOWS_IP="18.232.131.32"
 # This is useful when Lighthouse upgrades introduce DB incompatibilities.
 RESET_LIGHTHOUSE_VOLUMES="${RESET_LIGHTHOUSE_VOLUMES:-0}"
 
+# Optional: block height threshold for one-time bridge seeding.
+# Default: last Homestead-era block (right before DAO fork activates at 1,920,000).
+BRIDGE_SEED_CUTOFF_BLOCK="${BRIDGE_SEED_CUTOFF_BLOCK:-1919999}"
+
 echo "Generating keys locally..."
 ./generate-keys.sh
 
@@ -75,12 +79,20 @@ ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
   "cd /home/$VM_USER/chain-of-geths 2>/dev/null && (sudo docker compose down --remove-orphans 2>/dev/null || sudo docker-compose down --remove-orphans 2>/dev/null || true); \
    sudo chown -R $VM_USER:$VM_USER /home/$VM_USER/chain-of-geths/output 2>/dev/null || true"
 
-scp $SSH_OPTS -i "$SSH_KEY_PATH" -r output images monitoring generate-keys.sh build-images.sh docker-compose.yml "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
+scp $SSH_OPTS -i "$SSH_KEY_PATH" -r \
+  output images monitoring \
+  generate-keys.sh build-images.sh docker-compose.yml \
+  seed-v1.11.6-when-ready.sh seed-cutoff.sh seed-rlp-from-rpc.py \
+  "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
 
 echo "Running setup on Ubuntu VM..."
 # Pass RESET_LIGHTHOUSE_VOLUMES through to the remote shell explicitly.
-ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" "RESET_LIGHTHOUSE_VOLUMES=$RESET_LIGHTHOUSE_VOLUMES bash -s" << 'EOF'
+ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
+  "RESET_LIGHTHOUSE_VOLUMES=$RESET_LIGHTHOUSE_VOLUMES BRIDGE_SEED_CUTOFF_BLOCK=$BRIDGE_SEED_CUTOFF_BLOCK bash -s" << 'EOF'
 cd /home/ubuntu/chain-of-geths
+
+# One-time bridge seeding cutoff (see BRIDGE_SEED_CUTOFF_BLOCK in the local deploy script).
+BRIDGE_SEED_CUTOFF_BLOCK="${BRIDGE_SEED_CUTOFF_BLOCK:-1919999}"
 
 # Install Docker + Compose on the VM if missing.
 if ! command -v docker >/dev/null 2>&1; then
@@ -128,8 +140,24 @@ for img in images/*.tar; do
 done
 
 
-# Start the chain (support both compose v2 and legacy docker-compose on the VM)
-sudo docker compose up -d 2>/dev/null || sudo docker-compose up -d
+# Start base services only (avoid starting the v1.11.6 bridge until seeding is complete).
+# NOTE: `geth-exporter` no longer hard-depends on all legacy geth services.
+echo "Starting base services (top node + monitoring)..."
+sudo docker compose up -d geth-v1-16-7 lighthouse-16-7 geth-exporter prometheus grafana 2>/dev/null || \
+  sudo docker-compose up -d geth-v1-16-7 lighthouse-16-7 geth-exporter prometheus grafana
+
+# Create the bridge container but do not start it yet.
+sudo docker compose create geth-v1-11-6 2>/dev/null || sudo docker-compose create geth-v1-11-6 || true
+
+SEED_FLAG="/home/ubuntu/chain-of-geths/output/seed-v1.11.6-${BRIDGE_SEED_CUTOFF_BLOCK}.done"
+if [ -f "$SEED_FLAG" ]; then
+  echo "Bridge seeding already done ($SEED_FLAG). Starting legacy geth services..."
+  sudo docker compose up -d geth-v1-11-6 geth-v1-10-0 geth-v1-9-25 geth-v1-3-6 2>/dev/null || \
+    sudo docker-compose up -d geth-v1-11-6 geth-v1-10-0 geth-v1-9-25 geth-v1-3-6
+else
+  echo "Launching background bridge seeder (cutoff=$BRIDGE_SEED_CUTOFF_BLOCK)..."
+  nohup env CUTOFF_BLOCK="$BRIDGE_SEED_CUTOFF_BLOCK" bash /home/ubuntu/chain-of-geths/seed-v1.11.6-when-ready.sh >/home/ubuntu/chain-of-geths/output/seed-v1.11.6.nohup.log 2>&1 &
+fi
 
 echo "Chain started. Check logs with: docker-compose logs -f"
 EOF

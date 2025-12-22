@@ -11,7 +11,7 @@ services:
       --http
       --http.addr 0.0.0.0
       --http.vhosts *
-      --http.api eth,net,web3,personal,admin
+      --http.api eth,net,web3,personal,admin,debug
       --authrpc.addr 0.0.0.0
       --authrpc.port 8551
       --authrpc.vhosts *
@@ -196,10 +196,6 @@ services:
       - "9100:9100"
     depends_on:
       - geth-v1-16-7
-      - geth-v1-11-6
-      - geth-v1-10-0
-      - geth-v1-9-25
-      - geth-v1-3-6
     networks:
       - ethereum
 

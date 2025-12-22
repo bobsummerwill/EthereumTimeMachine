@@ -56,6 +56,27 @@ Run `./chain-of-geths/deploy.sh` after updating `SSH_KEY_PATH` and ensuring AWS 
 - **Peer Count**: Use `net_peerCount` to verify connections
 - **Chain Continuity**: Ensure block hashes match between adjacent nodes
 
+## Offline seeding for a fixed historical cutoff (no second consensus client)
+
+If you only need **historical blocks up to a fixed cutoff** (e.g. “last Homestead-era block” = `1,919,999`) and you don’t need the bridge node (`geth v1.11.6`) to follow post-Merge mainnet, you can seed the legacy datadirs **offline**:
+
+1. Let the modern node (`geth v1.16.7`) sync normally (with `lighthouse-16-7`).
+2. Export blocks `0..CUTOFF_BLOCK` from the modern node’s datadir.
+3. Import that block range into the legacy nodes’ datadirs.
+
+This avoids needing to run a second beacon node paired to an older execution client.
+
+Automation:
+- Use [`chain-of-geths/seed-cutoff.sh`](chain-of-geths/seed-cutoff.sh:1) from your local machine.
+- Default cutoff is `CUTOFF_BLOCK=1919999` (end of Homestead era / pre-DAO).
+
+Example:
+
+```bash
+# Seed legacy nodes up to the last Homestead-era block
+CUTOFF_BLOCK=1919999 ./chain-of-geths/seed-cutoff.sh
+```
+
 ### 6. Potential Challenges and Solutions
 
 - **Build Issues**: Older Go versions may require specific compiler flags or dependency adjustments
