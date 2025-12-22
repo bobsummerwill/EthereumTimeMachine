@@ -603,6 +603,12 @@
       "title": "Sync progress",
       "transformations": [
         {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
           "id": "joinByField",
           "options": {
             "byField": "node",
@@ -632,10 +638,10 @@
             },
             "renameByName": {
               "node": "Version",
-              "geth_node_sort_key": "_sort",
-              "geth_effective_head_block": "Block",
-              "geth_sync_target_block": "Head",
-              "geth_sync_percent": "Percentage"
+              "Value": "_sort",
+              "Value 1": "Block",
+              "Value 2": "Head",
+              "Value 3": "Percentage"
             }
           }
         },
