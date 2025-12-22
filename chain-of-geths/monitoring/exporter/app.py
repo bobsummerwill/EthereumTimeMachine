@@ -88,6 +88,14 @@ app = Flask(__name__)
 
 g_up = Gauge("geth_up", "Whether the exporter can query the node (1=up, 0=down)", ["node"])
 g_block = Gauge("geth_block_number", "Latest known head block number", ["node"])
+# During snap/beacon-style sync, some clients may keep `eth_blockNumber` pinned
+# while `eth_syncing.currentBlock` advances. This metric provides a less confusing
+# single “best estimate” of the node's progress.
+g_effective_head = Gauge(
+    "geth_effective_head_block",
+    "Best-effort progress head: if syncing then max(eth_blockNumber, eth_syncing.currentBlock) else eth_blockNumber",
+    ["node"],
+)
 g_peers = Gauge("geth_peer_count", "Peer count", ["node"])
 g_syncing = Gauge("geth_syncing", "Whether node reports eth_syncing != false", ["node"])
 g_sync_current = Gauge("geth_sync_current_block", "eth_syncing.currentBlock (0 when not syncing)", ["node"])
@@ -141,6 +149,7 @@ class Poller:
                         g_sync_current.labels(node=name).set(0)
                         g_sync_highest.labels(node=name).set(0)
                         g_sync_remaining.labels(node=name).set(0)
+                        g_effective_head.labels(node=name).set(block_num)
                     else:
                         # Some clients return a dict with hex values.
                         cur = hex_to_int(syncing.get("currentBlock"))
@@ -149,6 +158,7 @@ class Poller:
                         g_sync_current.labels(node=name).set(cur)
                         g_sync_highest.labels(node=name).set(hi)
                         g_sync_remaining.labels(node=name).set(max(0, hi - cur))
+                        g_effective_head.labels(node=name).set(max(block_num, cur))
 
                 except Exception:
                     # Mark node as down, keep last-seen metrics for block/peers.
@@ -157,6 +167,7 @@ class Poller:
                     g_sync_current.labels(node=name).set(0)
                     g_sync_highest.labels(node=name).set(0)
                     g_sync_remaining.labels(node=name).set(0)
+                    g_effective_head.labels(node=name).set(0)
 
             # Lag metrics: compute after all blocks are fetched.
             if top_name in blocks:

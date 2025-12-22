@@ -103,13 +103,21 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "geth_block_number",
+          "expr": "geth_effective_head_block",
           "legendFormat": "{{node}}",
           "range": true,
           "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "geth_block_number",
+          "hide": true,
+          "legendFormat": "{{node}} (canonical)",
+          "range": true,
+          "refId": "B"
         }
       ],
-      "title": "Block height (eth_blockNumber)",
+      "title": "Head height (effective)",
       "type": "timeseries"
     },
     {
