@@ -175,7 +175,8 @@ ensure_mainnet_genesis_for_v1_0_0() {
 
     # dumpgenesis is a read-only operation and does not require chain data.
     # Note: ethereum/client-go images have entrypoint set to `geth`, so we call the subcommand directly.
-    docker run --rm ethereum/client-go:v1.16.7 dumpgenesis > "$tmp"
+    # Use the built-in mainnet preset so we don't depend on any local chain DB.
+    docker run --rm ethereum/client-go:v1.16.7 dumpgenesis --mainnet > "$tmp"
     mv "$tmp" "$dest"
 }
 
