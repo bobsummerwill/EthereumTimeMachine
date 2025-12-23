@@ -19,6 +19,7 @@ The Compose stack includes Prometheus + Grafana and a small JSON-RPC exporter.
 - Grafana: http://localhost:3000 (default `admin` / `admin`) via [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:1)
 - Prometheus: http://localhost:9090
 - Exporter metrics: http://localhost:9100/metrics
+- Sync UI (minimal): http://localhost:8088
 
 The pre-provisioned dashboard is **“Chain of Geths – Sync Progress”**, with panels for:
 - block height per node

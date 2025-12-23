@@ -256,6 +256,21 @@ services:
     networks:
       - ethereum
 
+  # Minimal web UI that queries Prometheus and renders a “Sync progress” table.
+  sync-ui:
+    build:
+      context: ./monitoring/sync-ui
+    container_name: sync-ui
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      PORT: "8088"
+    ports:
+      - "8088:8088"
+    depends_on:
+      - prometheus
+    networks:
+      - ethereum
+
   grafana:
     image: grafana/grafana:11.3.0
     container_name: grafana
