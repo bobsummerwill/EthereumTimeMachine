@@ -174,7 +174,8 @@ ensure_mainnet_genesis_for_v1_0_0() {
     rm -f "$tmp"
 
     # dumpgenesis is a read-only operation and does not require chain data.
-    docker run --rm ethereum/client-go:v1.16.7 geth dumpgenesis > "$tmp"
+    # Note: ethereum/client-go images have entrypoint set to `geth`, so we call the subcommand directly.
+    docker run --rm ethereum/client-go:v1.16.7 dumpgenesis > "$tmp"
     mv "$tmp" "$dest"
 }
 
