@@ -225,6 +225,8 @@ services:
         Geth v1.0.0=http://geth-v1-0-0:8545
       # Used to add a Lighthouse row in the same “Sync progress” table.
       LIGHTHOUSE_API_URL: http://lighthouse-16-7:5052
+      # Stable label for the Lighthouse row (emit from startup even if the API is still booting).
+      LIGHTHOUSE_DISPLAY_NAME: Lighthouse v8.0.1
       # Used for stage checklist (best-effort backfill detection).
       LIGHTHOUSE_METRICS_URL: http://lighthouse-16-7:8080
       # Used for stage checklist (export/import phases) by reading files under the host ./output bind.
