@@ -12,7 +12,7 @@ Entrypoints:
 
 ### Execution + consensus (top of chain)
 
-- **`geth-v1-16-7`** (execution, `eth/68–69`) + **`lighthouse-16-7`** (consensus) track post-Merge mainnet.
+- **`geth-v1-16-7`** (execution, `eth/68–69`) + **`lighthouse-v8-0-1`** (consensus) track post-Merge mainnet.
   - Services: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
   - `geth-v1-16-7` exposes HTTP JSON-RPC on host port `8545`.
 
@@ -23,8 +23,8 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
 ```
                            (post-Merge head)
             +-----------------------------------------------+
-            | lighthouse-16-7 (v8.0.1, 20th Nov 2025) (CL)  |
-            | geth-v1-16-7 (4th Nov 2025) (EL)              |
+            | lighthouse v8.0.1 (20th Nov 2025) (CL)        |
+            | geth v1.16.7 (4th Nov 2025) (EL)              |
             | eth/68-69                                     |
             | Forks added:                                  |
             |   Cancun                                      |
@@ -33,7 +33,7 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
                                | (offline block export/import up to cutoff)
                                v
             +-----------------------------------------------+
-            | geth-v1-11-6 (20th Apr 2023)                  |
+            | geth v1.11.6 (20th Apr 2023)                  |
             | eth/66-68                                     |
             | Forks added:                                  |
             |   Shanghai                                    |
@@ -45,7 +45,7 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
                                | eth/66
                                v
             +-----------------------------------------------+
-            | geth-v1-10-0 (3rd Mar 2021)                   |
+            | geth v1.10.0 (3rd Mar 2021)                   |
             | eth/64-66                                     |
             | Forks added:                                  |
             |   London                                      |
@@ -55,7 +55,7 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
                                | eth/64-65
                                v
             +-----------------------------------------------+
-            | geth-v1-9-25 (11th Dec 2020)                  |
+            | geth v1.9.25 (11th Dec 2020)                  |
             | eth/63-65                                     |
             | Forks added:                                  |
             |   Muir Glacier                                |
@@ -71,7 +71,7 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
                                | eth/63
                                v
             +-----------------------------------------------+
-            | geth-v1-3-6 (1st Apr 2016)                    |
+            | geth v1.3.6 (1st Apr 2016)                    |
             | eth/61-63                                     |
             | Forks added:                                  |
             |   Homestead                                   |
@@ -80,7 +80,7 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
                                | eth/61
                                v
             +-----------------------------------------------+
-            | geth-v1-0-3 (27th Jan 2014)                   |
+            | geth v1.0.3 (27th Jan 2014)                   |
             | eth/60-61                                     |
             | Forks:                                        |
             |   Frontier                                    |
@@ -88,19 +88,25 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
 ```
 
 Services:
-- `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:42) (line 42)
-- `geth-v1-10-0`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:70) (line 70)
-- `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:99) (line 99)
-- `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:125) (line 125)
-- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:151) (line 151)
+- `geth-v1-16-7`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:4) (line 4)
+- `lighthouse-v8-0-1`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:182) (line 182)
+- `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:43) (line 43)
+- `geth-v1-10-0`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:72) (line 72)
+- `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:101) (line 101)
+- `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:127) (line 127)
+- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:153) (line 153)
+- `geth-exporter`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:216) (line 216)
+- `prometheus`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:246) (line 246)
+- `sync-ui`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:263) (line 263)
+- `grafana`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:277) (line 277)
 
 ## Offline export/import seeding (bridge workflow)
 
-The stack uses a single consensus client (`lighthouse-16-7`) for the head node.
+The stack uses a single consensus client (`lighthouse-v8-0-1`) for the head node.
 
 The bridge workflow seeds older datadirs up to a fixed historical cutoff using **block export/import**:
 
-1. Let `geth-v1-16-7` + `lighthouse-16-7` sync normally.
+1. Let `geth-v1-16-7` + `lighthouse-v8-0-1` sync normally.
 2. Export blocks `0..CUTOFF_BLOCK` from the modern node.
 3. Import that block range into `geth-v1-11-6` (and then bring up the rest of the legacy chain).
 

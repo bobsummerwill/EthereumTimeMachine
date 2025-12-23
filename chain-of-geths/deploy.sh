@@ -128,7 +128,7 @@ sudo docker volume ls -q | grep -E '(^|_)grafana-data$' | xargs -r sudo docker v
 if [ "${RESET_LIGHTHOUSE_VOLUMES:-0}" = "1" ]; then
   echo "Deleting Lighthouse data volumes (RESET_LIGHTHOUSE_VOLUMES=1)..."
   # docker-compose names volumes as <project>_<volume>. Match both raw and project-prefixed names.
-  sudo docker volume ls -q | grep -E '(^|_)lighthouse-16-7-data$' | xargs -r sudo docker volume rm -f || true
+  sudo docker volume ls -q | grep -E '(^|_)lighthouse-v8-0-1-data$' | xargs -r sudo docker volume rm -f || true
 else
   echo "Keeping Lighthouse data volumes (set RESET_LIGHTHOUSE_VOLUMES=1 to wipe them)."
 fi
@@ -142,8 +142,8 @@ done
 # Start base services only (avoid starting the v1.11.6 bridge until seeding is complete).
 # NOTE: `geth-exporter` no longer hard-depends on all legacy geth services.
 echo "Starting base services (top node + monitoring)..."
-sudo docker compose up -d geth-v1-16-7 lighthouse-16-7 geth-exporter prometheus grafana sync-ui 2>/dev/null || \
-  sudo docker-compose up -d geth-v1-16-7 lighthouse-16-7 geth-exporter prometheus grafana sync-ui
+sudo docker compose up -d geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui 2>/dev/null || \
+  sudo docker-compose up -d geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui
 
 # Create the bridge container but do not start it yet.
 sudo docker compose create geth-v1-11-6 2>/dev/null || sudo docker-compose create geth-v1-11-6 || true

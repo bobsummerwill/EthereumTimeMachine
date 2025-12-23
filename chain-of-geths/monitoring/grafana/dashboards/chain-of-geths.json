@@ -764,7 +764,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "up{job=\"lighthouse_16_7\"}",
+          "expr": "up{job=\"lighthouse_v8_0_1\"}",
           "legendFormat": "lighthouse-exporter",
           "range": true,
           "refId": "B"

@@ -179,9 +179,9 @@ services:
   # Consensus client (beacon node) for the *modern feeder* execution node.
   # We keep this single CL instance so the modern EL can progress on post-Merge mainnet
   # and continue serving historical blocks to older nodes.
-  lighthouse-16-7:
+  lighthouse-v8-0-1:
     image: sigp/lighthouse:v8.0.1
-    container_name: lighthouse-16-7
+    container_name: lighthouse-v8-0-1
     command: |
       lighthouse beacon_node
       --datadir /data
@@ -203,7 +203,7 @@ services:
       - "9000:9000/udp"
       - "9001:9001/udp"
     volumes:
-      - lighthouse-16-7-data:/data
+      - lighthouse-v8-0-1-data:/data
       - ./generated-files/data/v1.16.7/geth/jwtsecret:/jwt/jwtsecret:ro
     depends_on:
       - geth-v1-16-7
@@ -227,11 +227,11 @@ services:
         Geth v1.3.6=http://geth-v1-3-6:8545,
         Geth v1.0.3=http://geth-v1-0-3:8545
       # Used to add a Lighthouse row in the same “Sync progress” table.
-      LIGHTHOUSE_API_URL: http://lighthouse-16-7:5052
+      LIGHTHOUSE_API_URL: http://lighthouse-v8-0-1:5052
       # Stable label for the Lighthouse row (emit from startup even if the API is still booting).
       LIGHTHOUSE_DISPLAY_NAME: Lighthouse v8.0.1
       # Used for stage checklist (best-effort backfill detection).
-      LIGHTHOUSE_METRICS_URL: http://lighthouse-16-7:8080
+      LIGHTHOUSE_METRICS_URL: http://lighthouse-v8-0-1:8080
       # Used for stage checklist (export/import phases) by reading files under the host ./generated-files bind.
       HOST_OUTPUT_DIR: /host_output
       CUTOFF_BLOCK: "1919999"
@@ -304,4 +304,4 @@ networks:
 volumes:
   prometheus-data:
   grafana-data:
-  lighthouse-16-7-data:
+  lighthouse-v8-0-1-data:

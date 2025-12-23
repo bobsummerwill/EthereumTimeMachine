@@ -7,8 +7,8 @@ scrape_configs:
     static_configs:
       - targets:
           - geth-exporter:9100
-  - job_name: lighthouse_16_7
+  - job_name: lighthouse_v8_0_1
     metrics_path: /metrics
     static_configs:
       - targets:
-          - lighthouse-16-7:8080
+          - lighthouse-v8-0-1:8080
