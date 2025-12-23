@@ -154,7 +154,6 @@ services:
     command: |
       --datadir /data
       --nodekey /data/nodekey
-      --cache 256
       --rpc
       --rpcaddr 0.0.0.0
       --rpcapi eth,net,web3
