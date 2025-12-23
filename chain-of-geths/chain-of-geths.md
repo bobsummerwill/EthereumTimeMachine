@@ -1,93 +1,122 @@
-# Chain of Geths
+# Chain of Geths (implemented)
 
-## Goal
+This document describes the **current, working** “Chain of Geths” implementation in this repository (not a future plan).
 
-The goal of the EthereumTimeMachine project is to sync a Geth 1.0 node by chaining together successively older Geth versions that share overlapping ETH protocols. This allows bridging from the latest PoS-capable node down to Frontier-era Geth (v1.0.x), enabling historical blockchain data access without requiring every intermediate version.
+The system is defined by:
+- Docker Compose: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:1)
+- Key/static-peering generator: [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh:1)
+- Image builder (downloads binaries + builds v1.0.3 from source): [`chain-of-geths/build-images.sh`](chain-of-geths/build-images.sh:1)
+- Automated deploy to the AWS VM: [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh:1)
 
-## Minimal Version Chain
+## What we built
 
-To sync a Geth 1.0 node from the current Ethereum mainnet, we need to bridge from the latest ETH protocol (68) down to ETH 60. The minimal set of versions needed for complete protocol compatibility is:
+### Execution + consensus (top of chain)
 
-- **Geth v1.16.7** (ETH 68, 69) - Latest version, can peer with current mainnet
-- **Geth v1.11.6** (ETH 66, 67, 68) - Bridges `v1.16.7` ↔ `v1.10.0`
-- **Geth v1.10.0** (ETH 64, 65, 66) - Bridges `v1.11.6` ↔ `v1.9.25`
-- **Geth v1.9.25** (ETH 63, 64, 65) - Bridges `v1.10.0` ↔ `v1.3.6`
-- **Geth v1.3.6** (ETH 61, 62, 63) - Oldest Linux node in the Compose stack
-- **Geth v1.0.x** (ETH 60, 61) - Original Frontier client
+- **`geth-v1-16-7`** (execution, `eth/68–69`) + **`lighthouse-16-7`** (consensus) track post-Merge mainnet.
+  - Services: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:4)
+  - `geth-v1-16-7` exposes HTTP JSON-RPC on host port `8545`.
 
-This chain ensures every adjacent pair shares at least one protocol version, allowing the top node to sync from mainnet and propagate data down to Geth 1.0.
+### Protocol bridge chain (down to Frontier)
 
-Notes on protocol compatibility:
-- `v1.16.7` supports `eth/68` and `eth/69`, so it cannot peer directly with `v1.10.0` (`eth/64`, `eth/65`, `eth/66`).
-- `v1.11.6` is inserted specifically because it supports `eth/66`, `eth/67`, and `eth/68`.
-- `v1.10.0` also cannot peer directly with `v1.3.6` (`eth/61`, `eth/62`, `eth/63`), so `v1.9.25` is used to bridge `eth/65 → eth/63`.
+The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
 
-## Detailed Implementation Plan
-
-### 1. Automated Setup
-
-The entire setup is automated using the scripts in the `/chain-of-geths/` directory:
-
-- `generate-keys.sh`: Generates node keys and static nodes for automatic peering
-- `build-images.sh`: Builds Docker images with downloaded binaries
-- `deploy.sh`: Deploys everything to AWS VMs
-
-Notes:
-- The Docker Compose stack runs **v1.16.7 → v1.0.3** (all Linux containers).
-
-### 2. AWS Deployment
-
-Deployment is fully automated using the `deploy.sh` script from your local machine. It handles:
-
-- Pregenerating node keys and static nodes for consistent enode IDs and automatic peering
-- Building Docker images locally
-- Deploying to the Ubuntu AWS EC2 instance (m6a.2xlarge at 54.81.90.194)
-- Starting the Docker Compose chain (v1.16.7 through v1.0.3) with automatic container wiring via static nodes
-
-Run `./chain-of-geths/deploy.sh` after updating `SSH_KEY_PATH` and ensuring AWS CLI is configured.
-
-
-### 5. Validation and Monitoring
-
-- **Handshake Verification**: Check logs for successful peer connections
-- **Block Height Monitoring**: Query `eth_blockNumber` on each node to ensure progressive sync
-- **Peer Count**: Use `net_peerCount` to verify connections
-- **Chain Continuity**: Ensure block hashes match between adjacent nodes
-
-## Offline seeding for a fixed historical cutoff (no second consensus client)
-
-If you only need **historical blocks up to a fixed cutoff** (e.g. “last Homestead-era block” = `1,919,999`) and you don’t need the bridge node (`geth v1.11.6`) to follow post-Merge mainnet, you can seed the legacy datadirs **offline**:
-
-1. Let the modern node (`geth v1.16.7`) sync normally (with `lighthouse-16-7`).
-2. Export blocks `0..CUTOFF_BLOCK` from the modern node’s datadir.
-3. Import that block range into the legacy nodes’ datadirs.
-
-This avoids needing to run a second beacon node paired to an older execution client.
-
-Automation:
-- Use [`chain-of-geths/seed-cutoff.sh`](chain-of-geths/seed-cutoff.sh:1) from your local machine.
-- Default cutoff is `CUTOFF_BLOCK=1919999` (end of Homestead era / pre-DAO).
-
-Example:
-
-```bash
-# Seed legacy nodes up to the last Homestead-era block
-CUTOFF_BLOCK=1919999 ./chain-of-geths/seed-cutoff.sh
+```
+                    (post-Merge head)
+           +--------------------------------+
+           | lighthouse-16-7 (CL)           |
+           | + geth-v1-16-7 (EL)            |
+           |   eth/68-69                    |
+           +---------------+----------------+
+                           |
+                           | (offline block export/import up to cutoff)
+                           v
+           +---------------+----------------+
+           | geth-v1-11-6                     |
+           | eth/66-68                         |
+           +---------------+----------------+
+                           |
+                           | eth/66
+                           v
+           +---------------+----------------+
+           | geth-v1-10-0                     |
+           | eth/64-66                         |
+           +---------------+----------------+
+                           |
+                           | eth/64-65
+                           v
+           +---------------+----------------+
+           | geth-v1-9-25                     |
+           | eth/63-65                         |
+           +---------------+----------------+
+                           |
+                           | eth/63
+                           v
+           +---------------+----------------+
+           | geth-v1-3-6                      |
+           | eth/61-63                         |
+           +---------------+----------------+
+                           |
+                           | eth/61
+                           v
+           +---------------+----------------+
+           | geth-v1-0-3                      |
+           | eth/60-61 (Frontier-era)          |
+           +--------------------------------+
 ```
 
-### 6. Potential Challenges and Solutions
+Services:
+- `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:42)
+- `geth-v1-10-0`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:70)
+- `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:99)
+- `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:125)
+- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:151)
 
-- **Build Issues**: Older Go versions may require specific compiler flags or dependency adjustments
-- **Protocol Compatibility**: Ensure no breaking changes in devp2p between versions
-- **Resource Requirements**: Monitor CPU/memory usage on m6a.large instance
-- **Sync Time**: PoW chain sync may take significant time; consider fast sync modes where possible
+## The key workaround: offline export/import seeding (no “old EL + CL” pair)
 
-### 7. Next Steps
+We do **not** run a second beacon node for older execution clients.
 
-- Implement automated peer discovery and connection
-- Add health checks and restart policies
-- Create monitoring dashboards
-- Develop validation scripts for chain integrity
-- Document troubleshooting procedures
+Instead, we seed the bridge datadirs up to a fixed historical cutoff using **block export/import**:
 
-This plan provides a complete roadmap for achieving the goal of syncing a Geth 1.0 node through a minimal chain of historical versions.
+1. Let `geth-v1-16-7` + `lighthouse-16-7` sync normally.
+2. Export blocks `0..CUTOFF_BLOCK` from the modern node.
+3. Import that block range into `geth-v1-11-6` (and then bring up the rest of the legacy chain).
+
+Automation:
+- Bridge seeding orchestration: [`chain-of-geths/seed-v1.11.6-when-ready.sh`](chain-of-geths/seed-v1.11.6-when-ready.sh:1)
+- One-shot helper for fixed cutoff: [`chain-of-geths/seed-cutoff.sh`](chain-of-geths/seed-cutoff.sh:1)
+- Export helper (RPC-based): [`chain-of-geths/seed-rlp-from-rpc.py`](chain-of-geths/seed-rlp-from-rpc.py:1)
+
+This avoids the “old chainstate format” / “no compatible consensus client” problem: the modern EL+CL stays authoritative for head sync, while the legacy nodes consume only the historical block range we seeded.
+
+## Static peering (no discovery for legacy nodes)
+
+Legacy services run with discovery disabled and peer **only** to the next node in the chain.
+
+- `generate-keys.sh` pre-generates node keys and writes `static-nodes.json` into each datadir under `chain-of-geths/output/`.
+  - Script: [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh:1)
+
+This makes peering deterministic across restarts and across the AWS deployment.
+
+## Monitoring
+
+The stack includes Prometheus + Grafana + a JSON-RPC exporter so metrics work across old geth versions:
+
+- Exporter: [`chain-of-geths/monitoring/exporter/app.py`](chain-of-geths/monitoring/exporter/app.py:1)
+- Prometheus config: [`chain-of-geths/monitoring/prometheus/prometheus.yml`](chain-of-geths/monitoring/prometheus/prometheus.yml:1)
+- Grafana dashboard provisioning: [`chain-of-geths/monitoring/grafana/provisioning/dashboards/dashboard.yml`](chain-of-geths/monitoring/grafana/provisioning/dashboards/dashboard.yml:1)
+- Grafana dashboard JSON: [`chain-of-geths/monitoring/grafana/dashboards/chain-of-geths.json`](chain-of-geths/monitoring/grafana/dashboards/chain-of-geths.json:1)
+- Minimal “Sync UI”: [`chain-of-geths/monitoring/sync-ui/server.js`](chain-of-geths/monitoring/sync-ui/server.js:1)
+
+## Deployment
+
+Run the end-to-end automation from your machine:
+
+- [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh:1)
+
+It:
+1. Generates keys/static-nodes
+2. Builds images
+3. Copies artifacts + compose stack to the VM
+4. Starts the modern head node + monitoring
+5. Seeds the bridge via export/import (once)
+6. Starts the legacy chain in stages
