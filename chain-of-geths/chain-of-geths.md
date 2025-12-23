@@ -1,19 +1,19 @@
-# Chain of Geths (implemented)
+# Chain of Geths
 
-This document describes the **current, working** “Chain of Geths” implementation in this repository (not a future plan).
+This directory contains a Docker Compose stack that runs multiple Geth versions (plus Lighthouse) and wires them together via static peering.
 
-The system is defined by:
-- Docker Compose: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:1)
-- Key/static-peering generator: [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh:1)
-- Image builder (downloads binaries + builds v1.0.3 from source): [`chain-of-geths/build-images.sh`](chain-of-geths/build-images.sh:1)
-- Automated deploy to the AWS VM: [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh:1)
+Entrypoints:
+- Compose stack: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- Key/config generation: [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh)
+- Image build: [`chain-of-geths/build-images.sh`](chain-of-geths/build-images.sh)
+- Remote deploy: [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh)
 
 ## What we built
 
 ### Execution + consensus (top of chain)
 
 - **`geth-v1-16-7`** (execution, `eth/68–69`) + **`lighthouse-16-7`** (consensus) track post-Merge mainnet.
-  - Services: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:4)
+  - Services: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
   - `geth-v1-16-7` exposes HTTP JSON-RPC on host port `8545`.
 
 ### Protocol bridge chain (down to Frontier)
@@ -88,35 +88,40 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
 ```
 
 Services:
-- `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:42)
-- `geth-v1-10-0`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:70)
-- `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:99)
-- `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:125)
-- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:151)
+- `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:42) (line 42)
+- `geth-v1-10-0`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:70) (line 70)
+- `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:99) (line 99)
+- `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:125) (line 125)
+- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:151) (line 151)
 
-## The key workaround: offline export/import seeding (no “old EL + CL” pair)
+## Offline export/import seeding (bridge workflow)
 
-We do **not** run a second beacon node for older execution clients.
+The stack uses a single consensus client (`lighthouse-16-7`) for the head node.
 
-Instead, we seed the bridge datadirs up to a fixed historical cutoff using **block export/import**:
+The bridge workflow seeds older datadirs up to a fixed historical cutoff using **block export/import**:
 
 1. Let `geth-v1-16-7` + `lighthouse-16-7` sync normally.
 2. Export blocks `0..CUTOFF_BLOCK` from the modern node.
 3. Import that block range into `geth-v1-11-6` (and then bring up the rest of the legacy chain).
 
 Automation:
-- Bridge seeding orchestration: [`chain-of-geths/seed-v1.11.6-when-ready.sh`](chain-of-geths/seed-v1.11.6-when-ready.sh:1)
-- One-shot helper for fixed cutoff: [`chain-of-geths/seed-cutoff.sh`](chain-of-geths/seed-cutoff.sh:1)
-- Export helper (RPC-based): [`chain-of-geths/seed-rlp-from-rpc.py`](chain-of-geths/seed-rlp-from-rpc.py:1)
+- Bridge seeding orchestration: [`chain-of-geths/seed-v1.11.6-when-ready.sh`](chain-of-geths/seed-v1.11.6-when-ready.sh)
+- One-shot helper for fixed cutoff: [`chain-of-geths/seed-cutoff.sh`](chain-of-geths/seed-cutoff.sh)
+- Export helper (RPC-based): [`chain-of-geths/seed-rlp-from-rpc.py`](chain-of-geths/seed-rlp-from-rpc.py)
 
 This avoids the “old chainstate format” / “no compatible consensus client” problem: the modern EL+CL stays authoritative for head sync, while the legacy nodes consume only the historical block range we seeded.
 
-## Static peering (no discovery for legacy nodes)
+## Static peering (no discovery for older nodes)
 
-Legacy services run with discovery disabled and peer **only** to the next node in the chain.
+Older services run with discovery disabled and peer **only** to the next node in the chain.
 
- - `generate-keys.sh` pre-generates node keys and writes `static-nodes.json` into each datadir under `chain-of-geths/generated-files/`.
-  - Script: [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh:1)
+`generate-keys.sh` writes deterministic peering/config files under `chain-of-geths/generated-files/`:
+- `nodekey`
+- `static-nodes.json`
+- `config.toml` (newer nodes)
+- `genesis.json` (v1.0.3)
+
+See: [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh)
 
 This makes peering deterministic across restarts and across the AWS deployment.
 
@@ -124,17 +129,36 @@ This makes peering deterministic across restarts and across the AWS deployment.
 
 The stack includes Prometheus + Grafana + a JSON-RPC exporter so metrics work across old geth versions:
 
-- Exporter: [`chain-of-geths/monitoring/exporter/app.py`](chain-of-geths/monitoring/exporter/app.py:1)
-- Prometheus config: [`chain-of-geths/monitoring/prometheus/prometheus.yml`](chain-of-geths/monitoring/prometheus/prometheus.yml:1)
-- Grafana dashboard provisioning: [`chain-of-geths/monitoring/grafana/provisioning/dashboards/dashboard.yml`](chain-of-geths/monitoring/grafana/provisioning/dashboards/dashboard.yml:1)
-- Grafana dashboard JSON: [`chain-of-geths/monitoring/grafana/dashboards/chain-of-geths.json`](chain-of-geths/monitoring/grafana/dashboards/chain-of-geths.json:1)
-- Minimal “Sync UI”: [`chain-of-geths/monitoring/sync-ui/server.js`](chain-of-geths/monitoring/sync-ui/server.js:1)
+- Exporter: [`chain-of-geths/monitoring/exporter/app.py`](chain-of-geths/monitoring/exporter/app.py)
+- Prometheus config: [`chain-of-geths/monitoring/prometheus/prometheus.yml`](chain-of-geths/monitoring/prometheus/prometheus.yml)
+- Grafana dashboard provisioning: [`chain-of-geths/monitoring/grafana/provisioning/dashboards/dashboard.yml`](chain-of-geths/monitoring/grafana/provisioning/dashboards/dashboard.yml)
+- Grafana dashboard JSON: [`chain-of-geths/monitoring/grafana/dashboards/chain-of-geths.json`](chain-of-geths/monitoring/grafana/dashboards/chain-of-geths.json)
+- Minimal “Sync UI”: [`chain-of-geths/monitoring/sync-ui/server.js`](chain-of-geths/monitoring/sync-ui/server.js)
+
+
+Endpoints (on the deployed host; see [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)):
+- Grafana: http://localhost:3000 (default `admin` / `admin`)
+- Prometheus: http://localhost:9090
+- Exporter metrics: http://localhost:9100/metrics
+- Sync UI: http://localhost:8088
+
+## Generated files directory
+
+All generated material is under `chain-of-geths/generated-files/`.
+
+[`.gitignore`](.gitignore) is configured to:
+- ignore `known_hosts`, `jwtsecret`, exports/logs, docker image tarballs, and chain DB data
+- allowlist `nodekey`, `static-nodes.json`, `config.toml`, and `genesis.json`
+
+## Remote deploy
+
+Run: [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh)
 
 ## Deployment
 
 Run the end-to-end automation from your machine:
 
-- [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh:1)
+- [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh)
 
 It:
 1. Generates keys/static-nodes

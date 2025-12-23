@@ -1,39 +1,23 @@
 # EthereumTimeMachine
-Tools to revive Ethereum Frontier and Homestead chains
+Tools to run historical Ethereum clients and related workflows.
 
 ## Chain of Geths
 
-This repository currently focuses on the **"Chain of Geths"** approach: run multiple historical Geth versions that share overlapping `eth/*` protocol versions, allowing a modern node to sync from mainnet and propagate chain data down to progressively older clients.
+The primary implementation in this repo is **Chain of Geths**: a Docker Compose stack of multiple Geth versions (plus Lighthouse) where adjacent nodes share overlapping `eth/*` subprotocols.
 
-Start here:
-- Design/plan: `chain-of-geths/chain-of-geths.md`
-- Docker Compose stack (v1.16.7 → v1.3.6, with protocol bridge nodes): `chain-of-geths/docker-compose.yml`
-- Automation scripts: `chain-of-geths/generate-keys.sh`, `chain-of-geths/build-images.sh`, `chain-of-geths/deploy.sh`
+Documentation: [`chain-of-geths/chain-of-geths.md`](chain-of-geths/chain-of-geths.md)
 
-Note: The Docker Compose stack includes a containerized **Geth v1.0.3** (built from source).
+Entrypoints:
+- Compose stack: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- Key/config generation: [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh)
+- Image build: [`chain-of-geths/build-images.sh`](chain-of-geths/build-images.sh)
+- Remote deploy: [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh)
 
-## Visual sync progress (Grafana)
+### Quick start (remote deploy)
 
-The Compose stack includes Prometheus + Grafana and a small JSON-RPC exporter.
+```bash
+# Ensure SSH_KEY_PATH points at your PEM and SSH can reach the VM.
+./chain-of-geths/deploy.sh
+```
 
-- Grafana: http://localhost:3000 (default `admin` / `admin`) via [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:1)
-- Prometheus: http://localhost:9090
-- Exporter metrics: http://localhost:9100/metrics
-- Sync UI (minimal): http://localhost:8088
-
-The pre-provisioned dashboard is **“Chain of Geths – Sync Progress”**, with panels for:
-- block height per node
-- lag vs the top node (v1.16.7)
-- remaining blocks while syncing
-- peer count
-
-## Generated artifacts
-
-[`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh:1) writes its outputs under `chain-of-geths/generated-files/`.
-
-[`.gitignore`](.gitignore:1) is set up to:
-- **ignore** machine-specific SSH state (`known_hosts`), per-deployment secrets (`jwtsecret`), exports/logs, and large chain DB data
-- **allowlist** small deterministic files (e.g. `nodekey`, `static-nodes.json`, `config.toml`, `genesis.json`)
-
-Example outputs:
-- [`chain-of-geths/generated-files/data/v1.10.0/static-nodes.json`](chain-of-geths/generated-files/data/v1.10.0/static-nodes.json:1)
+Reference: [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh)
