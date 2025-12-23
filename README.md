@@ -29,7 +29,11 @@ The pre-provisioned dashboard is **“Chain of Geths – Sync Progress”**, wit
 
 ## Generated artifacts
 
-[`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh:1) writes its outputs under `chain-of-geths/output/` (ignored by git via [`.gitignore`](.gitignore:1)).
+[`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh:1) writes its outputs under `chain-of-geths/generated-files/`.
+
+[`.gitignore`](.gitignore:1) is set up to:
+- **ignore** machine-specific SSH state (`known_hosts`), per-deployment secrets (`jwtsecret`), exports/logs, and large chain DB data
+- **allowlist** small deterministic files (e.g. `nodekey`, `static-nodes.json`, `config.toml`, `genesis.json`)
 
 Example outputs:
-- [`chain-of-geths/output/data/v1.10.0/static-nodes.json`](chain-of-geths/output/data/v1.10.0/static-nodes.json:1)
+- [`chain-of-geths/generated-files/data/v1.10.0/static-nodes.json`](chain-of-geths/generated-files/data/v1.10.0/static-nodes.json:1)

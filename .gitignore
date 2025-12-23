@@ -1,5 +1,21 @@
 # Generated artifacts
-chain-of-geths/images/
-chain-of-geths/output/
-*.pyc
 
+# Docker image tarball dir used by deploy.sh
+chain-of-geths/images/
+chain-of-geths/generated-files/docker-images/
+chain-of-geths/generated-files/docker-images/**
+
+# Generated key material + configs.
+# We commit a small deterministic subset (nodekey/static-nodes/config/genesis) but ignore:
+# - machine-specific SSH state
+# - per-deployment secrets
+# - runtime/export artifacts and large chain DB data
+
+# Machine-specific SSH host key pinning
+chain-of-geths/generated-files/known_hosts
+
+# Per-deployment secrets (Engine API JWT)
+chain-of-geths/generated-files/**/jwtsecret
+
+# Compiled python output
+*.pyc

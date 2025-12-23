@@ -12,8 +12,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Non-interactive SSH defaults for first-time connections (no host-key prompt).
-# We store known_hosts under output/ so it doesn't pollute the user's global ~/.ssh/known_hosts.
-SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$SCRIPT_DIR/output/known_hosts"
+# We store known_hosts under generated-files/ so it doesn't pollute the user's global ~/.ssh/known_hosts.
+SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$SCRIPT_DIR/generated-files/known_hosts"
 
 VM_IP="54.81.90.194"
 VM_USER="ubuntu"
@@ -24,7 +24,7 @@ SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/Downloads/chain-of-geths-keys.pem}"
 # Cutoff: last Homestead-era block (right before the DAO fork activates at 1,920,000).
 CUTOFF_BLOCK="${CUTOFF_BLOCK:-1919999}"
 
-EXPORT_DIR_REMOTE="/home/$VM_USER/chain-of-geths/output/exports"
+EXPORT_DIR_REMOTE="/home/$VM_USER/chain-of-geths/generated-files/exports"
 EXPORT_FILE_NAME="${EXPORT_FILE_NAME:-mainnet-0-${CUTOFF_BLOCK}.rlp}"
 
 echo "Seeding cutoff blocks 0..$CUTOFF_BLOCK on $VM_USER@$VM_IP"
@@ -35,16 +35,16 @@ ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
 set -euo pipefail
 cd /home/ubuntu/chain-of-geths
 
-mkdir -p output/exports
+mkdir -p generated-files/exports
 
 echo "Stopping geth-v1-16-7 to release DB lock..."
 sudo docker compose stop geth-v1-16-7 >/dev/null 2>&1 || sudo docker-compose stop geth-v1-16-7 >/dev/null 2>&1 || true
 
 echo "Exporting blocks 0..$CUTOFF_BLOCK from geth-v1-16-7 datadir..."
-sudo docker run --rm \
+  sudo docker run --rm \
   --entrypoint geth \
-  -v "$(pwd)/output/data/v1.16.7:/data" \
-  -v "$(pwd)/output/exports:/exports" \
+  -v "$(pwd)/generated-files/data/v1.16.7:/data" \
+  -v "$(pwd)/generated-files/exports:/exports" \
   ethereum/client-go:v1.16.7 \
   --datadir /data export "/exports/$EXPORT_FILE_NAME" 0 $CUTOFF_BLOCK
 
@@ -61,8 +61,8 @@ import_one() {
   echo "Importing into $version ($image)..."
   sudo docker run --rm \
     --entrypoint geth \
-    -v "$(pwd)/output/data/$version:/data" \
-    -v "$(pwd)/output/exports:/exports" \
+    -v "$(pwd)/generated-files/data/$version:/data" \
+    -v "$(pwd)/generated-files/exports:/exports" \
     "$image" \
     --datadir /data import "/exports/$EXPORT_FILE_NAME"
 }

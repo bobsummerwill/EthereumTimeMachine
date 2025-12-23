@@ -8,11 +8,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-mkdir -p "$SCRIPT_DIR/output"
+mkdir -p "$SCRIPT_DIR/generated-files"
 
 # Non-interactive SSH defaults for first-time connections (no host-key prompt).
-# We store known_hosts under output/ so it doesn't pollute the user's global ~/.ssh/known_hosts.
-SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$SCRIPT_DIR/output/known_hosts"
+# We store known_hosts under generated-files/ so it doesn't pollute the user's global ~/.ssh/known_hosts.
+SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$SCRIPT_DIR/generated-files/known_hosts"
 
 require_cmd() {
     local cmd="$1"
@@ -57,11 +57,12 @@ echo "Building Docker images locally..."
 ./build-images.sh
 
 echo "Saving Docker images..."
-mkdir -p images
+DOCKER_IMAGES_DIR="$SCRIPT_DIR/generated-files/docker-images"
+mkdir -p "$DOCKER_IMAGES_DIR"
 # Avoid carrying forward stale tarballs for versions that are no longer in the stack.
-rm -f images/*.tar
+rm -f "$DOCKER_IMAGES_DIR"/*.tar
 for version in v1.0.3 v1.11.6 v1.10.0 v1.9.25 v1.3.6; do
-    docker save ethereumtimemachine/geth:$version > images/geth-$version.tar
+    docker save ethereumtimemachine/geth:$version > "$DOCKER_IMAGES_DIR/geth-$version.tar"
 done
 
 echo "Copying files to VM..."
@@ -69,16 +70,16 @@ echo "Copying files to VM..."
 # Ensure remote directory exists before copying.
 ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" "mkdir -p /home/$VM_USER/chain-of-geths"
 
-# If the compose stack has been run before, bind-mounted directories under output/ may be root-owned
-# (because containers often run as root). That breaks `scp -r output ...`.
+# If the compose stack has been run before, bind-mounted directories under generated-files/ may be root-owned
+# (because containers often run as root). That breaks `scp -r generated-files ...`.
 #
-# Fix by stopping any running stack and chown'ing output/ back to the SSH user before copying.
+# Fix by stopping any running stack and chown'ing generated-files/ back to the SSH user before copying.
 ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
   "cd /home/$VM_USER/chain-of-geths 2>/dev/null && (sudo docker compose down --remove-orphans 2>/dev/null || sudo docker-compose down --remove-orphans 2>/dev/null || true); \
-   sudo chown -R $VM_USER:$VM_USER /home/$VM_USER/chain-of-geths/output 2>/dev/null || true"
+   sudo chown -R $VM_USER:$VM_USER /home/$VM_USER/chain-of-geths/generated-files 2>/dev/null || true"
 
 scp $SSH_OPTS -i "$SSH_KEY_PATH" -r \
-  output images monitoring \
+  generated-files monitoring \
   generate-keys.sh build-images.sh docker-compose.yml \
   seed-v1.11.6-when-ready.sh seed-cutoff.sh seed-rlp-from-rpc.py start-legacy-staged.sh \
   "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
@@ -133,8 +134,8 @@ else
 fi
 
 # Load Docker images
-for img in images/*.tar; do
-    sudo docker load < $img
+for img in generated-files/docker-images/*.tar; do
+    sudo docker load < "$img"
 done
 
 
@@ -147,13 +148,13 @@ sudo docker compose up -d geth-v1-16-7 lighthouse-16-7 geth-exporter prometheus 
 # Create the bridge container but do not start it yet.
 sudo docker compose create geth-v1-11-6 2>/dev/null || sudo docker-compose create geth-v1-11-6 || true
 
-SEED_FLAG="/home/ubuntu/chain-of-geths/output/seed-v1.11.6-${BRIDGE_SEED_CUTOFF_BLOCK}.done"
+SEED_FLAG="/home/ubuntu/chain-of-geths/generated-files/seed-v1.11.6-${BRIDGE_SEED_CUTOFF_BLOCK}.done"
 if [ -f "$SEED_FLAG" ]; then
   echo "Bridge seeding already done ($SEED_FLAG). Starting legacy geth services..."
   bash /home/ubuntu/chain-of-geths/start-legacy-staged.sh
 else
   echo "Launching background bridge seeder (cutoff=$BRIDGE_SEED_CUTOFF_BLOCK)..."
-  nohup env CUTOFF_BLOCK="$BRIDGE_SEED_CUTOFF_BLOCK" bash /home/ubuntu/chain-of-geths/seed-v1.11.6-when-ready.sh >/home/ubuntu/chain-of-geths/output/seed-v1.11.6.nohup.log 2>&1 &
+  nohup env CUTOFF_BLOCK="$BRIDGE_SEED_CUTOFF_BLOCK" bash /home/ubuntu/chain-of-geths/seed-v1.11.6-when-ready.sh >/home/ubuntu/chain-of-geths/generated-files/seed-v1.11.6.nohup.log 2>&1 &
 fi
 
 echo "Chain started. Check logs with: docker-compose logs -f"

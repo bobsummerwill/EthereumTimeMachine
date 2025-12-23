@@ -115,7 +115,7 @@ This avoids the “old chainstate format” / “no compatible consensus client�
 
 Legacy services run with discovery disabled and peer **only** to the next node in the chain.
 
-- `generate-keys.sh` pre-generates node keys and writes `static-nodes.json` into each datadir under `chain-of-geths/output/`.
+ - `generate-keys.sh` pre-generates node keys and writes `static-nodes.json` into each datadir under `chain-of-geths/generated-files/`.
   - Script: [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh:1)
 
 This makes peering deterministic across restarts and across the AWS deployment.

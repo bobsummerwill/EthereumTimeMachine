@@ -32,7 +32,7 @@ cd "$SCRIPT_DIR"
 
 require_docker
 
-OUTPUT_DIR="$SCRIPT_DIR/output"
+OUTPUT_DIR="$SCRIPT_DIR/generated-files"
 DATA_ROOT="$OUTPUT_DIR/data"
 mkdir -p "$DATA_ROOT"
 
@@ -101,7 +101,7 @@ generate_enode() {
     # We use the JS console to print admin.nodeInfo.enode, because it's stable across versions.
     local raw
     # Mount only the nodekey file (read-only) and use an ephemeral container datadir,
-    # so we don't create root-owned artifacts in the host output directory.
+    # so we don't create root-owned artifacts in the host generated-files directory.
     raw=$(docker run --rm -v "$nodekey_path:/nodekey:ro" ethereum/client-go:v1.16.7 \
         --datadir /tmp \
         --nodekey /nodekey \

@@ -1,0 +1,11 @@
+[Node]
+DataDir = "/data"
+
+[Node.P2P]
+NoDiscovery = true
+ListenAddr = ":30308"
+# NOTE: In v1.11.x, static-nodes.json is deprecated/ignored when using --config.
+# Use the config field instead (Geth log: "Use P2P.StaticNodes in config.toml instead.")
+StaticNodes = [
+  "enode://49ba3e4d46cd0fa600b7f8579758e2a6675e940cc1434f7649a61d2257e7dbf823f8faa5f29672242876dffe48682b019293c7de9c8e9714532247f5c6f79994@172.20.0.18:30306?discport=0"
+]

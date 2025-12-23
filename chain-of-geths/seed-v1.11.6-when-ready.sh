@@ -10,14 +10,14 @@ cd "$ROOT_DIR"
 
 CUTOFF_BLOCK="${CUTOFF_BLOCK:-1919999}"
 
-EXPORT_DIR="$ROOT_DIR/output/exports"
+EXPORT_DIR="$ROOT_DIR/generated-files/exports"
 EXPORT_FILE_NAME="${EXPORT_FILE_NAME:-mainnet-0-${CUTOFF_BLOCK}.rlp}"
 
-FLAG_FILE="$ROOT_DIR/output/seed-v1.11.6-${CUTOFF_BLOCK}.done"
-LOCK_FILE="$ROOT_DIR/output/seed-v1.11.6.lock"
-LOG_FILE="$ROOT_DIR/output/seed-v1.11.6.log"
+FLAG_FILE="$ROOT_DIR/generated-files/seed-v1.11.6-${CUTOFF_BLOCK}.done"
+LOCK_FILE="$ROOT_DIR/generated-files/seed-v1.11.6.lock"
+LOG_FILE="$ROOT_DIR/generated-files/seed-v1.11.6.log"
 
-mkdir -p "$ROOT_DIR/output" "$EXPORT_DIR"
+mkdir -p "$ROOT_DIR/generated-files" "$EXPORT_DIR"
 
 if [ -f "$FLAG_FILE" ]; then
   echo "[seed] already done: $FLAG_FILE" >> "$LOG_FILE"
@@ -95,7 +95,7 @@ sudo docker compose stop geth-v1-11-6 geth-v1-10-0 geth-v1-9-25 geth-v1-3-6 >> "
 
 sudo docker run --rm \
   --entrypoint geth \
-  -v "$ROOT_DIR/output/data/v1.11.6:/data" \
+  -v "$ROOT_DIR/generated-files/data/v1.11.6:/data" \
   -v "$EXPORT_DIR:/exports" \
   ethereumtimemachine/geth:v1.11.6 \
   --datadir /data \
