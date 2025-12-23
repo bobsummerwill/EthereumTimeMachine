@@ -75,7 +75,7 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
            +----------------------------------------------+
            | geth-v1-0-3                                   |
            | eth/60-61                                     |
-           | Forks added:                                  |
+           | Forks:                                        |
            |   Frontier                                    |
            +----------------------------------------------+
 ```
