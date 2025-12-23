@@ -143,10 +143,11 @@ The stack includes Prometheus + Grafana + a JSON-RPC exporter so metrics work ac
 
 
 Endpoints (on the deployed host; see [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)):
-- Grafana: http://localhost:3000 (default `admin` / `admin`)
-- Prometheus: http://localhost:9090
-- Exporter metrics: http://localhost:9100/metrics
-- Sync UI: http://localhost:8088
+Endpoints (on the Ubuntu VM running the stack; default `VM_IP` is in [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh:39) (line 39)):
+- Grafana: http://<VM_IP>:3000 (default `admin` / `admin`)
+- Prometheus: http://<VM_IP>:9090
+- Exporter metrics: http://<VM_IP>:9100/metrics
+- Sync UI: http://<VM_IP>:8088
 
 ## Generated files directory
 
@@ -160,16 +161,10 @@ All generated material is under `chain-of-geths/generated-files/`.
 
 Run: [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh)
 
-## Deployment
-
-Run the end-to-end automation from your machine:
-
-- [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh)
-
-It:
+This script:
 1. Generates keys/static-nodes
 2. Builds images
 3. Copies artifacts + compose stack to the VM
-4. Starts the modern head node + monitoring
+4. Starts the head node + monitoring
 5. Seeds the bridge via export/import (once)
-6. Starts the legacy chain in stages
+6. Starts the rest of the chain
