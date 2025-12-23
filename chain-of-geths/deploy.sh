@@ -82,7 +82,7 @@ ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
 scp $SSH_OPTS -i "$SSH_KEY_PATH" -r \
   output images monitoring \
   generate-keys.sh build-images.sh docker-compose.yml \
-  seed-v1.11.6-when-ready.sh seed-cutoff.sh seed-rlp-from-rpc.py \
+  seed-v1.11.6-when-ready.sh seed-cutoff.sh seed-rlp-from-rpc.py start-legacy-staged.sh \
   "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
 
 echo "Running setup on Ubuntu VM..."
@@ -152,8 +152,7 @@ sudo docker compose create geth-v1-11-6 2>/dev/null || sudo docker-compose creat
 SEED_FLAG="/home/ubuntu/chain-of-geths/output/seed-v1.11.6-${BRIDGE_SEED_CUTOFF_BLOCK}.done"
 if [ -f "$SEED_FLAG" ]; then
   echo "Bridge seeding already done ($SEED_FLAG). Starting legacy geth services..."
-  sudo docker compose up -d geth-v1-11-6 geth-v1-10-0 geth-v1-9-25 geth-v1-3-6 2>/dev/null || \
-    sudo docker-compose up -d geth-v1-11-6 geth-v1-10-0 geth-v1-9-25 geth-v1-3-6
+  bash /home/ubuntu/chain-of-geths/start-legacy-staged.sh
 else
   echo "Launching background bridge seeder (cutoff=$BRIDGE_SEED_CUTOFF_BLOCK)..."
   nohup env CUTOFF_BLOCK="$BRIDGE_SEED_CUTOFF_BLOCK" bash /home/ubuntu/chain-of-geths/seed-v1.11.6-when-ready.sh >/home/ubuntu/chain-of-geths/output/seed-v1.11.6.nohup.log 2>&1 &

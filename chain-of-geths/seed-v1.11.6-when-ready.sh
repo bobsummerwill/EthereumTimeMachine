@@ -98,10 +98,14 @@ sudo docker run --rm \
   -v "$ROOT_DIR/output/data/v1.11.6:/data" \
   -v "$EXPORT_DIR:/exports" \
   ethereumtimemachine/geth:v1.11.6 \
-  --datadir /data import "/exports/$EXPORT_FILE_NAME" >> "$LOG_FILE" 2>&1
+  --datadir /data \
+  --cache 12288 \
+  --snapshot=false \
+  --txlookuplimit 0 \
+  import "/exports/$EXPORT_FILE_NAME" >> "$LOG_FILE" 2>&1
 
 # Bring everything back up.
-sudo docker compose up -d >> "$LOG_FILE" 2>&1 || sudo docker-compose up -d >> "$LOG_FILE" 2>&1
+bash /home/ubuntu/chain-of-geths/start-legacy-staged.sh >> "$LOG_FILE" 2>&1
 
 touch "$FLAG_FILE"
 echo "[seed] done; wrote $FLAG_FILE" >> "$LOG_FILE"

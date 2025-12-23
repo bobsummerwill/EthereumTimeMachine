@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -7,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 from flask import Flask, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
+from pathlib import Path
 
 
 def _env_int(name: str, default: int) -> int:
@@ -75,6 +77,40 @@ def _http_get_json(url: str, timeout: float = 5.0) -> Any:
     r = requests.get(url, timeout=timeout)
     r.raise_for_status()
     return r.json()
+
+
+def _http_get_text(url: str, timeout: float = 5.0) -> str:
+    r = requests.get(url, timeout=timeout)
+    r.raise_for_status()
+    return r.text
+
+
+def _read_json_file(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return None
+
+
+def _parse_prom_gauge(text: str, metric: str, label_selector: str = "") -> float | None:
+    """Parse a single Prometheus exposition line like:
+
+      metric{a="b"} 123
+
+    `label_selector` is a raw substring that must appear inside the braces.
+    """
+    # Very small parser: match one line only.
+    # Example selector: 'type="chain_segment_backfill"'
+    pat = re.compile(rf"^{re.escape(metric)}\\{{([^}}]*)\\}}\\s+([-+]?\\d+(?:\\.\\d+)?)\\s*$", re.MULTILINE)
+    for m in pat.finditer(text):
+        labels = m.group(1)
+        if label_selector and label_selector not in labels:
+            continue
+        try:
+            return float(m.group(2))
+        except Exception:
+            return None
+    return None
 
 
 def _lighthouse_display_version(raw: str) -> str:
@@ -160,6 +196,13 @@ g_sync_progress_info = Gauge(
     ["node", "progress"],
 )
 
+# Stage checklist (0=not started/down, 1=in progress, 2=done).
+g_stage_status = Gauge(
+    "chain_stage_status",
+    "Stage status for the chain checklist (0=not started/down, 1=in progress, 2=done)",
+    ["stage"],
+)
+
 
 class Poller:
     def __init__(
@@ -186,10 +229,31 @@ class Poller:
     def _run(self) -> None:
         # first node is the “top” reference
         top_name, _ = self.nodes[0]
+
+        # Stage checklist config.
+        cutoff_block = _env_int("CUTOFF_BLOCK", 1919999)
+        host_output_dir = Path(os.environ.get("HOST_OUTPUT_DIR", "/host_output")).resolve()
+        lighthouse_metrics_url = (os.environ.get("LIGHTHOUSE_METRICS_URL", "") or "").strip().rstrip("/")
+
+        # Pre-compute common file paths used by the seeder.
+        export_progress_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}.rlp.progress"
+        export_file_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}.rlp"
+        seed_log_path = host_output_dir / "seed-v1.11.6.log"
+        seed_done_path = host_output_dir / f"seed-v1.11.6-{cutoff_block}.done"
+
         while not self._stop.is_set():
             # Clear dynamic label series each round so we don't accumulate stale values.
             g_sync_progress_info.clear()
             blocks: Dict[str, int] = {}
+
+            node_up: Dict[str, bool] = {}
+            node_syncing: Dict[str, bool] = {}
+            node_effective_head: Dict[str, int] = {}
+
+            lighthouse_up = False
+            lighthouse_is_syncing = False
+            lighthouse_sync_distance = 0
+            lighthouse_backfill_workers = None
 
             # Add a Lighthouse row into the same progress metrics (using slots, not blocks).
             if self.lighthouse_api_url:
@@ -208,6 +272,23 @@ class Poller:
                     head_slot = int(data.get("head_slot") or 0)
                     distance = int(data.get("sync_distance") or 0)
                     target_slot = head_slot + distance
+
+                    lighthouse_up = True
+                    lighthouse_is_syncing = bool(data.get("is_syncing"))
+                    lighthouse_sync_distance = distance
+
+                    # Best-effort: detect whether Lighthouse is currently doing backfill work.
+                    # This uses its /metrics endpoint and the worker gauge for backfill chain segments.
+                    if lighthouse_metrics_url:
+                        try:
+                            metrics_text = _http_get_text(f"{lighthouse_metrics_url}/metrics")
+                            lighthouse_backfill_workers = _parse_prom_gauge(
+                                metrics_text,
+                                "beacon_processor_workers_active_gauge_by_type",
+                                'type="chain_segment_backfill"',
+                            )
+                        except Exception:
+                            lighthouse_backfill_workers = None
 
                     g_sort_key.labels(node=node_label).set(lighthouse_sort_key)
                     g_up.labels(node=node_label).set(1)
@@ -237,11 +318,14 @@ class Poller:
                     peer_count = hex_to_int(peers_hex)
 
                     g_up.labels(node=name).set(1)
+                    node_up[name] = True
                     g_block.labels(node=name).set(block_num)
                     g_peers.labels(node=name).set(peer_count)
                     blocks[name] = block_num
 
                     if syncing is False:
+                        node_syncing[name] = False
+                        node_effective_head[name] = block_num
                         g_syncing.labels(node=name).set(0)
                         g_sync_current.labels(node=name).set(0)
                         g_sync_highest.labels(node=name).set(0)
@@ -257,11 +341,13 @@ class Poller:
                         # Some clients return a dict with hex values.
                         cur = hex_to_int(syncing.get("currentBlock"))
                         hi = hex_to_int(syncing.get("highestBlock"))
+                        node_syncing[name] = True
                         g_syncing.labels(node=name).set(1)
                         g_sync_current.labels(node=name).set(cur)
                         g_sync_highest.labels(node=name).set(hi)
                         g_sync_remaining.labels(node=name).set(max(0, hi - cur))
                         eff = max(block_num, cur)
+                        node_effective_head[name] = eff
                         target = max(hi, eff)
                         g_effective_head.labels(node=name).set(eff)
                         pct = (eff * 100.0 / target) if target > 0 else 0.0
@@ -273,6 +359,9 @@ class Poller:
                 except Exception:
                     # Mark node as down, keep last-seen metrics for block/peers.
                     g_up.labels(node=name).set(0)
+                    node_up[name] = False
+                    node_syncing[name] = False
+                    node_effective_head[name] = 0
                     g_syncing.labels(node=name).set(0)
                     g_sync_current.labels(node=name).set(0)
                     g_sync_highest.labels(node=name).set(0)
@@ -291,6 +380,153 @@ class Poller:
                     else:
                         # If unknown this round, don't overwrite.
                         pass
+
+            # --- Stage checklist ---
+            # Helper to emit 0/1/2 for a stage label.
+            def set_stage(stage: str, status: int) -> None:
+                g_stage_status.labels(stage=stage).set(status)
+
+            # 1) Lighthouse syncing from snapshot (checkpoint sync + head catchup)
+            if not lighthouse_up:
+                set_stage("1. Lighthouse syncing from snapshot", 0)
+            else:
+                if lighthouse_is_syncing or lighthouse_sync_distance > 0:
+                    set_stage("1. Lighthouse syncing from snapshot", 1)
+                else:
+                    set_stage("1. Lighthouse syncing from snapshot", 2)
+
+            # 2) Lighthouse indexing/backfill (best-effort based on backfill worker gauge)
+            if not lighthouse_up:
+                set_stage("2. Lighthouse indexing/backfill", 0)
+            else:
+                # If we can read the gauge, use it. Otherwise, default to “done” once sync_distance is 0.
+                if lighthouse_backfill_workers is not None:
+                    set_stage(
+                        "2. Lighthouse indexing/backfill",
+                        1 if lighthouse_backfill_workers > 0 else 2,
+                    )
+                else:
+                    set_stage(
+                        "2. Lighthouse indexing/backfill",
+                        1 if (lighthouse_is_syncing or lighthouse_sync_distance > 0) else 2,
+                    )
+
+            # 3) Geth v1.16.7 syncing
+            top_eff = node_effective_head.get(top_name, 0)
+            if not node_up.get(top_name, False):
+                set_stage("3. Geth v1.16.7 syncing", 0)
+            else:
+                set_stage("3. Geth v1.16.7 syncing", 1 if node_syncing.get(top_name, False) else 2)
+
+            # 4) Geth v1.16.7 exporting data (seed RLP export)
+            export_last_done = None
+            if export_progress_path.exists():
+                data = _read_json_file(export_progress_path)
+                if isinstance(data, dict) and data.get("last_done") is not None:
+                    try:
+                        export_last_done = int(data.get("last_done"))
+                    except Exception:
+                        export_last_done = None
+            if export_last_done is None:
+                set_stage("4. Geth v1.16.7 exporting data", 0)
+            else:
+                set_stage(
+                    "4. Geth v1.16.7 exporting data",
+                    2 if export_last_done >= cutoff_block else 1,
+                )
+
+            # 5) Geth v1.11.6 importing data
+            if seed_done_path.exists():
+                set_stage("5. Geth v1.11.6 importing data", 2)
+            else:
+                importing = False
+                import_current = 0
+                try:
+                    if seed_log_path.exists():
+                        # Keep a fairly large tail so a brief burst of export/status logs
+                        # doesn't push the latest "Imported new chain segment" line out of view.
+                        tail = seed_log_path.read_text(errors="ignore")[-500000:]
+                        if "Importing blockchain" in tail or "Imported new chain segment" in tail:
+                            importing = True
+                        # Best-effort: parse latest imported block number from the log tail.
+                        # Example: "Imported new chain segment               number=487,500"
+                        m = re.findall(r"Imported new chain segment\s+number=([0-9,]+)", tail)
+                        if m:
+                            import_current = int(m[-1].replace(",", ""))
+                except Exception:
+                    importing = False
+                set_stage(
+                    "5. Geth v1.11.6 importing data",
+                    1 if importing else 0,
+                )
+
+            # --- Synthetic rows for export/import phases in the Sync progress table ---
+            # These are displayed as extra rows (between v1.16.7 and v1.11.6) by
+            # setting sort keys between their indices.
+            def emit_phase_row(
+                node_label: str,
+                sort_key: float,
+                current: int,
+                target: int,
+                running: bool,
+                up: bool,
+            ) -> None:
+                g_sort_key.labels(node=node_label).set(sort_key)
+                # Keep the row visible even when the phase isn't actively running;
+                # otherwise dashboards may drop it and it looks like progress reset.
+                g_up.labels(node=node_label).set(1 if up else 0)
+                g_effective_head.labels(node=node_label).set(current)
+                g_sync_target.labels(node=node_label).set(target)
+                pct = (current * 100.0 / target) if target > 0 else 0.0
+                g_sync_percent.labels(node=node_label).set(pct)
+                progress = f"{current}/{target} ({pct:.1f}%)" if target > 0 else "0/0 (0.0%)"
+                g_sync_progress_info.labels(node=node_label, progress=progress).set(1)
+                g_syncing.labels(node=node_label).set(1 if running else 0)
+
+            # Determine export progress for synthetic row.
+            export_current = export_last_done or 0
+            export_running = export_last_done is not None and export_last_done < cutoff_block
+            export_up = export_progress_path.exists() or export_file_path.exists()
+            emit_phase_row(
+                "Export (v1.16.7 → RLP)",
+                1.50,
+                export_current,
+                cutoff_block,
+                export_running,
+                export_up,
+            )
+
+            # Determine import progress for synthetic row.
+            import_done = seed_done_path.exists()
+            import_running = importing if not import_done else False
+            # If done, show full cutoff.
+            import_display = cutoff_block if import_done else import_current
+            import_up = seed_log_path.exists() or import_done or import_current > 0
+            emit_phase_row(
+                "Import (RLP → v1.11.6)",
+                1.60,
+                import_display,
+                cutoff_block,
+                import_running,
+                import_up,
+            )
+
+            # 6-8) Legacy geth nodes reaching cutoff
+            def legacy_stage(node: str, stage_label: str) -> None:
+                if not node_up.get(node, False):
+                    set_stage(stage_label, 0)
+                    return
+                eff = node_effective_head.get(node, 0)
+                if eff >= cutoff_block:
+                    set_stage(stage_label, 2)
+                elif eff > 0:
+                    set_stage(stage_label, 1)
+                else:
+                    set_stage(stage_label, 0)
+
+            legacy_stage("Geth v1.10.0", "6. Geth v1.10.0 syncing")
+            legacy_stage("Geth v1.9.25", "7. Geth v1.9.25 syncing")
+            legacy_stage("Geth v1.3.6", "8. Geth v1.3.6 syncing")
 
             self._stop.wait(self.interval_seconds)
 
