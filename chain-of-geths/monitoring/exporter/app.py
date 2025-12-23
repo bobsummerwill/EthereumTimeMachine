@@ -72,6 +72,17 @@ def rpc_call(url: str, method: str, params: Optional[list] = None, timeout: floa
         raise RuntimeError(f"RPC error from {url} {method}: {body['error']}")
     return body.get("result")
 
+def rpc_call_optional(url: str, method: str, params: Optional[list] = None, timeout: float = 5.0) -> Any:
+    """RPC call that returns None on any failure.
+
+    This keeps the exporter compatible with very old clients that may not implement
+    newer JSON-RPC methods (or may implement them partially).
+    """
+    try:
+        return rpc_call(url, method, params=params, timeout=timeout)
+    except Exception:
+        return None
+
 
 def _http_get_json(url: str, timeout: float = 5.0) -> Any:
     r = requests.get(url, timeout=timeout)
@@ -91,18 +102,21 @@ def _read_json_file(path: Path) -> Any:
     except Exception:
         return None
 
+def _parse_prom_number(text: str, metric: str, label_selector: str = "") -> float | None:
+    """Parse a single Prometheus exposition line.
 
-def _parse_prom_gauge(text: str, metric: str, label_selector: str = "") -> float | None:
-    """Parse a single Prometheus exposition line like:
-
+    Supports both:
       metric{a="b"} 123
+      metric 123
 
     `label_selector` is a raw substring that must appear inside the braces.
     """
-    # Very small parser: match one line only.
-    # Example selector: 'type="chain_segment_backfill"'
-    pat = re.compile(rf"^{re.escape(metric)}\\{{([^}}]*)\\}}\\s+([-+]?\\d+(?:\\.\\d+)?)\\s*$", re.MULTILINE)
-    for m in pat.finditer(text):
+    # Labeled series.
+    pat_labeled = re.compile(
+        rf"^{re.escape(metric)}\\{{([^}}]*)\\}}\\s+([-+]?\\d+(?:\\.\\d+)?)\\s*$",
+        re.MULTILINE,
+    )
+    for m in pat_labeled.finditer(text):
         labels = m.group(1)
         if label_selector and label_selector not in labels:
             continue
@@ -110,6 +124,17 @@ def _parse_prom_gauge(text: str, metric: str, label_selector: str = "") -> float
             return float(m.group(2))
         except Exception:
             return None
+
+    # Unlabeled series.
+    if not label_selector:
+        pat_plain = re.compile(rf"^{re.escape(metric)}\\s+([-+]?\\d+(?:\\.\\d+)?)\\s*$", re.MULTILINE)
+        m = pat_plain.search(text)
+        if m:
+            try:
+                return float(m.group(1))
+            except Exception:
+                return None
+
     return None
 
 
@@ -219,6 +244,10 @@ class Poller:
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="poller", daemon=True)
 
+        # Lighthouse backfill activity tracking.
+        self._lh_backfill_last_total: float | None = None
+        self._lh_backfill_last_inc_ts: float | None = None
+
     def start(self) -> None:
         self._thread.start()
 
@@ -235,6 +264,9 @@ class Poller:
         host_output_dir = Path(os.environ.get("HOST_OUTPUT_DIR", "/host_output")).resolve()
         lighthouse_metrics_url = (os.environ.get("LIGHTHOUSE_METRICS_URL", "") or "").strip().rstrip("/")
 
+        # How long we consider Lighthouse backfill "active" after observing progress.
+        backfill_activity_window_seconds = _env_float("LIGHTHOUSE_BACKFILL_ACTIVITY_WINDOW_SECONDS", 300.0)
+
         # Pre-compute common file paths used by the seeder.
         export_progress_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}.rlp.progress"
         export_file_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}.rlp"
@@ -245,6 +277,9 @@ class Poller:
             # Clear dynamic label series each round so we don't accumulate stale values.
             g_sync_progress_info.clear()
             blocks: Dict[str, int] = {}
+
+            # Keep peer counts for checklist heuristics.
+            peers: Dict[str, int] = {}
 
             node_up: Dict[str, bool] = {}
             node_syncing: Dict[str, bool] = {}
@@ -282,11 +317,26 @@ class Poller:
                     if lighthouse_metrics_url:
                         try:
                             metrics_text = _http_get_text(f"{lighthouse_metrics_url}/metrics")
-                            lighthouse_backfill_workers = _parse_prom_gauge(
+                            lighthouse_backfill_workers = _parse_prom_number(
                                 metrics_text,
                                 "beacon_processor_workers_active_gauge_by_type",
                                 'type="chain_segment_backfill"',
                             )
+
+                            # Also detect backfill activity by watching a monotonic counter.
+                            # This is more stable across versions than relying purely on worker gauges.
+                            backfill_total = _parse_prom_number(
+                                metrics_text,
+                                "beacon_processor_backfill_chain_segment_success_total",
+                            )
+                            if backfill_total is not None:
+                                now_ts = time.time()
+                                if (
+                                    self._lh_backfill_last_total is not None
+                                    and backfill_total > self._lh_backfill_last_total
+                                ):
+                                    self._lh_backfill_last_inc_ts = now_ts
+                                self._lh_backfill_last_total = backfill_total
                         except Exception:
                             lighthouse_backfill_workers = None
 
@@ -310,9 +360,14 @@ class Poller:
             for idx, (name, url) in enumerate(self.nodes, start=1):
                 g_sort_key.labels(node=name).set(idx)
                 try:
-                    block_hex = rpc_call(url, "eth_blockNumber")
-                    peers_hex = rpc_call(url, "net_peerCount")
-                    syncing = rpc_call(url, "eth_syncing")
+                    # Required for "up".
+                    block_hex = rpc_call_optional(url, "eth_blockNumber")
+                    if block_hex is None:
+                        raise RuntimeError("eth_blockNumber failed")
+
+                    # Optional / version-dependent.
+                    peers_hex = rpc_call_optional(url, "net_peerCount")
+                    syncing = rpc_call_optional(url, "eth_syncing")
 
                     block_num = hex_to_int(block_hex)
                     peer_count = hex_to_int(peers_hex)
@@ -322,8 +377,10 @@ class Poller:
                     g_block.labels(node=name).set(block_num)
                     g_peers.labels(node=name).set(peer_count)
                     blocks[name] = block_num
+                    peers[name] = peer_count
 
-                    if syncing is False:
+                    # Very old clients may not support eth_syncing; treat as not syncing.
+                    if syncing is None or syncing is False:
                         node_syncing[name] = False
                         node_effective_head[name] = block_num
                         g_syncing.labels(node=name).set(0)
@@ -362,6 +419,7 @@ class Poller:
                     node_up[name] = False
                     node_syncing[name] = False
                     node_effective_head[name] = 0
+                    peers[name] = 0
                     g_syncing.labels(node=name).set(0)
                     g_sync_current.labels(node=name).set(0)
                     g_sync_highest.labels(node=name).set(0)
@@ -399,11 +457,21 @@ class Poller:
             if not lighthouse_up:
                 set_stage("2. Lighthouse indexing/backfill", 0)
             else:
-                # If we can read the gauge, use it. Otherwise, default to “done” once sync_distance is 0.
+                # More accurate detection combines:
+                #  - active worker gauge (if available)
+                #  - recent progress on the backfill success counter
+                # If neither signal is observable, we fall back to “done once sync_distance is 0”.
+                now_ts = time.time()
+                backfill_recent = (
+                    self._lh_backfill_last_inc_ts is not None
+                    and (now_ts - self._lh_backfill_last_inc_ts) <= backfill_activity_window_seconds
+                )
+
                 if lighthouse_backfill_workers is not None:
+                    active = lighthouse_backfill_workers > 0
                     set_stage(
                         "2. Lighthouse indexing/backfill",
-                        1 if lighthouse_backfill_workers > 0 else 2,
+                        1 if (active or backfill_recent) else 2,
                     )
                 else:
                     set_stage(
@@ -416,7 +484,13 @@ class Poller:
             if not node_up.get(top_name, False):
                 set_stage("3. Geth v1.16.7 syncing", 0)
             else:
-                set_stage("3. Geth v1.16.7 syncing", 1 if node_syncing.get(top_name, False) else 2)
+                # Treat a totally "cold" node as not started until it has a non-zero effective head.
+                # (`effective head` already accounts for clients where eth_syncing.currentBlock advances first.)
+                # This avoids showing "IN PROGRESS" just because eth_syncing returns a dict at startup.
+                if top_eff <= 0:
+                    set_stage("3. Geth v1.16.7 syncing", 0)
+                else:
+                    set_stage("3. Geth v1.16.7 syncing", 1 if node_syncing.get(top_name, False) else 2)
 
             # 4) Geth v1.16.7 exporting data (seed RLP export)
             export_last_done = None
@@ -527,6 +601,7 @@ class Poller:
             legacy_stage("Geth v1.10.0", "6. Geth v1.10.0 syncing")
             legacy_stage("Geth v1.9.25", "7. Geth v1.9.25 syncing")
             legacy_stage("Geth v1.3.6", "8. Geth v1.3.6 syncing")
+            legacy_stage("Geth v1.0.0", "9. Geth v1.0.0 syncing")
 
             self._stop.wait(self.interval_seconds)
 

@@ -286,6 +286,33 @@
                 ]
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "9. Geth v1.0.0 syncing"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "9. Geth v1.0.0 syncing — TODO"
+                      },
+                      "1": {
+                        "text": "9. Geth v1.0.0 syncing — IN PROGRESS"
+                      },
+                      "2": {
+                        "text": "9. Geth v1.0.0 syncing — DONE"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -846,6 +873,13 @@
           "legendFormat": "Geth v1.3.6",
           "range": true,
           "refId": "E"
+        },
+        {
+          "editorMode": "code",
+          "expr": "geth_up{node=\"Geth v1.0.0\"}",
+          "legendFormat": "Geth v1.0.0",
+          "range": true,
+          "refId": "F"
         }
       ],
       "title": "Geth status",

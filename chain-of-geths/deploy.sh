@@ -62,7 +62,7 @@ echo "Saving Docker images..."
 mkdir -p images
 # Avoid carrying forward stale tarballs for versions that are no longer in the stack.
 rm -f images/*.tar
-for version in v1.11.6 v1.10.0 v1.9.25 v1.3.6; do
+for version in v1.0.0 v1.11.6 v1.10.0 v1.9.25 v1.3.6; do
     docker save ethereumtimemachine/geth:$version > images/geth-$version.tar
 done
 

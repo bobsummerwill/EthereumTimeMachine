@@ -147,6 +147,32 @@ services:
       ethereum:
         ipv4_address: 172.20.0.14
 
+  # Frontier-era node: peers only with v1.3.6 via static-nodes.json (no discovery).
+  geth-v1-0-0:
+    image: ethereumtimemachine/geth:v1.0.0
+    container_name: geth-v1-0-0
+    command: |
+      --datadir /data
+      --nodekey /data/nodekey
+      --cache 256
+      --rpc
+      --rpcaddr 0.0.0.0
+      --rpcapi eth,net,web3
+      --networkid 1
+      --port 30305
+      --nodiscover
+    ports:
+      - "8553:8545"
+      - "30305:30305/tcp"
+      - "30305:30305/udp"
+    volumes:
+      - ./output/data/v1.0.0:/data
+    depends_on:
+      - geth-v1-3-6
+    networks:
+      ethereum:
+        ipv4_address: 172.20.0.13
+
   # Consensus client (beacon node) for the *modern feeder* execution node.
   # We keep this single CL instance so the modern EL can progress on post-Merge mainnet
   # and continue serving historical blocks to older nodes.
@@ -195,7 +221,8 @@ services:
         Geth v1.11.6=http://geth-v1-11-6:8545,
         Geth v1.10.0=http://geth-v1-10-0:8545,
         Geth v1.9.25=http://geth-v1-9-25:8545,
-        Geth v1.3.6=http://geth-v1-3-6:8545
+        Geth v1.3.6=http://geth-v1-3-6:8545,
+        Geth v1.0.0=http://geth-v1-0-0:8545
       # Used to add a Lighthouse row in the same “Sync progress” table.
       LIGHTHOUSE_API_URL: http://lighthouse-16-7:5052
       # Used for stage checklist (best-effort backfill detection).
@@ -208,8 +235,6 @@ services:
       - ./output:/host_output:ro
     ports:
       - "9100:9100"
-    depends_on:
-      - geth-v1-16-7
     networks:
       - ethereum
 
@@ -249,9 +274,9 @@ services:
     networks:
       - ethereum
 
-  # NOTE: Geth v1.0.0 is intentionally NOT part of this Compose stack.
-  # There are no maintained Linux binaries for v1.0.0; the project runs it on a Windows VM
-  # and points it at geth-v1-3-6 via --bootnodes.
+
+  # NOTE: If you still want to run a Windows v1.0.0 node instead of the containerized one,
+  # `generate-keys.sh` continues to emit the public bootnode enode for v1.3.6 under output/.
 
 networks:
   ethereum:

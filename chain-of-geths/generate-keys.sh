@@ -42,13 +42,14 @@ mkdir -p "$DATA_ROOT"
 # - v1.11.6: ETH66/67/68 (bridges v1.16.7 <-> v1.10.0)
 # - v1.10.0: ETH64/65/66 (bridges v1.11.6 <-> v1.9.25)
 # - v1.9.25:  eth63/64/65 (bridges v1.10.0 <-> v1.3.6)
-versions=(v1.16.7 v1.11.6 v1.10.0 v1.9.25 v1.3.6)
+versions=(v1.16.7 v1.11.6 v1.10.0 v1.9.25 v1.3.6 v1.0.0)
 declare -A ip_by_version=(
     ["v1.16.7"]="172.20.0.18"
     ["v1.11.6"]="172.20.0.15"
     ["v1.10.0"]="172.20.0.16"
     ["v1.9.25"]="172.20.0.17"
     ["v1.3.6"]="172.20.0.14"
+    ["v1.0.0"]="172.20.0.13"
 )
 declare -A port_by_version=(
     ["v1.16.7"]="30306"
@@ -56,6 +57,7 @@ declare -A port_by_version=(
     ["v1.10.0"]="30309"
     ["v1.9.25"]="30310"
     ["v1.3.6"]="30307"
+    ["v1.0.0"]="30305"
 )
 
 # Ubuntu external IP for connecting to v1.3.6 from Windows
@@ -234,11 +236,12 @@ printf '["%s"]\n' "${enodes[v1.16.7]}" > "$v1_11_6_dir/static-nodes.json"
 echo "Created config.toml + static-nodes.json for v1.11.6 pointing to v1.16.7"
 
 # Create static-nodes.json for each non-top version
-for version in v1.10.0 v1.9.25 v1.3.6; do
+for version in v1.10.0 v1.9.25 v1.3.6 v1.0.0; do
     case $version in
         v1.10.0) next="v1.11.6" ;;
         v1.9.25) next="v1.10.0" ;;
         v1.3.6) next="v1.9.25" ;;
+        v1.0.0) next="v1.3.6" ;;
     esac
 
     datadir="$DATA_ROOT/$version"
