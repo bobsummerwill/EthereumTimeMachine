@@ -7,6 +7,7 @@ services:
     command: |
       --config /data/config.toml
       --datadir /data
+      --cache 4096
       --nodekey /data/geth/nodekey
       --http
       --http.addr 0.0.0.0
@@ -45,6 +46,7 @@ services:
     command: |
       --config /data/config.toml
       --datadir /data
+      --cache 4096
       --nodekey /data/geth/nodekey
       --http
       --http.addr 0.0.0.0
@@ -101,7 +103,7 @@ services:
     container_name: geth-v1-9-25
     command: |
       --datadir /data
-      --cache 2048
+      --cache 4096
       --rpc
       --rpcaddr 0.0.0.0
       --rpcvhosts *
@@ -128,7 +130,7 @@ services:
     command: |
       --datadir /data
       --nodekey /data/nodekey
-      --cache 512
+      --cache 4096
       --rpc
       --rpcaddr 0.0.0.0
       --rpcapi eth,net,web3
@@ -155,6 +157,7 @@ services:
       --genesis /data/genesis.json
       --datadir /data
       --nodekey /data/nodekey
+      --cache 2048
       --rpc
       --rpcaddr 0.0.0.0
       --rpcapi eth,net,web3
