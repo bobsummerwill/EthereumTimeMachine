@@ -172,6 +172,11 @@ def hex_to_int(value: Any) -> int:
 
 app = Flask(__name__)
 
+
+# Geth v1.0.3 cannot practically follow modern mainnet beyond a certain point.
+# For dashboards, it is more useful to show its progress vs a fixed historical target.
+GETH_V1_0_3_TARGET_BLOCK = 1_149_999
+
 g_up = Gauge("geth_up", "Whether the exporter can query the node (1=up, 0=down)", ["node"])
 g_block = Gauge("geth_block_number", "Latest known head block number", ["node"])
 # During snap/beacon-style sync, some clients may keep `eth_blockNumber` pinned
@@ -368,6 +373,10 @@ class Poller:
 
             for idx, (name, url) in enumerate(self.nodes, start=1):
                 g_sort_key.labels(node=name).set(idx)
+
+                fixed_target: int | None = (
+                    GETH_V1_0_3_TARGET_BLOCK if name.strip() == "Geth v1.0.3" else None
+                )
                 try:
                     # Required for "up".
                     block_hex = rpc_call_optional(url, "eth_blockNumber")
@@ -397,8 +406,8 @@ class Poller:
                         g_sync_highest.labels(node=name).set(0)
                         g_sync_remaining.labels(node=name).set(0)
                         g_effective_head.labels(node=name).set(block_num)
-                        target = block_num
-                        pct = 100.0 if target > 0 else 0.0
+                        target = fixed_target if fixed_target is not None else block_num
+                        pct = (block_num * 100.0 / target) if target > 0 else 0.0
                         progress = f"{block_num}/{target} ({pct:.1f}%)" if target > 0 else "0/0 (0.0%)"
                         g_sync_target.labels(node=name).set(target)
                         g_sync_percent.labels(node=name).set(pct)
@@ -414,7 +423,7 @@ class Poller:
                         g_sync_remaining.labels(node=name).set(max(0, hi - cur))
                         eff = max(block_num, cur)
                         node_effective_head[name] = eff
-                        target = max(hi, eff)
+                        target = max(hi, eff, fixed_target or 0)
                         g_effective_head.labels(node=name).set(eff)
                         pct = (eff * 100.0 / target) if target > 0 else 0.0
                         progress = f"{eff}/{target} ({pct:.1f}%)"
@@ -610,7 +619,7 @@ class Poller:
             legacy_stage("Geth v1.10.0", "6. Geth v1.10.0 syncing")
             legacy_stage("Geth v1.9.25", "7. Geth v1.9.25 syncing")
             legacy_stage("Geth v1.3.6", "8. Geth v1.3.6 syncing")
-            legacy_stage("Geth v1.0.0", "9. Geth v1.0.0 syncing")
+            legacy_stage("Geth v1.0.3", "9. Geth v1.0.3 syncing")
 
             self._stop.wait(self.interval_seconds)
 

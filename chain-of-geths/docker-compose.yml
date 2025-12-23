@@ -127,12 +127,12 @@ services:
     container_name: geth-v1-3-6
     command: |
       --datadir /data
+      --nodekey /data/nodekey
       --cache 512
       --rpc
       --rpcaddr 0.0.0.0
       --rpcapi eth,net,web3
       --networkid 1
-      --fast
       --port 30307
       --nodiscover
     ports:
@@ -147,10 +147,10 @@ services:
       ethereum:
         ipv4_address: 172.20.0.14
 
-  # Frontier-era node: peers only with v1.3.6 via static-nodes.json (no discovery).
-  geth-v1-0-0:
-    image: ethereumtimemachine/geth:v1.0.0
-    container_name: geth-v1-0-0
+  # Frontier-era node: discovery disabled; intended to dial only its single configured peer (v1.3.6).
+  geth-v1-0-3:
+    image: ethereumtimemachine/geth:v1.0.3
+    container_name: geth-v1-0-3
     command: |
       --genesis /data/genesis.json
       --datadir /data
@@ -166,7 +166,7 @@ services:
       - "30305:30305/tcp"
       - "30305:30305/udp"
     volumes:
-      - ./output/data/v1.0.0:/data
+      - ./output/data/v1.0.3:/data
     depends_on:
       - geth-v1-3-6
     networks:
@@ -222,7 +222,7 @@ services:
         Geth v1.10.0=http://geth-v1-10-0:8545,
         Geth v1.9.25=http://geth-v1-9-25:8545,
         Geth v1.3.6=http://geth-v1-3-6:8545,
-        Geth v1.0.0=http://geth-v1-0-0:8545
+        Geth v1.0.3=http://geth-v1-0-3:8545
       # Used to add a Lighthouse row in the same “Sync progress” table.
       LIGHTHOUSE_API_URL: http://lighthouse-16-7:5052
       # Stable label for the Lighthouse row (emit from startup even if the API is still booting).
@@ -275,10 +275,6 @@ services:
       - prometheus
     networks:
       - ethereum
-
-
-  # NOTE: If you still want to run a Windows v1.0.0 node instead of the containerized one,
-  # `generate-keys.sh` continues to emit the public bootnode enode for v1.3.6 under output/.
 
 networks:
   ethereum:

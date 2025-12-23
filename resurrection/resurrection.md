@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-Phase 2 of the Ethereum Time Machine project focuses on extending historical Ethereum chains beyond their original termination points. After establishing the chain-of-Geths infrastructure with synced Geth v1.0.0 and v1.3.6 nodes, this phase provides two separate mining options for resurrecting Frontier and Homestead eras.
+Phase 2 of the Ethereum Time Machine project focuses on extending historical Ethereum chains beyond their original termination points. After establishing the chain-of-Geths infrastructure with synced Geth v1.0.3 and v1.3.6 nodes, this phase provides two separate mining options for resurrecting Frontier and Homestead eras.
 
 The goal is to create functional, CPU-mineable historical chains that serve as educational testnets, allowing users to experience authentic Ethereum mining dynamics from different eras.
 
 ## Prerequisites
 
-- Completed chain-of-Geths setup with synced Geth v1.0.0 (Frontier) and Geth v1.3.6 (Homestead) nodes
+- Completed chain-of-Geths setup with synced Geth v1.0.3 (Frontier) and Geth v1.3.6 (Homestead) nodes
 - Mining infrastructure capable of rapid block production (GPUs recommended)
 - Understanding of Ethereum's difficulty adjustment algorithms
 
@@ -33,7 +33,7 @@ This phase offers two independent revival projects:
 
 ### Option 2: Frontier Era Revival (Challenging - More Historical)
 - **Target Era**: Original Frontier release (blocks 0-200,000)
-- **Starting Point**: Geth v1.0.0 synced to block 200,000
+- **Starting Point**: Geth v1.0.3 synced to block 200,000
 - **Advantages**: Purest historical experience
 - **Timeline**: 4-6 weeks
 - **Difficulty**: High (requires extensive GPU mining)
@@ -105,7 +105,7 @@ Extend the Homestead fork (block 1,150,000) using Geth v1.3.6 with its improved 
 ## Option 2: Frontier Era Revival
 
 ### Overview
-Extend the original Frontier chain (blocks 0-200,000) using Geth v1.0.0 for the purest historical experience.
+Extend the original Frontier chain (blocks 0-200,000) using Geth v1.0.3 for the purest historical experience.
 
 ### Technical Specifications
 - **Starting Block**: 200,000 (Frontier termination)
@@ -117,7 +117,7 @@ Extend the original Frontier chain (blocks 0-200,000) using Geth v1.0.0 for the 
 
 ### Mining Strategy
 1. **Phase 1: Extended GPU Mining** (50-100 blocks, 1-2 days)
-   - Deploy GPU mining nodes with Geth v1.0.0
+   - Deploy GPU mining nodes with Geth v1.0.3
    - Produce blocks rapidly to reduce difficulty
    - Target sub-second block production initially
 
@@ -132,7 +132,7 @@ Extend the original Frontier chain (blocks 0-200,000) using Geth v1.0.0 for the 
    - Maintain Frontier protocol purity
 
 ### Infrastructure Requirements
-- **Reference Node**: Geth v1.0.0 synced to block 200,000 (Windows VM)
+- **Reference Node**: Geth v1.0.3 synced to block 200,000
 - **Mining Hardware**: 4-8 GPUs ($2,000-5,000)
 - **Timeline**: 4-6 weeks total
 - **Success Criteria**: CPU-mineable difficulty, extended beyond block 200,000, stable Frontier-compatible operation
@@ -170,7 +170,7 @@ Extend the original Frontier chain (blocks 0-200,000) using Geth v1.0.0 for the 
 
 ### Node Architecture
 ```
-[Synced Reference Node] (Geth v1.0.0 or v1.3.6)
+[Synced Reference Node] (Geth v1.0.3 or v1.3.6)
     |
     +-- [Mining Node 1] -- GPU Miner
     |

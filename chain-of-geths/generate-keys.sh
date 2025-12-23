@@ -42,14 +42,14 @@ mkdir -p "$DATA_ROOT"
 # - v1.11.6: ETH66/67/68 (bridges v1.16.7 <-> v1.10.0)
 # - v1.10.0: ETH64/65/66 (bridges v1.11.6 <-> v1.9.25)
 # - v1.9.25:  eth63/64/65 (bridges v1.10.0 <-> v1.3.6)
-versions=(v1.16.7 v1.11.6 v1.10.0 v1.9.25 v1.3.6 v1.0.0)
+versions=(v1.16.7 v1.11.6 v1.10.0 v1.9.25 v1.3.6 v1.0.3)
 declare -A ip_by_version=(
     ["v1.16.7"]="172.20.0.18"
     ["v1.11.6"]="172.20.0.15"
     ["v1.10.0"]="172.20.0.16"
     ["v1.9.25"]="172.20.0.17"
     ["v1.3.6"]="172.20.0.14"
-    ["v1.0.0"]="172.20.0.13"
+    ["v1.0.3"]="172.20.0.13"
 )
 declare -A port_by_version=(
     ["v1.16.7"]="30306"
@@ -57,17 +57,10 @@ declare -A port_by_version=(
     ["v1.10.0"]="30309"
     ["v1.9.25"]="30310"
     ["v1.3.6"]="30307"
-    ["v1.0.0"]="30305"
+    ["v1.0.3"]="30305"
 )
 
-# Ubuntu external IP for connecting to v1.3.6 from Windows
-EXTERNAL_IP="54.81.90.194"
-WINDOWS_PORT="${port_by_version[v1.3.6]}"
 
-# Windows VM public IP and p2p port for Geth v1.0.0.
-# This is only needed if you want to precompute the v1.0.0 node's enode (and enforce a fixed nodekey).
-WINDOWS_IP="18.232.131.32"
-WINDOWS_P2P_PORT="30308"
 
 # Function to generate nodekey and get enode using Docker
 generate_enode() {
@@ -127,7 +120,8 @@ generate_enode() {
         echo "Failed to extract pubkey from enode output for $version. Raw: '$raw'" >&2
         exit 1
     fi
-    echo "enode://$pubkey@$ip:$port"
+    # Keep discport=0 for maximum cross-version compatibility (especially for older clients).
+    echo "enode://$pubkey@$ip:$port?discport=0"
 }
 
 # Generate for each version
@@ -159,14 +153,14 @@ ensure_jwtsecret() {
 
 ensure_jwtsecret v1.16.7
 
-# Geth v1.0.0 requires the genesis block to be explicitly provided/inserted.
+# Geth v1.0.3 requires the genesis block to be explicitly provided/inserted.
 # We generate a canonical mainnet genesis.json using a modern geth binary.
-ensure_mainnet_genesis_for_v1_0_0() {
-    local dest="$DATA_ROOT/v1.0.0/genesis.json"
+ensure_mainnet_genesis_for_v1_0_3() {
+    local dest="$DATA_ROOT/v1.0.3/genesis.json"
     if [[ -f "$dest" ]]; then
         return 0
     fi
-    echo "Generating mainnet genesis.json for v1.0.0..."
+    echo "Generating mainnet genesis.json for v1.0.3..."
     mkdir -p "$(dirname "$dest")"
 
     local tmp
@@ -180,39 +174,7 @@ ensure_mainnet_genesis_for_v1_0_0() {
     mv "$tmp" "$dest"
 }
 
-ensure_mainnet_genesis_for_v1_0_0
-
-# Generate a deterministic nodekey + enode for the Windows Geth v1.0.0 node.
-# Note: this does NOT require running v1.0.0; it just derives the enode from the nodekey.
-WINDOWS_DATA_DIR="$DATA_ROOT/v1.0.0"
-mkdir -p "$WINDOWS_DATA_DIR"
-if [[ ! -f "$WINDOWS_DATA_DIR/nodekey" ]]; then
-    if command -v openssl >/dev/null 2>&1; then
-        openssl rand -hex 32 | tr -d '\n' > "$WINDOWS_DATA_DIR/nodekey"
-    else
-        od -An -N32 -tx1 /dev/urandom | tr -d ' \n' > "$WINDOWS_DATA_DIR/nodekey"
-    fi
-    chmod 600 "$WINDOWS_DATA_DIR/nodekey" || true
-fi
-
-windows_raw=$(docker run --rm -v "$WINDOWS_DATA_DIR/nodekey:/nodekey:ro" ethereum/client-go:v1.16.7 \
-    --datadir /tmp \
-    --nodekey /nodekey \
-    --port "$WINDOWS_P2P_PORT" \
-    --nodiscover \
-    --ipcdisable \
-    --http \
-    --http.api admin \
-    console --exec "admin.nodeInfo.enode" 2>&1 | tr -d '\r' | grep -Eo 'enode://[0-9a-fA-F]+@[^ ]+' | head -n 1)
-
-windows_pubkey=$(echo "$windows_raw" | sed -E 's#^enode://([^@]+)@.*#\1#')
-if [[ -z "$windows_pubkey" ]]; then
-    echo "Failed to extract pubkey for Windows v1.0.0 enode. Raw: '$windows_raw'" >&2
-    exit 1
-fi
-
-v1_0_0_enode="enode://$windows_pubkey@$WINDOWS_IP:$WINDOWS_P2P_PORT"
-echo "$v1_0_0_enode" > "$OUTPUT_DIR/v1.0.0_enode.txt"
+ensure_mainnet_genesis_for_v1_0_3
 
 # v1.16.7 is the top node; it peers with mainnet via discovery.
 v1_16_7_dir="$DATA_ROOT/v1.16.7"
@@ -259,12 +221,12 @@ printf '["%s"]\n' "${enodes[v1.16.7]}" > "$v1_11_6_dir/static-nodes.json"
 echo "Created config.toml + static-nodes.json for v1.11.6 pointing to v1.16.7"
 
 # Create static-nodes.json for each non-top version
-for version in v1.10.0 v1.9.25 v1.3.6 v1.0.0; do
+for version in v1.10.0 v1.9.25 v1.3.6 v1.0.3; do
     case $version in
         v1.10.0) next="v1.11.6" ;;
         v1.9.25) next="v1.10.0" ;;
         v1.3.6) next="v1.9.25" ;;
-        v1.0.0) next="v1.3.6" ;;
+        v1.0.3) next="v1.3.6" ;;
     esac
 
     datadir="$DATA_ROOT/$version"
@@ -272,12 +234,4 @@ for version in v1.10.0 v1.9.25 v1.3.6 v1.0.0; do
     echo "Created static-nodes.json for $version pointing to $next"
 done
 
-# For v1.0.0 (Windows), output the enode of v1.3.6 for connection
-v1_3_6_enode="${enodes[v1.3.6]}"
-# Replace the docker-network IP with the VM's public IP so the Windows VM can reach it.
-# Port remains the published p2p port for v1.3.6.
-windows_enode=$(echo "$v1_3_6_enode" | sed -E "s/@[^:]+:/@$EXTERNAL_IP:/")
-echo "$windows_enode" > "$OUTPUT_DIR/windows_enode.txt"
-echo "Windows bootnode enode (v1.3.6 public): $windows_enode"
-echo "Windows v1.0.0 enode (deterministic):    $v1_0_0_enode"
-echo "Wrote: $OUTPUT_DIR/windows_enode.txt, $OUTPUT_DIR/v1.0.0_enode.txt, $DATA_ROOT/*/{nodekey,static-nodes.json}"
+echo "Wrote: $DATA_ROOT/*/{nodekey,static-nodes.json}"

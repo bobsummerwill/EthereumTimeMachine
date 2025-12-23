@@ -290,6 +290,33 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "9. Geth v1.0.3 syncing"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "9. Geth v1.0.3 syncing — TODO"
+                      },
+                      "1": {
+                        "text": "9. Geth v1.0.3 syncing — IN PROGRESS"
+                      },
+                      "2": {
+                        "text": "9. Geth v1.0.3 syncing — DONE"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "9. Geth v1.0.0 syncing"
             },
             "properties": [
@@ -876,8 +903,8 @@
         },
         {
           "editorMode": "code",
-          "expr": "geth_up{node=\"Geth v1.0.0\"}",
-          "legendFormat": "Geth v1.0.0",
+          "expr": "geth_up{node=\"Geth v1.0.3\"}",
+          "legendFormat": "Geth v1.0.3",
           "range": true,
           "refId": "F"
         }

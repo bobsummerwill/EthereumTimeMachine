@@ -21,8 +21,8 @@ RUN apt-get update \
 # Download and install geth binary
 EOF
     case $version in
-        v1.0.0)
-            # Build from source: no maintained prebuilt Linux binaries for v1.0.0.
+        v1.0.3)
+            # Build from source: no maintained prebuilt Linux binaries for these very early releases.
             # We compile using a downloaded Go 1.4.x toolchain (DockerHub no longer serves schema1 images like golang:1.4).
             cat > "$out_file" << 'EOF'
 # Use an older Debian toolchain for compatibility with the Go 1.4 CGO toolchain.
@@ -54,12 +54,12 @@ ENV GOPATH=/go
 
 WORKDIR /go/src/github.com/ethereum/go-ethereum
 RUN git clone https://github.com/ethereum/go-ethereum.git . \
-    && git checkout v1.0.0
+    && git checkout v1.0.3
 
 # Build logs for debugging/reproducibility
 RUN echo "[build] go version: $(go version)" \
     && echo "[build] git rev:   $(git rev-parse --short HEAD)" \
-    && echo "[build] git tag:   v1.0.0"
+    && echo "[build] git tag:   v1.0.3"
 
 # IMPORTANT: Go 1.4's cgo DWARF parser is brittle with modern GCC output.
 # Use an older distro toolchain (jessie, GCC 4.9) and keep DWARFv2.
@@ -120,8 +120,8 @@ EOF
             ;;
     esac
 
-    # v1.0.0 has a fully-defined multi-stage Dockerfile already.
-    if [[ "$version" == "v1.0.0" ]]; then
+    # v1.0.3 has a fully-defined multi-stage Dockerfile already.
+    if [[ "$version" == "v1.0.3" ]]; then
         return 0
     fi
 
@@ -142,7 +142,7 @@ EOF
 
 # Build images
 versions=(
-    "v1.0.0"
+    "v1.0.3"
     "v1.11.6"
     "v1.10.0"
     "v1.9.25"
@@ -150,7 +150,7 @@ versions=(
 )
 
 # Optional: build only a single version (faster iteration).
-# Example: ONLY_VERSION=v1.0.0 ./build-images.sh
+# Example: ONLY_VERSION=v1.0.3 ./build-images.sh
 if [[ -n "${ONLY_VERSION:-}" ]]; then
     versions=("$ONLY_VERSION")
 fi

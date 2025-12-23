@@ -10,7 +10,7 @@ Start here:
 - Docker Compose stack (v1.16.7 → v1.3.6, with protocol bridge nodes): `chain-of-geths/docker-compose.yml`
 - Automation scripts: `chain-of-geths/generate-keys.sh`, `chain-of-geths/build-images.sh`, `chain-of-geths/deploy.sh`
 
-Note: **Geth v1.0.x is run on Windows** (no maintained pre-built Linux binaries). The Windows node is bootstrapped to the chain by connecting to the Ubuntu host's Geth v1.3.6 via `--bootnodes`.
+Note: The Docker Compose stack includes a containerized **Geth v1.0.3** (built from source).
 
 ## Visual sync progress (Grafana)
 
@@ -31,5 +31,4 @@ The pre-provisioned dashboard is **“Chain of Geths – Sync Progress”**, wit
 [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh:1) writes its outputs under `chain-of-geths/output/` (ignored by git via [`.gitignore`](.gitignore:1)).
 
 Example outputs:
-- [`chain-of-geths/output/windows_enode.txt`](chain-of-geths/output/windows_enode.txt:1)
 - [`chain-of-geths/output/data/v1.10.0/static-nodes.json`](chain-of-geths/output/data/v1.10.0/static-nodes.json:1)

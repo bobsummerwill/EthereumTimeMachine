@@ -87,7 +87,7 @@ compose_up geth-v1-3-6
 
 wait_for_block_ge "geth-v1-3-6" "http://localhost:8549" "$MIN_BLOCK"
 
-echo "[start-legacy] starting geth-v1-0-0"
-compose_up geth-v1-0-0
+echo "[start-legacy] starting geth-v1-0-3"
+compose_up geth-v1-0-3
 
 echo "[start-legacy] done"

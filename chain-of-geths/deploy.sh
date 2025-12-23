@@ -42,8 +42,6 @@ VM_USER="ubuntu"
 # Update this to your PEM key path. Note: don't quote ~ (tilde expansion doesn't happen in quotes).
 SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/Downloads/chain-of-geths-keys.pem}"
 
-WINDOWS_IP="18.232.131.32"
-
 # Optional: wipe Lighthouse (consensus client) data volumes on the Ubuntu VM.
 # This is useful when Lighthouse upgrades introduce DB incompatibilities.
 RESET_LIGHTHOUSE_VOLUMES="${RESET_LIGHTHOUSE_VOLUMES:-0}"
@@ -62,7 +60,7 @@ echo "Saving Docker images..."
 mkdir -p images
 # Avoid carrying forward stale tarballs for versions that are no longer in the stack.
 rm -f images/*.tar
-for version in v1.0.0 v1.11.6 v1.10.0 v1.9.25 v1.3.6; do
+for version in v1.0.3 v1.11.6 v1.10.0 v1.9.25 v1.3.6; do
     docker save ethereumtimemachine/geth:$version > images/geth-$version.tar
 done
 
@@ -161,8 +159,4 @@ fi
 echo "Chain started. Check logs with: docker-compose logs -f"
 EOF
 
-echo "Skipping Windows (Geth v1.0.0) deployment automation."
-echo "Windows VM public IP (for manual setup later): $WINDOWS_IP"
-echo "Bootnode enode for Windows (v1.3.6 public): $(cat output/windows_enode.txt)"
-echo "Deterministic Windows v1.0.0 enode (if you use the generated nodekey): $(cat output/v1.0.0_enode.txt)"
-echo "Deployment complete (Ubuntu chain + monitoring only)."
+echo "Deployment complete."

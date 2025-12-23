@@ -33,8 +33,7 @@ The entire setup is automated using the scripts in the `/chain-of-geths/` direct
 - `deploy.sh`: Deploys everything to AWS VMs
 
 Notes:
-- The Docker Compose stack runs **v1.16.7 → v1.3.6** only. Geth **v1.0.x is run on Windows**, since there are no maintained pre-built Linux binaries.
-- The bridge from Windows (v1.0.x) into the chain is done by pointing v1.0.x at the Ubuntu host's **v1.3.6 p2p port** via `--bootnodes`.
+- The Docker Compose stack runs **v1.16.7 → v1.0.3** (all Linux containers).
 
 ### 2. AWS Deployment
 
@@ -43,8 +42,7 @@ Deployment is fully automated using the `deploy.sh` script from your local machi
 - Pregenerating node keys and static nodes for consistent enode IDs and automatic peering
 - Building Docker images locally
 - Deploying to the Ubuntu AWS EC2 instance (m6a.2xlarge at 54.81.90.194)
-- Starting the Docker Compose chain (v1.16.7 through v1.3.6) with automatic container wiring via static nodes
-- Remotely setting up Geth v1.0.0 on the Windows VM (t2.large at 18.232.131.32) via AWS Systems Manager
+- Starting the Docker Compose chain (v1.16.7 through v1.0.3) with automatic container wiring via static nodes
 
 Run `./chain-of-geths/deploy.sh` after updating `SSH_KEY_PATH` and ensuring AWS CLI is configured.
 
