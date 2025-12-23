@@ -159,6 +159,27 @@ ensure_jwtsecret() {
 
 ensure_jwtsecret v1.16.7
 
+# Geth v1.0.0 requires the genesis block to be explicitly provided/inserted.
+# We generate a canonical mainnet genesis.json using a modern geth binary.
+ensure_mainnet_genesis_for_v1_0_0() {
+    local dest="$DATA_ROOT/v1.0.0/genesis.json"
+    if [[ -f "$dest" ]]; then
+        return 0
+    fi
+    echo "Generating mainnet genesis.json for v1.0.0..."
+    mkdir -p "$(dirname "$dest")"
+
+    local tmp
+    tmp="${dest}.tmp"
+    rm -f "$tmp"
+
+    # dumpgenesis is a read-only operation and does not require chain data.
+    docker run --rm ethereum/client-go:v1.16.7 geth dumpgenesis > "$tmp"
+    mv "$tmp" "$dest"
+}
+
+ensure_mainnet_genesis_for_v1_0_0
+
 # Generate a deterministic nodekey + enode for the Windows Geth v1.0.0 node.
 # Note: this does NOT require running v1.0.0; it just derives the enode from the nodekey.
 WINDOWS_DATA_DIR="$DATA_ROOT/v1.0.0"

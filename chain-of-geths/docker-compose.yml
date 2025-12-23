@@ -152,6 +152,7 @@ services:
     image: ethereumtimemachine/geth:v1.0.0
     container_name: geth-v1-0-0
     command: |
+      --genesis /data/genesis.json
       --datadir /data
       --nodekey /data/nodekey
       --rpc
