@@ -72,7 +72,6 @@ services:
     container_name: geth-v1-10-0
     command: |
       --datadir /data
-      # More memory cache generally reduces LevelDB churn and speeds up legacy sync.
       --cache 4096
       --http
       --http.addr 0.0.0.0
@@ -102,7 +101,6 @@ services:
     container_name: geth-v1-9-25
     command: |
       --datadir /data
-      # More memory cache generally reduces LevelDB churn and speeds up legacy sync.
       --cache 2048
       --rpc
       --rpcaddr 0.0.0.0
@@ -129,7 +127,6 @@ services:
     container_name: geth-v1-3-6
     command: |
       --datadir /data
-      # Geth v1.3.6 is memory-sensitive; keep cache modest.
       --cache 512
       --rpc
       --rpcaddr 0.0.0.0
