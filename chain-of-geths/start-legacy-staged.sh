@@ -72,9 +72,16 @@ wait_for_block_ge() {
   done
 }
 
-echo "[start-legacy] starting geth-v1-11-6 + geth-v1-10-0"
-compose_up geth-v1-11-6 geth-v1-10-0
+# Start downstream nodes only after the upstream reports a non-zero head via JSON-RPC.
+# This reduces flakiness during initial startup and prevents older clients from
+# getting stuck after receiving transiently incomplete responses from an upstream.
 
+echo "[start-legacy] starting geth-v1-11-6"
+compose_up geth-v1-11-6
+wait_for_block_ge "geth-v1-11-6" "http://localhost:8546" "$MIN_BLOCK"
+
+echo "[start-legacy] starting geth-v1-10-0"
+compose_up geth-v1-10-0
 wait_for_block_ge "geth-v1-10-0" "http://localhost:8551" "$MIN_BLOCK"
 
 echo "[start-legacy] starting geth-v1-9-25"
