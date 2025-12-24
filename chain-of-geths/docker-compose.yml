@@ -4,6 +4,8 @@ services:
   geth-v1-16-7:
     image: ethereum/client-go:v1.16.7
     container_name: geth-v1-16-7
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     command: |
       --config /data/config.toml
       --datadir /data
@@ -27,6 +29,7 @@ services:
       - "30306:30306/udp"
     volumes:
       - ./generated-files/data/v1.16.7:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
     networks:
       ethereum:
         ipv4_address: 172.20.0.18
@@ -43,6 +46,8 @@ services:
   geth-v1-11-6:
     image: ethereumtimemachine/geth:v1.11.6
     container_name: geth-v1-11-6
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     command: |
       --config /data/config.toml
       --datadir /data
@@ -63,6 +68,7 @@ services:
       - "30308:30308/udp"
     volumes:
       - ./generated-files/data/v1.11.6:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
     networks:
       ethereum:
         ipv4_address: 172.20.0.15
@@ -72,6 +78,8 @@ services:
   geth-v1-10-0:
     image: ethereumtimemachine/geth:v1.10.0
     container_name: geth-v1-10-0
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     command: |
       --datadir /data
       --cache 2048
@@ -90,6 +98,7 @@ services:
       - "30309:30309/udp"
     volumes:
       - ./generated-files/data/v1.10.0:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
     depends_on:
       - geth-v1-11-6
     networks:
@@ -101,6 +110,8 @@ services:
   geth-v1-9-25:
     image: ethereumtimemachine/geth:v1.9.25
     container_name: geth-v1-9-25
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     command: |
       --datadir /data
       --cache 2048
@@ -118,6 +129,7 @@ services:
       - "30310:30310/udp"
     volumes:
       - ./generated-files/data/v1.9.25:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
     depends_on:
       - geth-v1-10-0
     networks:
@@ -127,6 +139,8 @@ services:
   geth-v1-3-6:
     image: ethereumtimemachine/geth:v1.3.6
     container_name: geth-v1-3-6
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     command: |
       --datadir /data
       --nodekey /data/nodekey
@@ -143,6 +157,7 @@ services:
       - "30307:30307/udp"
     volumes:
       - ./generated-files/data/v1.3.6:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
     depends_on:
       - geth-v1-9-25
     networks:
@@ -153,6 +168,8 @@ services:
   geth-v1-0-3:
     image: ethereumtimemachine/geth:v1.0.3
     container_name: geth-v1-0-3
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     command: |
       --genesis /data/genesis.json
       --datadir /data
@@ -170,6 +187,7 @@ services:
       - "30305:30305/udp"
     volumes:
       - ./generated-files/data/v1.0.3:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
     depends_on:
       - geth-v1-3-6
     networks:
@@ -242,6 +260,7 @@ services:
       - "9100:9100"
     networks:
       - ethereum
+
 
   prometheus:
     image: prom/prometheus:v2.55.1
