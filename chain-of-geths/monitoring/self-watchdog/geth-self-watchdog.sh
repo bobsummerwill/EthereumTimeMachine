@@ -8,22 +8,29 @@
 #     if Current has not changed since the last sample interval, terminate the container.
 # - With `restart: unless-stopped`, Docker will restart the container.
 
-set -eu
+# NOTE: use POSIX sh features only; many images use dash (/bin/sh) which lacks
+# bashisms such as base#number arithmetic.
+set -e
 
 SAMPLE_INTERVAL_SECONDS="${SAMPLE_INTERVAL_SECONDS:-600}"
 TARGET_MARGIN_BLOCKS="${TARGET_MARGIN_BLOCKS:-10}"
 IPC_PATH="${IPC_PATH:-/data/geth.ipc}"
 
-hex_to_dec() {
+num_to_dec() {
   # Accept 0x-prefixed hex or decimal strings.
+  # Portable across dash: use 0x... arithmetic, avoid base#number.
   v="$1"
   case "$v" in
     0x*|0X*)
-      h=${v#0x}; h=${h#0X}
-      echo $((16#$h))
+      # dash supports 0x... in $(( ))
+      echo $((v))
+      ;;
+    *[!0-9]*)
+      # unknown format
+      echo ""
       ;;
     *)
-      echo "$v"
+      echo $((v))
       ;;
   esac
 }
@@ -44,38 +51,74 @@ extract_hex_field() {
   printf "%s" "$v"
 }
 
-rpc_syncing_raw() {
-  # geth attach prints to stdout; on failure, return empty.
-  geth attach "$IPC_PATH" --exec 'eth.syncing' 2>/dev/null || true
+attach_exec() {
+  # Best-effort attach across versions.
+  # Try: plain IPC path, ipc: prefix, then HTTP.
+  expr="$1"
+
+  # If IPC isn't ready yet, skip quickly.
+  if [ -S "$IPC_PATH" ]; then
+    out=$(geth attach "$IPC_PATH" --exec "$expr" 2>/dev/null || true)
+    [ -n "$out" ] && { printf "%s" "$out"; return 0; }
+    out=$(geth attach "ipc:$IPC_PATH" --exec "$expr" 2>/dev/null || true)
+    [ -n "$out" ] && { printf "%s" "$out"; return 0; }
+  fi
+
+  # HTTP fallback (only if enabled in the container)
+  out=$(geth attach "http://127.0.0.1:8545" --exec "$expr" 2>/dev/null || true)
+  [ -n "$out" ] && { printf "%s" "$out"; return 0; }
+  out=$(geth attach "http://localhost:8545" --exec "$expr" 2>/dev/null || true)
+  [ -n "$out" ] && { printf "%s" "$out"; return 0; }
+
+  return 1
 }
 
-rpc_blocknumber_raw() {
-  geth attach "$IPC_PATH" --exec 'eth.blockNumber' 2>/dev/null || true
+first_hex_or_dec() {
+  # Extract the first 0x... literal, else the first decimal integer.
+  input="$1"
+  v=$(printf "%s" "$input" | grep -Eo '0x[0-9a-fA-F]+' | head -n 1 || true)
+  [ -n "$v" ] && { printf "%s" "$v"; return 0; }
+  v=$(printf "%s" "$input" | grep -Eo '[0-9]+' | head -n 1 || true)
+  printf "%s" "$v"
+}
+
+get_current_and_target() {
+  # Use a JS expression that returns a 2-element array.
+  # We parse the first two numeric literals.
+  #
+  # eth.syncing is either false or an object with currentBlock/highestBlock.
+  # For non-syncing nodes, we use blockNumber for both.
+  out=$(attach_exec "(function(){var s=eth.syncing; if(!s){return [eth.blockNumber, eth.blockNumber];} return [s.currentBlock, s.highestBlock];})()" || true)
+
+  if [ -z "$out" ]; then
+    echo ""; echo ""; return 0
+  fi
+
+  # Grab first two numbers.
+  first=$(first_hex_or_dec "$out")
+  # remove up to first occurrence so the next grep finds the second
+  rest=$(printf "%s" "$out" | sed "0,/$first/s//X/")
+  second=$(first_hex_or_dec "$rest")
+
+  printf "%s\n%s\n" "$first" "$second"
 }
 
 current_and_target() {
-  syncing=$(rpc_syncing_raw)
-  case "$syncing" in
-    *false*)
-      bn_raw=$(rpc_blocknumber_raw)
-      # geth attach usually prints a bare hex string (e.g. 0x1234). Grab the first hex literal.
-      bn_hex=$(printf "%s" "$bn_raw" | grep -Eo '0x[0-9a-fA-F]+' | head -n 1 || true)
-      [ -z "$bn_hex" ] && bn_hex="0x0"
-      cur=$(hex_to_dec "$bn_hex")
-      echo "$cur $cur"
-      return 0
-      ;;
-    *)
-      cur_hex=$(extract_hex_field currentBlock "$syncing" || true)
-      tgt_hex=$(extract_hex_field highestBlock "$syncing" || true)
-      [ -z "$cur_hex" ] && cur_hex="0x0"
-      [ -z "$tgt_hex" ] && tgt_hex="$cur_hex"
-      cur=$(hex_to_dec "$cur_hex")
-      tgt=$(hex_to_dec "$tgt_hex")
-      echo "$cur $tgt"
-      return 0
-      ;;
-  esac
+  # Outputs: "<cur_dec> <tgt_dec>" or "" if unavailable.
+  set -- $(get_current_and_target)
+  cur_raw="$1"
+  tgt_raw="$2"
+
+  [ -z "$cur_raw" ] && { echo ""; return 0; }
+  [ -z "$tgt_raw" ] && tgt_raw="$cur_raw"
+
+  cur=$(num_to_dec "$cur_raw" || true)
+  tgt=$(num_to_dec "$tgt_raw" || true)
+
+  # If conversion failed, fall back to equality-only mode: treat target=current.
+  [ -z "$cur" ] && cur=0
+  [ -z "$tgt" ] && tgt="$cur"
+  echo "$cur $tgt"
 }
 
 echo "[self-watchdog] starting geth (wrapper pid=$$)"
@@ -88,23 +131,33 @@ echo "[self-watchdog] geth pid=$GETH_PID"
 
 last_cur=""
 
+ # Give geth a brief moment to bring up IPC/HTTP before first sample.
+sleep 10
+
 while true; do
-  sleep "$SAMPLE_INTERVAL_SECONDS"
 
   if ! kill -0 "$GETH_PID" 2>/dev/null; then
     echo "[self-watchdog] geth process is gone; exiting"
     exit 1
   fi
 
-  set -- $(current_and_target)
-  cur="$1"
-  tgt="$2"
+  ct=$(current_and_target || true)
+  if [ -z "$ct" ]; then
+    # Not ready yet (IPC/HTTP not up); don't restart.
+    sleep "$SAMPLE_INTERVAL_SECONDS"
+    continue
+  fi
+  # shell-split into two fields
+  set -- $ct
+  cur=${1:-0}
+  tgt=${2:-$cur}
 
   echo "[self-watchdog] progress current=$cur target=$tgt"
 
   # If we are basically at target, don't reboot for lack of progress.
   if [ $((cur + TARGET_MARGIN_BLOCKS)) -gt "$tgt" ]; then
     last_cur="$cur"
+    sleep "$SAMPLE_INTERVAL_SECONDS"
     continue
   fi
 
@@ -117,4 +170,7 @@ while true; do
   fi
 
   last_cur="$cur"
+
+  # Normal cadence.
+  sleep "$SAMPLE_INTERVAL_SECONDS"
 done
