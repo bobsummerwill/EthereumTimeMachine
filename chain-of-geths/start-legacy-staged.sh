@@ -11,8 +11,10 @@ set -euo pipefail
 ROOT_DIR="/home/ubuntu/chain-of-geths"
 cd "$ROOT_DIR"
 
-# "block > 0" gate requested.
-MIN_BLOCK="${MIN_BLOCK:-1}"
+# Default gate: wait for upstream to reach a small-but-nontrivial height.
+# This avoids starting downstream nodes during the very earliest phase of sync,
+# where some older clients can get stuck after transiently incomplete responses.
+MIN_BLOCK="${MIN_BLOCK:-1000}"
 
 hex_to_int() {
   python3 - <<'PY' "$1"
