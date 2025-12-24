@@ -46,7 +46,7 @@ services:
     command: |
       --config /data/config.toml
       --datadir /data
-      --cache 4096
+      --cache 2048
       --nodekey /data/geth/nodekey
       --http
       --http.addr 0.0.0.0
@@ -74,7 +74,7 @@ services:
     container_name: geth-v1-10-0
     command: |
       --datadir /data
-      --cache 4096
+      --cache 2048
       --http
       --http.addr 0.0.0.0
       --http.vhosts *
@@ -103,7 +103,7 @@ services:
     container_name: geth-v1-9-25
     command: |
       --datadir /data
-      --cache 4096
+      --cache 2048
       --rpc
       --rpcaddr 0.0.0.0
       --rpcvhosts *
