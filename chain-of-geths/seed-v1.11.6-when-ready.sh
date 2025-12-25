@@ -105,7 +105,8 @@ sudo docker run --rm \
   import "/exports/$EXPORT_FILE_NAME" >> "$LOG_FILE" 2>&1
 
 # Bring everything back up.
-bash /home/ubuntu/chain-of-geths/start-legacy-staged.sh >> "$LOG_FILE" 2>&1
+# Pass cutoff through so downstream offline-seeding steps (e.g. v1.9.25 -> v1.3.6) use the same range.
+CUTOFF_BLOCK="$CUTOFF_BLOCK" bash /home/ubuntu/chain-of-geths/start-legacy-staged.sh >> "$LOG_FILE" 2>&1
 
 touch "$FLAG_FILE"
 echo "[seed] done; wrote $FLAG_FILE" >> "$LOG_FILE"

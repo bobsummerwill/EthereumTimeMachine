@@ -118,7 +118,7 @@ services:
       --rpc
       --rpcaddr 0.0.0.0
       --rpcvhosts *
-      --rpcapi eth,net,web3
+      --rpcapi eth,net,web3,debug
       --networkid 1
       --syncmode full
       --port 30310
@@ -158,8 +158,6 @@ services:
     volumes:
       - ./generated-files/data/v1.3.6:/data
       - ./monitoring/self-watchdog:/watchdog:ro
-    depends_on:
-      - geth-v1-9-25
     networks:
       ethereum:
         ipv4_address: 172.20.0.14

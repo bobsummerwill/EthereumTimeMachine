@@ -220,18 +220,36 @@ printf '["%s"]\n' "${enodes[v1.16.7]}" > "$v1_11_6_dir/geth/static-nodes.json"
 printf '["%s"]\n' "${enodes[v1.16.7]}" > "$v1_11_6_dir/static-nodes.json"
 echo "Created config.toml + static-nodes.json for v1.11.6 pointing to v1.16.7"
 
-# Create static-nodes.json for each non-top version
+# Create static-nodes.json for each non-top version.
+#
+# IMPORTANT: We intentionally do *not* statically peer v1.3.6 upstream to v1.9.25.
+# v1.3.6 is expected to be seeded via export/import (offline) and then serve blocks
+# downstream (to v1.0.3) without outbound peering.
 for version in v1.10.0 v1.9.25 v1.3.6 v1.0.3; do
-    case $version in
-        v1.10.0) next="v1.11.6" ;;
-        v1.9.25) next="v1.10.0" ;;
-        v1.3.6) next="v1.9.25" ;;
-        v1.0.3) next="v1.3.6" ;;
-    esac
-
     datadir="$DATA_ROOT/$version"
-    printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
-    echo "Created static-nodes.json for $version pointing to $next"
+
+    case $version in
+        v1.10.0)
+            next="v1.11.6"
+            printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
+            echo "Created static-nodes.json for $version pointing to $next"
+            ;;
+        v1.9.25)
+            next="v1.10.0"
+            printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
+            echo "Created static-nodes.json for $version pointing to $next"
+            ;;
+        v1.3.6)
+            # No outbound pairing: allow only inbound peers (e.g. v1.0.3).
+            printf '[]\n' > "$datadir/static-nodes.json"
+            echo "Created static-nodes.json for $version (empty; no outbound peering)"
+            ;;
+        v1.0.3)
+            next="v1.3.6"
+            printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
+            echo "Created static-nodes.json for $version pointing to $next"
+            ;;
+    esac
 done
 
 echo "Wrote: $DATA_ROOT/*/{nodekey,static-nodes.json}"

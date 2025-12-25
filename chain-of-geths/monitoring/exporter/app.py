@@ -282,9 +282,24 @@ class Poller:
         seed_log_path = host_output_dir / "seed-v1.11.6.log"
         seed_done_path = host_output_dir / f"seed-v1.11.6-{cutoff_block}.done"
 
+        # Legacy (v1.9.25 -> v1.3.6) seeding paths (written by start-legacy-staged.sh).
+        v136_export_file_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}-from-v1.9.25.rlp"
+        v136_export_progress_path = (
+            host_output_dir / "exports" / f"mainnet-0-{cutoff_block}-from-v1.9.25.rlp.progress"
+        )
+        v136_export_marker_path = (
+            host_output_dir / "exports" / f"mainnet-0-{cutoff_block}-from-v1.9.25.rlp.exporting"
+        )
+        v136_export_done_path = host_output_dir / f"seed-v1.3.6-export-{cutoff_block}.done"
+        v136_import_marker_path = host_output_dir / f"seed-v1.3.6-import-{cutoff_block}.importing"
+        v136_import_log_path = host_output_dir / "seed-v1.3.6-import.log"
+        v136_seed_done_path = host_output_dir / f"seed-v1.3.6-from-v1.9.25-{cutoff_block}.done"
+
         while not self._stop.is_set():
             # Clear dynamic label series each round so we don't accumulate stale values.
             g_sync_progress_info.clear()
+            # Stage labels are also dynamic (we may add/rename stages); clear to prevent stale rows.
+            g_stage_status.clear()
             blocks: Dict[str, int] = {}
 
             # Keep peer counts for checklist heuristics.
@@ -462,18 +477,18 @@ class Poller:
             def set_stage(stage: str, status: int) -> None:
                 g_stage_status.labels(stage=stage).set(status)
 
-            # 1) Lighthouse syncing from snapshot (checkpoint sync + head catchup)
+            # 01) Lighthouse syncing from snapshot (checkpoint sync + head catchup)
             if not lighthouse_up:
-                set_stage("1. Lighthouse syncing from snapshot", 0)
+                set_stage("01. Lighthouse syncing from snapshot", 0)
             else:
                 if lighthouse_is_syncing or lighthouse_sync_distance > 0:
-                    set_stage("1. Lighthouse syncing from snapshot", 1)
+                    set_stage("01. Lighthouse syncing from snapshot", 1)
                 else:
-                    set_stage("1. Lighthouse syncing from snapshot", 2)
+                    set_stage("01. Lighthouse syncing from snapshot", 2)
 
-            # 2) Lighthouse indexing/backfill (best-effort based on backfill worker gauge)
+            # 02) Lighthouse indexing/backfill (best-effort based on backfill worker gauge)
             if not lighthouse_up:
-                set_stage("2. Lighthouse indexing/backfill", 0)
+                set_stage("02. Lighthouse indexing/backfill", 0)
             else:
                 # More accurate detection combines:
                 #  - active worker gauge (if available)
@@ -488,29 +503,29 @@ class Poller:
                 if lighthouse_backfill_workers is not None:
                     active = lighthouse_backfill_workers > 0
                     set_stage(
-                        "2. Lighthouse indexing/backfill",
+                        "02. Lighthouse indexing/backfill",
                         1 if (active or backfill_recent) else 2,
                     )
                 else:
                     set_stage(
-                        "2. Lighthouse indexing/backfill",
+                        "02. Lighthouse indexing/backfill",
                         1 if (lighthouse_is_syncing or lighthouse_sync_distance > 0) else 2,
                     )
 
-            # 3) Geth v1.16.7 syncing
+            # 03) Geth v1.16.7 syncing
             top_eff = node_effective_head.get(top_name, 0)
             if not node_up.get(top_name, False):
-                set_stage("3. Geth v1.16.7 syncing", 0)
+                set_stage("03. Geth v1.16.7 syncing", 0)
             else:
                 # Treat a totally "cold" node as not started until it has a non-zero effective head.
                 # (`effective head` already accounts for clients where eth_syncing.currentBlock advances first.)
                 # This avoids showing "IN PROGRESS" just because eth_syncing returns a dict at startup.
                 if top_eff <= 0:
-                    set_stage("3. Geth v1.16.7 syncing", 0)
+                    set_stage("03. Geth v1.16.7 syncing", 0)
                 else:
-                    set_stage("3. Geth v1.16.7 syncing", 1 if node_syncing.get(top_name, False) else 2)
+                    set_stage("03. Geth v1.16.7 syncing", 1 if node_syncing.get(top_name, False) else 2)
 
-            # 4) Geth v1.16.7 exporting data (seed RLP export)
+            # 04) Geth v1.16.7 exporting data (seed RLP export)
             export_last_done = None
             if export_progress_path.exists():
                 data = _read_json_file(export_progress_path)
@@ -520,16 +535,16 @@ class Poller:
                     except Exception:
                         export_last_done = None
             if export_last_done is None:
-                set_stage("4. Geth v1.16.7 exporting data", 0)
+                set_stage("04. Geth v1.16.7 exporting data", 0)
             else:
                 set_stage(
-                    "4. Geth v1.16.7 exporting data",
+                    "04. Geth v1.16.7 exporting data",
                     2 if export_last_done >= cutoff_block else 1,
                 )
 
-            # 5) Geth v1.11.6 importing data
+            # 05) Geth v1.11.6 importing data
             if seed_done_path.exists():
-                set_stage("5. Geth v1.11.6 importing data", 2)
+                set_stage("05. Geth v1.11.6 importing data", 2)
             else:
                 importing = False
                 import_current = 0
@@ -548,9 +563,79 @@ class Poller:
                 except Exception:
                     importing = False
                 set_stage(
-                    "5. Geth v1.11.6 importing data",
+                    "05. Geth v1.11.6 importing data",
                     1 if importing else 0,
                 )
+
+            # 6-7) Legacy bridge nodes reaching cutoff
+            def legacy_stage(node: str, stage_label: str) -> None:
+                if not node_up.get(node, False):
+                    set_stage(stage_label, 0)
+                    return
+                eff = node_effective_head.get(node, 0)
+                if eff >= cutoff_block:
+                    set_stage(stage_label, 2)
+                elif eff > 0:
+                    set_stage(stage_label, 1)
+                else:
+                    set_stage(stage_label, 0)
+
+            legacy_stage("Geth v1.10.0", "06. Geth v1.10.0 syncing")
+            legacy_stage("Geth v1.9.25", "07. Geth v1.9.25 syncing")
+
+            # 08) Geth v1.9.25 exporting data (RLP export stage)
+            # IMPORTANT: do NOT infer "DONE" from the mere presence of the export file.
+            # A failed/partial `geth export` can leave a tiny/truncated file behind.
+            # We only mark DONE when the script writes the explicit done marker.
+            v136_export_done = v136_seed_done_path.exists() or v136_export_done_path.exists()
+            v136_export_running = v136_export_marker_path.exists()
+
+            v136_export_last_done = None
+            if v136_export_progress_path.exists():
+                data = _read_json_file(v136_export_progress_path)
+                if isinstance(data, dict) and data.get("last_done") is not None:
+                    try:
+                        v136_export_last_done = int(data.get("last_done"))
+                    except Exception:
+                        v136_export_last_done = None
+
+            if v136_export_done:
+                set_stage("08. Geth v1.9.25 exporting data", 2)
+            elif v136_export_last_done is not None:
+                set_stage(
+                    "08. Geth v1.9.25 exporting data",
+                    2 if v136_export_last_done >= cutoff_block else 1,
+                )
+            elif v136_export_running:
+                set_stage("08. Geth v1.9.25 exporting data", 1)
+            else:
+                set_stage("08. Geth v1.9.25 exporting data", 0)
+
+            # 09) Geth v1.3.6 importing data (RLP import stage)
+            v136_importing = False
+            v136_import_current = 0
+            if v136_seed_done_path.exists():
+                set_stage("09. Geth v1.3.6 importing data", 2)
+            else:
+                if v136_import_marker_path.exists():
+                    v136_importing = True
+                try:
+                    if v136_import_log_path.exists():
+                        tail = v136_import_log_path.read_text(errors="ignore")[-500000:]
+                        if "Importing blockchain" in tail or "Imported new chain segment" in tail:
+                            v136_importing = True
+                        m = re.findall(r"Imported new chain segment\s+number=([0-9,]+)", tail)
+                        if m:
+                            v136_import_current = int(m[-1].replace(",", ""))
+                except Exception:
+                    pass
+                set_stage(
+                    "09. Geth v1.3.6 importing data",
+                    1 if v136_importing else 0,
+                )
+
+            # 10) Geth v1.0.3 syncing
+            legacy_stage("Geth v1.0.3", "10. Geth v1.0.3 syncing")
 
             # --- Synthetic rows for export/import phases in the Sync progress table ---
             # These are displayed as extra rows (between v1.16.7 and v1.11.6) by
@@ -603,23 +688,46 @@ class Poller:
                 import_up,
             )
 
-            # 6-8) Legacy geth nodes reaching cutoff
-            def legacy_stage(node: str, stage_label: str) -> None:
-                if not node_up.get(node, False):
-                    set_stage(stage_label, 0)
-                    return
-                eff = node_effective_head.get(node, 0)
-                if eff >= cutoff_block:
-                    set_stage(stage_label, 2)
-                elif eff > 0:
-                    set_stage(stage_label, 1)
-                else:
-                    set_stage(stage_label, 0)
+            # --- Synthetic rows for legacy export/import phases (v1.9.25 -> v1.3.6) ---
+            v136_export_up = (
+                v136_export_marker_path.exists()
+                or v136_export_progress_path.exists()
+                or v136_export_file_path.exists()
+                or v136_export_done
+            )
+            v136_export_display = (
+                cutoff_block
+                if v136_export_done
+                else (v136_export_last_done if v136_export_last_done is not None else 0)
+            )
+            v136_export_running = (
+                (v136_export_last_done is not None and v136_export_last_done < cutoff_block)
+                or v136_export_marker_path.exists()
+            ) and not v136_export_done
+            emit_phase_row(
+                "Export (v1.9.25 → RLP)",
+                4.50,
+                v136_export_display,
+                cutoff_block,
+                v136_export_running,
+                v136_export_up,
+            )
 
-            legacy_stage("Geth v1.10.0", "6. Geth v1.10.0 syncing")
-            legacy_stage("Geth v1.9.25", "7. Geth v1.9.25 syncing")
-            legacy_stage("Geth v1.3.6", "8. Geth v1.3.6 syncing")
-            legacy_stage("Geth v1.0.3", "9. Geth v1.0.3 syncing")
+            v136_import_done = v136_seed_done_path.exists()
+            v136_import_up = (
+                v136_import_marker_path.exists()
+                or v136_import_log_path.exists()
+                or v136_import_done
+                or v136_import_current > 0
+            )
+            emit_phase_row(
+                "Import (RLP → v1.3.6)",
+                4.60,
+                cutoff_block if v136_import_done else v136_import_current,
+                cutoff_block,
+                (v136_importing and not v136_import_done),
+                v136_import_up,
+            )
 
             self._stop.wait(self.interval_seconds)
 

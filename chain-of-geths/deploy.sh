@@ -151,7 +151,7 @@ sudo docker compose create geth-v1-11-6 2>/dev/null || sudo docker-compose creat
 SEED_FLAG="/home/ubuntu/chain-of-geths/generated-files/seed-v1.11.6-${BRIDGE_SEED_CUTOFF_BLOCK}.done"
 if [ -f "$SEED_FLAG" ]; then
   echo "Bridge seeding already done ($SEED_FLAG). Starting legacy geth services..."
-  bash /home/ubuntu/chain-of-geths/start-legacy-staged.sh
+  CUTOFF_BLOCK="$BRIDGE_SEED_CUTOFF_BLOCK" bash /home/ubuntu/chain-of-geths/start-legacy-staged.sh
 else
   echo "Launching background bridge seeder (cutoff=$BRIDGE_SEED_CUTOFF_BLOCK)..."
   nohup env CUTOFF_BLOCK="$BRIDGE_SEED_CUTOFF_BLOCK" bash /home/ubuntu/chain-of-geths/seed-v1.11.6-when-ready.sh >/home/ubuntu/chain-of-geths/generated-files/seed-v1.11.6.nohup.log 2>&1 &

@@ -1,6 +1,6 @@
 # Chain of Geths
 
-This directory contains a Docker Compose stack that runs multiple Geth versions (plus Lighthouse) and wires them together via static peering.
+This directory contains a Docker Compose stack that runs multiple Geth versions (plus Lighthouse) and wires them together via a mix of static peering and offline export/import seeding.
 
 Entrypoints:
 - Compose stack: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
@@ -68,8 +68,8 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
             |   DAO                                         |
             +-----------------------------------------------+
                                |
-                               | eth/63
-                               v
+                                | (offline block export/import up to cutoff)
+                                v
             +-----------------------------------------------+
             | geth v1.3.6 (1st Apr 2016)                    |
             | eth/61-63                                     |
@@ -120,6 +120,8 @@ This avoids the “old chainstate format” / “no compatible consensus client�
 ## Static peering (no discovery for older nodes)
 
 Older services run with discovery disabled and peer **only** to the next node in the chain.
+
+Exception: `geth-v1-3-6` is expected to be **offline-seeded** from `geth-v1-9-25` (export/import) and does **not** dial upstream peers.
 
 `generate-keys.sh` writes deterministic peering/config files under `chain-of-geths/generated-files/`:
 - `nodekey`

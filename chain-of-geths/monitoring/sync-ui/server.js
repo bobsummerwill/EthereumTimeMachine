@@ -77,6 +77,9 @@ async function fetchSyncProgress() {
 
   const rows = Array.from(rowsByNode.values())
     .filter((r) => r.node) // defensive
+    // Keep this table aligned with the Grafana dashboard: v1.3.6 is seeded via export/import,
+    // and we show that progress via synthetic rows instead of the raw node row.
+    .filter((r) => r.node !== "Geth v1.3.6")
     // Hide raw internal rows if ever introduced; keep the current behavior simple.
     .sort((a, b) => {
       const sa = a.sort ?? Number.POSITIVE_INFINITY;
@@ -96,7 +99,7 @@ function normalizeForDisplay(row) {
 
   // Match the Grafana dashboard behavior: for selected legacy nodes, display a fixed cutoff target.
   // Grafana does this in the panel query by substituting 1919999 for these nodes.
-  const legacyFixedTarget = /^Geth v1\.(11\.6|10\.0|9\.25|3\.6)$/.test(node);
+  const legacyFixedTarget = /^Geth v1\.(11\.6|10\.0|9\.25)$/.test(node);
   if (legacyFixedTarget && Number.isFinite(CUTOFF_BLOCK) && CUTOFF_BLOCK > 0) {
     tgt = CUTOFF_BLOCK;
     pct = Math.min(100, (cur * 100.0) / CUTOFF_BLOCK);

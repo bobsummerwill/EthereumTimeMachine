@@ -71,11 +71,11 @@
           "max": 2
         },
         "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "1. Lighthouse syncing from snapshot"
-            },
+           {
+             "matcher": {
+               "id": "byName",
+               "options": "01. Lighthouse syncing from snapshot"
+             },
             "properties": [
               {
                 "id": "mappings",
@@ -98,11 +98,11 @@
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "2. Lighthouse indexing/backfill"
-            },
+           {
+             "matcher": {
+               "id": "byName",
+               "options": "02. Lighthouse indexing/backfill"
+             },
             "properties": [
               {
                 "id": "mappings",
@@ -125,11 +125,11 @@
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "3. Geth v1.16.7 syncing"
-            },
+           {
+             "matcher": {
+               "id": "byName",
+               "options": "03. Geth v1.16.7 syncing"
+             },
             "properties": [
               {
                 "id": "mappings",
@@ -152,11 +152,11 @@
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "4. Geth v1.16.7 exporting data"
-            },
+           {
+             "matcher": {
+               "id": "byName",
+               "options": "04. Geth v1.16.7 exporting data"
+             },
             "properties": [
               {
                 "id": "mappings",
@@ -179,11 +179,11 @@
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "5. Geth v1.11.6 importing data"
-            },
+           {
+             "matcher": {
+               "id": "byName",
+               "options": "05. Geth v1.11.6 importing data"
+             },
             "properties": [
               {
                 "id": "mappings",
@@ -206,11 +206,11 @@
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "6. Geth v1.10.0 syncing"
-            },
+           {
+             "matcher": {
+               "id": "byName",
+               "options": "06. Geth v1.10.0 syncing"
+             },
             "properties": [
               {
                 "id": "mappings",
@@ -233,11 +233,11 @@
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "7. Geth v1.9.25 syncing"
-            },
+           {
+             "matcher": {
+               "id": "byName",
+               "options": "07. Geth v1.9.25 syncing"
+             },
             "properties": [
               {
                 "id": "mappings",
@@ -260,61 +260,88 @@
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "8. Geth v1.3.6 syncing"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "8. Geth v1.3.6 syncing — TODO"
-                      },
-                      "1": {
-                        "text": "8. Geth v1.3.6 syncing — IN PROGRESS"
-                      },
-                      "2": {
-                        "text": "8. Geth v1.3.6 syncing — DONE"
+           {
+             "matcher": {
+               "id": "byName",
+               "options": "08. Geth v1.9.25 exporting data"
+             },
+             "properties": [
+               {
+                 "id": "mappings",
+                 "value": [
+                   {
+                     "type": "value",
+                     "options": {
+                       "0": {
+                         "text": "8. Geth v1.9.25 exporting data — TODO"
+                       },
+                       "1": {
+                         "text": "8. Geth v1.9.25 exporting data — IN PROGRESS"
+                       },
+                       "2": {
+                         "text": "8. Geth v1.9.25 exporting data — DONE"
+                       }
+                     }
+                   }
+                 ]
+               }
+             ]
+           },
+           {
+             "matcher": {
+               "id": "byName",
+               "options": "09. Geth v1.3.6 importing data"
+             },
+             "properties": [
+               {
+                 "id": "mappings",
+                 "value": [
+                   {
+                     "type": "value",
+                     "options": {
+                       "0": {
+                         "text": "9. Geth v1.3.6 importing data — TODO"
+                       },
+                       "1": {
+                         "text": "9. Geth v1.3.6 importing data — IN PROGRESS"
+                       },
+                       "2": {
+                         "text": "9. Geth v1.3.6 importing data — DONE"
+                        }
                       }
                     }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "9. Geth v1.0.3 syncing"
+                  ]
+                }
+              ]
             },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "9. Geth v1.0.3 syncing — TODO"
-                      },
-                      "1": {
-                        "text": "9. Geth v1.0.3 syncing — IN PROGRESS"
-                      },
-                      "2": {
-                        "text": "9. Geth v1.0.3 syncing — DONE"
+            {
+              "matcher": {
+                "id": "byName",
+               "options": "10. Geth v1.0.3 syncing"
+              },
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                         "text": "10. Geth v1.0.3 syncing — TODO"
+                        },
+                        "1": {
+                         "text": "10. Geth v1.0.3 syncing — IN PROGRESS"
+                        },
+                        "2": {
+                         "text": "10. Geth v1.0.3 syncing — DONE"
+                        }
                       }
                     }
-                  }
-                ]
-              }
-            ]
-          }
-        ]
+                  ]
+                }
+              ]
+            }
+          ]
       },
       "gridPos": {
         "h": 9,
@@ -323,34 +350,54 @@
         "y": 0
       },
       "id": 9,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "value",
-        "textSize": {
-          "value": 32
-        },
-        "wideLayout": true
-      },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "chain_stage_status",
-          "legendFormat": "{{stage}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
+       "options": {
+         "colorMode": "value",
+         "graphMode": "none",
+         "justifyMode": "auto",
+         "orientation": "horizontal",
+         "reduceOptions": {
+           "calcs": [
+             "lastNotNull"
+           ],
+           "fields": "",
+           "values": false
+         },
+         "showPercentChange": false,
+         "textMode": "value",
+         "textSize": {
+           "value": 32
+         },
+         "wideLayout": true
+       },
+       "transformations": [
+         {
+           "id": "organize",
+           "options": {
+             "indexByName": {
+               "01. Lighthouse syncing from snapshot": 0,
+               "02. Lighthouse indexing/backfill": 1,
+               "03. Geth v1.16.7 syncing": 2,
+               "04. Geth v1.16.7 exporting data": 3,
+               "05. Geth v1.11.6 importing data": 4,
+               "06. Geth v1.10.0 syncing": 5,
+               "07. Geth v1.9.25 syncing": 6,
+               "08. Geth v1.9.25 exporting data": 7,
+               "09. Geth v1.3.6 importing data": 8,
+               "10. Geth v1.0.3 syncing": 9
+             }
+           }
+         }
+       ],
+        "targets": [
+          {
+            "editorMode": "code",
+            "expr": "chain_stage_status",
+           "instant": true,
+           "legendFormat": "{{stage}}",
+           "range": false,
+           "refId": "A"
+         }
+       ],
       "title": "Stage checklist",
       "type": "stat"
     },
@@ -915,7 +962,7 @@
         ]
       },
        "gridPos": {
-         "h": 11,
+         "h": 12,
          "w": 24,
          "x": 0,
          "y": 18
@@ -926,38 +973,38 @@
          "cellHeight": "sm"
        },
        "targets": [
-         {
-           "editorMode": "code",
-           "expr": "geth_node_sort_key{node!=\"Lighthouse\"}",
-           "format": "table",
-           "instant": true,
-           "legendFormat": "sort",
-           "refId": "A"
-         },
-         {
-           "editorMode": "code",
-           "expr": "geth_effective_head_block{node!=\"Lighthouse\"}",
-           "format": "table",
-           "instant": true,
-           "legendFormat": "Block",
-           "refId": "B"
-         },
-           {
-             "editorMode": "code",
-             "expr": "(geth_sync_target_block{node!=\"Lighthouse\",node!~\"^Geth v1[.](11[.]6|10[.]0|9[.]25|3[.]6)$\"}) or (1919999 * (geth_node_sort_key{node=~\"^Geth v1[.](11[.]6|10[.]0|9[.]25|3[.]6)$\"} * 0 + 1))",
-             "format": "table",
-             "instant": true,
-             "legendFormat": "Head",
-             "refId": "C"
-           },
-           {
-             "editorMode": "code",
-             "expr": "(geth_sync_percent{node!=\"Lighthouse\",node!~\"^Geth v1[.](11[.]6|10[.]0|9[.]25|3[.]6)$\"}) or clamp_max(100 * geth_effective_head_block{node=~\"^Geth v1[.](11[.]6|10[.]0|9[.]25|3[.]6)$\"} / 1919999, 100)",
-             "format": "table",
-             "instant": true,
-             "legendFormat": "Percentage",
-             "refId": "D"
-           }
+        {
+          "editorMode": "code",
+          "expr": "geth_node_sort_key{node!=\"Lighthouse\",node!=\"Geth v1.3.6\"}",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "sort",
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "geth_effective_head_block{node!=\"Lighthouse\",node!=\"Geth v1.3.6\"}",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "Block",
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "(geth_sync_target_block{node!=\"Lighthouse\",node!=\"Geth v1.3.6\",node!~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"}) or (1919999 * (geth_node_sort_key{node=~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"} * 0 + 1))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "Head",
+          "refId": "C"
+        },
+        {
+          "editorMode": "code",
+          "expr": "(geth_sync_percent{node!=\"Lighthouse\",node!=\"Geth v1.3.6\",node!~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"}) or clamp_max(100 * geth_effective_head_block{node=~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"} / 1919999, 100)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "Percentage",
+          "refId": "D"
+        }
        ],
        "title": "Sync progress",
        "transformations": [
