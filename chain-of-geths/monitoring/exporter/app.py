@@ -296,8 +296,17 @@ class Poller:
         v136_seed_done_path = host_output_dir / f"seed-v1.3.6-from-v1.9.25-{cutoff_block}.done"
 
         # Optional: if we temporarily accelerate seeding by importing the already-exported
-        # v1.16.7 cutoff RLP into v1.9.25, we log it here (manual/ops step).
+        # v1.10.0-exported cutoff RLP into v1.9.25, we log it here.
         v925_import_log_path = host_output_dir / "seed-v1.9.25-import.log"
+        v925_import_done_path = host_output_dir / f"seed-v1.9.25-import-{cutoff_block}.done"
+
+        # v1.10.0 -> v1.9.25 export/import bridge paths.
+        v110_export_file_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}-from-v1.10.0.rlp"
+        v110_export_marker_path = (
+            host_output_dir / "exports" / f"mainnet-0-{cutoff_block}-from-v1.10.0.rlp.exporting"
+        )
+        v110_export_log_path = host_output_dir / "seed-v1.10.0-export.log"
+        v110_export_done_path = host_output_dir / f"seed-v1.10.0-export-{cutoff_block}.done"
 
         while not self._stop.is_set():
             # Clear dynamic label series each round so we don't accumulate stale values.
@@ -515,6 +524,18 @@ class Poller:
                     v925_import_current = 0
                     v925_import_running = False
 
+            # v1.10.0 export progress (used for Stage checklist + synthetic rows).
+            v110_export_current = 0
+            v110_export_running = legacy_enabled and v110_export_marker_path.exists()
+            if legacy_enabled and v110_export_log_path.exists():
+                try:
+                    tail = v110_export_log_path.read_text(errors="ignore")[-500000:]
+                    m = re.findall(r"Exporting blocks\s+exported=([0-9,]+)", tail)
+                    if m:
+                        v110_export_current = int(m[-1].replace(",", ""))
+                except Exception:
+                    v110_export_current = 0
+
             # --- Stage checklist ---
             # Helper to emit 0/1/2 for a stage label.
             def set_stage(stage: str, status: int) -> None:
@@ -633,11 +654,30 @@ class Poller:
             if legacy_enabled:
                 legacy_stage("Geth v1.10.0", "06. Geth v1.10.0 syncing")
 
+                # 06b) Geth v1.10.0 exporting data (RLP export for v1.9.25 import)
+                min_export_bytes = 16 * 1024 * 1024
+                v110_export_file_ok = False
+                if v110_export_file_path.exists():
+                    try:
+                        v110_export_file_ok = v110_export_file_path.stat().st_size >= min_export_bytes
+                    except Exception:
+                        v110_export_file_ok = False
+                v110_export_done = v110_export_done_path.exists() and v110_export_file_ok
+
+                if v110_export_done:
+                    set_stage("06b. Geth v1.10.0 exporting data", 2)
+                elif v110_export_running or v110_export_current > 0:
+                    set_stage("06b. Geth v1.10.0 exporting data", 1)
+                else:
+                    set_stage("06b. Geth v1.10.0 exporting data", 0)
+
                 # 07) Geth v1.9.25 importing data (optional acceleration step)
                 # If we're doing an offline import into v1.9.25, show that explicitly.
                 # Otherwise, fall back to the normal syncing stage.
                 v925_node_head = node_effective_head.get("Geth v1.9.25", 0)
-                if v925_import_current > 0 or v925_import_log_path.exists():
+                if v925_import_done_path.exists():
+                    set_stage("07. Geth v1.9.25 importing data", 2)
+                elif v925_import_current > 0 or v925_import_log_path.exists():
                     if v925_import_current >= cutoff_block or v925_node_head >= cutoff_block:
                         set_stage("07. Geth v1.9.25 importing data", 2)
                     else:
@@ -797,13 +837,37 @@ class Poller:
             # --- Synthetic rows for legacy export/import phases (v1.9.25 -> v1.3.6) ---
 
             if legacy_enabled:
+                # v1.10.0 export synthetic row (feeds v1.9.25 import).
+                min_export_bytes = 16 * 1024 * 1024
+                v110_export_file_ok = False
+                if v110_export_file_path.exists():
+                    try:
+                        v110_export_file_ok = v110_export_file_path.stat().st_size >= min_export_bytes
+                    except Exception:
+                        v110_export_file_ok = False
+                v110_export_done = v110_export_done_path.exists() and v110_export_file_ok
+                v110_export_up = (
+                    v110_export_marker_path.exists()
+                    or v110_export_file_path.exists()
+                    or v110_export_done_path.exists()
+                    or v110_export_log_path.exists()
+                )
+                emit_phase_row(
+                    "Export (v1.10.0 → RLP)",
+                    3.50,
+                    cutoff_block if v110_export_done else v110_export_current,
+                    cutoff_block,
+                    (v110_export_running and not v110_export_done),
+                    v110_export_up,
+                )
+
                 emit_phase_row(
                     "Import (RLP → v1.9.25)",
                     4.40,
                     cutoff_block if v925_import_current >= cutoff_block else v925_import_current,
                     cutoff_block,
                     v925_import_running,
-                    v925_import_log_path.exists() or v925_import_current > 0,
+                    v925_import_log_path.exists() or v925_import_done_path.exists() or v925_import_current > 0,
                 )
 
                 v136_export_up = (
@@ -851,6 +915,7 @@ class Poller:
             else:
                 # Explicitly overwrite any previously-exported legacy phase rows so Grafana doesn't
                 # show stale progress when legacy is disabled.
+                emit_phase_row("Export (v1.10.0 → RLP)", 3.50, 0, cutoff_block, False, False)
                 emit_phase_row("Import (RLP → v1.9.25)", 4.40, 0, cutoff_block, False, False)
                 emit_phase_row("Export (v1.9.25 → RLP)", 4.50, 0, cutoff_block, False, False)
                 emit_phase_row("Import (RLP → v1.3.6)", 4.60, 0, cutoff_block, False, False)

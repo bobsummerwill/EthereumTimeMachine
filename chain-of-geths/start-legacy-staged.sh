@@ -20,13 +20,6 @@ MIN_BLOCK="${MIN_BLOCK:-1000}"
 # Default: last Homestead-era block (right before the DAO fork activates at 1,920,000).
 CUTOFF_BLOCK="${CUTOFF_BLOCK:-1919999}"
 
-# Optional acceleration: import an already-exported cutoff RLP into v1.9.25 (offline)
-# and then continue with the normal v1.9.25 -> v1.3.6 export/import bridge.
-#
-# Enable with:
-#   ACCELERATE_V1_9_25_IMPORT=1 bash ./start-legacy-staged.sh
-ACCELERATE_V1_9_25_IMPORT="${ACCELERATE_V1_9_25_IMPORT:-0}"
-
 EXPORT_DIR="$ROOT_DIR/generated-files/exports"
 
 hex_to_int() {
@@ -268,6 +261,91 @@ wait_for_file() {
   done
 }
 
+seed_v1_9_25_from_v1_10_0() {
+  # Seed v1.9.25 offline from v1.10.0 via export/import.
+  # This avoids re-using the modern (v1.16.7) export and keeps the legacy bridge deterministic.
+  local export_file="mainnet-0-${CUTOFF_BLOCK}-from-v1.10.0.rlp"
+  local export_marker="$EXPORT_DIR/${export_file}.exporting"
+  local export_log="$ROOT_DIR/generated-files/seed-v1.10.0-export.log"
+  local export_done="$ROOT_DIR/generated-files/seed-v1.10.0-export-${CUTOFF_BLOCK}.done"
+
+  local import_log="$ROOT_DIR/generated-files/seed-v1.9.25-import.log"
+  local import_done="$ROOT_DIR/generated-files/seed-v1.9.25-import-${CUTOFF_BLOCK}.done"
+
+  if [ -f "$import_done" ]; then
+    echo "[start-legacy] v1.9.25 import already marked done ($import_done)"
+    return 0
+  fi
+
+  mkdir -p "$EXPORT_DIR" "$ROOT_DIR/generated-files"
+
+  # --- Step 06b: Export 0..cutoff from v1.10.0 ---
+  rm -f "$export_marker" "$export_done" || true
+  rm -f "$export_log" || true
+  rm -f "$EXPORT_DIR/$export_file" || true
+  touch "$export_marker"
+
+  echo "[start-legacy] stopping geth-v1-10-0 to release DB lock for export"
+  compose_stop geth-v1-10-0 || true
+
+  set +e
+  {
+    echo "[start-legacy] $(date -Is) v1.10.0 export begin"
+    sudo docker run --rm \
+      --entrypoint geth \
+      -v "$ROOT_DIR/generated-files/data/v1.10.0:/data" \
+      -v "$EXPORT_DIR:/exports" \
+      ethereumtimemachine/geth:v1.10.0 \
+      --nousb \
+      --datadir /data export "/exports/$export_file" 0 "$CUTOFF_BLOCK"
+    echo "[start-legacy] $(date -Is) v1.10.0 export done"
+  } 2>&1 | tee -a "$export_log"
+  export_rc=${PIPESTATUS[0]}
+  set -e
+  rm -f "$export_marker"
+
+  if [ "$export_rc" -ne 0 ]; then
+    echo "[start-legacy] v1.10.0 export failed (rc=$export_rc). Aborting." | tee -a "$export_log"
+    return "$export_rc"
+  fi
+  touch "$export_done"
+
+  echo "[start-legacy] restarting geth-v1-10-0"
+  compose_up geth-v1-10-0
+  wait_for_block_ge "geth-v1-10-0" "http://localhost:8551" "$MIN_BLOCK"
+
+  # --- Step 07: Import into v1.9.25 from the v1.10.0 export ---
+  echo "[start-legacy] stopping geth-v1-9-25 to release DB lock for import"
+  compose_stop geth-v1-9-25 || true
+
+  rm -f "$import_log" || true
+  set +e
+  {
+    echo "[start-legacy] $(date -Is) v1.9.25 import begin"
+    sudo docker run --rm \
+      --entrypoint geth \
+      -v "$ROOT_DIR/generated-files/data/v1.9.25:/data" \
+      -v "$EXPORT_DIR:/exports" \
+      ethereumtimemachine/geth:v1.9.25 \
+      --nousb \
+      --datadir /data import "/exports/$export_file"
+    echo "[start-legacy] $(date -Is) v1.9.25 import done"
+  } 2>&1 | tee -a "$import_log"
+  import_rc=${PIPESTATUS[0]}
+  set -e
+
+  if [ "$import_rc" -ne 0 ]; then
+    echo "[start-legacy] v1.9.25 import failed (rc=$import_rc). Aborting." | tee -a "$import_log"
+    return "$import_rc"
+  fi
+  touch "$import_done"
+  echo "[start-legacy] wrote $import_done"
+
+  echo "[start-legacy] restarting geth-v1-9-25"
+  compose_up geth-v1-9-25
+  wait_for_block_ge "geth-v1-9-25" "http://localhost:8552" "$MIN_BLOCK"
+}
+
 seed_v1_3_6_from_v1_9_25() {
   # Seed v1.3.6 via export/import from v1.9.25 instead of network peering.
   # This intentionally removes reliance on v1.3.6 dialing upstream peers.
@@ -480,79 +558,6 @@ seed_v1_3_6_from_v1_9_25() {
   echo "[start-legacy] v1.3.6 seeding completed"
 }
 
-accelerate_import_v1_9_25_from_cutoff_rlp() {
-  # If enabled, do an offline import into v1.9.25 from the already-exported cutoff RLP.
-  # This is intended as a speedup (avoids waiting for v1.9.25 to sync the whole range over p2p).
-  #
-  # IMPORTANT:
-  # - We stop the geth-v1-9-25 service to release the DB lock.
-  # - After import completes, we bring the service back up, so the normal staged flow can continue.
-  local src_rlp="$EXPORT_DIR/mainnet-0-${CUTOFF_BLOCK}.rlp"
-  local log="$ROOT_DIR/generated-files/seed-v1.9.25-import.log"
-  local done="$ROOT_DIR/generated-files/seed-v1.9.25-import-${CUTOFF_BLOCK}.done"
-
-  if [ "$ACCELERATE_V1_9_25_IMPORT" != "1" ]; then
-    return 0
-  fi
-
-  if [ -f "$done" ]; then
-    echo "[start-legacy] accelerate: v1.9.25 import already marked done ($done)"
-    return 0
-  fi
-
-  # If a previous manual/ops import already completed (log shows the cutoff), record the done marker.
-  # This makes the pipeline idempotent across restarts.
-  if [ -f "$log" ]; then
-    # Modern geth import logs include: "Imported new chain segment ... number=1234567"
-    last_num=$(grep -Eo 'number=[0-9,]+' "$log" | tail -n 1 | sed -E 's/^number=//' | tr -d ',' || true)
-    if [ -n "${last_num:-}" ] && [ "${last_num:-0}" -ge "$CUTOFF_BLOCK" ]; then
-      touch "$done"
-      echo "[start-legacy] accelerate: detected completed import in $log (number=$last_num); wrote $done"
-      # Ensure the service is running for subsequent RPC-based export.
-      compose_up geth-v1-9-25
-      return 0
-    fi
-  fi
-
-  if [ ! -f "$src_rlp" ]; then
-    echo "[start-legacy] accelerate: missing cutoff RLP: $src_rlp (skipping)"
-    return 0
-  fi
-
-  echo "[start-legacy] accelerate: importing $src_rlp into v1.9.25 (offline one-shot)"
-
-  # Stop v1.9.25 service if running (DB lock).
-  compose_stop geth-v1-9-25 || true
-
-  rm -f "$log" || true
-  set +e
-  {
-    echo "[start-legacy] $(date -Is) v1.9.25 import begin"
-    sudo docker run --rm \
-      --entrypoint geth \
-      -v "$ROOT_DIR/generated-files/data/v1.9.25:/data" \
-      -v "$EXPORT_DIR:/exports" \
-      ethereumtimemachine/geth:v1.9.25 \
-      --nousb \
-      --datadir /data import "/exports/mainnet-0-${CUTOFF_BLOCK}.rlp"
-    echo "[start-legacy] $(date -Is) v1.9.25 import done"
-  } 2>&1 | tee -a "$log"
-  local rc=${PIPESTATUS[0]}
-  set -e
-
-  if [ "$rc" -ne 0 ]; then
-    echo "[start-legacy] accelerate: v1.9.25 import failed (rc=$rc)"
-    return "$rc"
-  fi
-
-  touch "$done"
-  echo "[start-legacy] accelerate: wrote $done"
-
-  # Bring service back up for the remainder of the pipeline.
-  compose_up geth-v1-9-25
-  wait_for_block_ge "geth-v1-9-25" "http://localhost:8552" "$MIN_BLOCK"
-}
-
 # Start downstream nodes only after the upstream reports a non-zero head via JSON-RPC.
 # This reduces flakiness during initial startup and prevents older clients from
 # getting stuck after receiving transiently incomplete responses from an upstream.
@@ -570,14 +575,8 @@ echo "[start-legacy] starting geth-v1-10-0"
 compose_up geth-v1-10-0
 wait_for_block_ge "geth-v1-10-0" "http://localhost:8551" "$MIN_BLOCK"
 
-echo "[start-legacy] starting geth-v1-9-25"
-compose_up geth-v1-9-25
-
-wait_for_block_ge "geth-v1-9-25" "http://localhost:8552" "$MIN_BLOCK"
-
-# Optional acceleration step: offline import into v1.9.25 from the already-exported cutoff RLP.
-# If enabled, this completes Stage 07 and then the script proceeds immediately into Stage 08/09.
-accelerate_import_v1_9_25_from_cutoff_rlp
+# Offline-seed v1.9.25 from v1.10.0 via export/import before doing any v1.9.25 -> v1.3.6 work.
+seed_v1_9_25_from_v1_10_0
 
 # Offline-seed v1.3.6 from v1.9.25 before starting it.
 seed_v1_3_6_from_v1_9_25
