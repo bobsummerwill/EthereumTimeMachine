@@ -328,6 +328,10 @@ seed_v1_3_6_from_v1_9_25() {
 
   mkdir -p "$EXPORT_DIR" "$ROOT_DIR/generated-files"
 
+  # If a previous attempt was interrupted, marker files may be left behind.
+  # Clear them so dashboards don't show a misleading "in progress" state.
+  rm -f "$export_marker" "$import_marker" || true
+
   if [ -f "$flag_file" ]; then
     echo "[start-legacy] v1.3.6 seeding already done ($flag_file)"
     return 0
@@ -343,18 +347,21 @@ seed_v1_3_6_from_v1_9_25() {
   # If so, `geth export 0..N` fails on #1. We repair this by importing a known-good range
   # exported from v1.10.0 (one step upstream) into v1.9.25.
   echo "[start-legacy] probing v1.9.25 export (0..1) to verify genesis-era blocks exist"
+  # NOTE: geth v1.9.25 does not expose debug_getRawBlock, so we probe via offline `geth export`.
+  compose_stop geth-v1-9-25 || true
   set +e
-  # Use the same RPC-based exporter as the main step so we don't stall on geth DB state repairs.
-  RPC_URL="http://localhost:8552" \
-  START_BLOCK=0 \
-  END_BLOCK=1 \
-  OUT_FILE="$EXPORT_DIR/.probe-v1.9.25-0-1.rlp" \
-  PROGRESS_FILE="$EXPORT_DIR/.probe-v1.9.25-0-1.rlp.progress" \
-  BATCH_SIZE=2 \
-    python3 "$ROOT_DIR/seed-rlp-from-rpc.py"
+  sudo docker run --rm \
+    --entrypoint geth \
+    -v "$ROOT_DIR/generated-files/data/v1.9.25:/data" \
+    -v "$EXPORT_DIR:/exports" \
+    ethereumtimemachine/geth:v1.9.25 \
+    --nousb \
+    --datadir /data export "/exports/.probe-v1.9.25-0-1.rlp" 0 1 \
+    >/dev/null 2>&1
   local probe_rc=$?
   set -e
-  rm -f "$EXPORT_DIR/.probe-v1.9.25-0-1.rlp" "$EXPORT_DIR/.probe-v1.9.25-0-1.rlp.progress" || true
+  rm -f "$EXPORT_DIR/.probe-v1.9.25-0-1.rlp" || true
+  compose_up geth-v1-9-25
 
   if [ "$probe_rc" -ne 0 ]; then
     echo "[start-legacy] v1.9.25 export probe failed; will repair via v1.10.0"
@@ -370,23 +377,25 @@ seed_v1_3_6_from_v1_9_25() {
   echo "[start-legacy] exporting 0..${CUTOFF_BLOCK} from v1.9.25 -> $EXPORT_DIR/$export_file"
   # Start fresh (a failed export can leave a tiny/truncated file behind).
   #
-  # IMPORTANT: We do this export via JSON-RPC (`debug_getRawBlock`) instead of `geth export`:
-  # - It provides resumable progress via a .progress JSON file (consumed by the exporter/Grafana Sync Progress table)
-  # - It avoids DB-lock / stop-the-service problems
+  # IMPORTANT: geth v1.9.25 does *not* expose debug_getRawBlock over JSON-RPC.
+  # Use offline `geth export` (requires stopping the service to release DB lock).
   rm -f "$EXPORT_DIR/$export_file" "$export_done_file" || true
   rm -f "$export_marker" || true
   touch "$export_marker"
 
+  echo "[start-legacy] stopping geth-v1-9-25 to release DB lock for export"
+  compose_stop geth-v1-9-25 || true
+
   set +e
   {
     echo "[start-legacy] $(date -Is) export begin"
-    RPC_URL="http://localhost:8552" \
-    START_BLOCK=0 \
-    END_BLOCK="$CUTOFF_BLOCK" \
-    OUT_FILE="$EXPORT_DIR/$export_file" \
-    PROGRESS_FILE="$EXPORT_DIR/$export_file.progress" \
-    BATCH_SIZE=50 \
-      python3 "$ROOT_DIR/seed-rlp-from-rpc.py"
+    sudo docker run --rm \
+      --entrypoint geth \
+      -v "$ROOT_DIR/generated-files/data/v1.9.25:/data" \
+      -v "$EXPORT_DIR:/exports" \
+      ethereumtimemachine/geth:v1.9.25 \
+      --nousb \
+      --datadir /data export "/exports/$export_file" 0 "$CUTOFF_BLOCK"
     echo "[start-legacy] $(date -Is) export done"
   } 2>&1 | tee -a "$export_log"
   export_rc=${PIPESTATUS[0]}
@@ -408,16 +417,19 @@ seed_v1_3_6_from_v1_9_25() {
     rm -f "$export_marker" || true
     touch "$export_marker"
 
+    echo "[start-legacy] stopping geth-v1-9-25 to release DB lock for export retry"
+    compose_stop geth-v1-9-25 || true
+
     set +e
     {
       echo "[start-legacy] $(date -Is) export retry begin"
-      RPC_URL="http://localhost:8552" \
-      START_BLOCK=0 \
-      END_BLOCK="$CUTOFF_BLOCK" \
-      OUT_FILE="$EXPORT_DIR/$export_file" \
-      PROGRESS_FILE="$EXPORT_DIR/$export_file.progress" \
-      BATCH_SIZE=50 \
-        python3 "$ROOT_DIR/seed-rlp-from-rpc.py"
+      sudo docker run --rm \
+        --entrypoint geth \
+        -v "$ROOT_DIR/generated-files/data/v1.9.25:/data" \
+        -v "$EXPORT_DIR:/exports" \
+        ethereumtimemachine/geth:v1.9.25 \
+        --nousb \
+        --datadir /data export "/exports/$export_file" 0 "$CUTOFF_BLOCK"
       echo "[start-legacy] $(date -Is) export retry done"
     } 2>&1 | tee -a "$export_log"
     export_rc=${PIPESTATUS[0]}
@@ -432,6 +444,10 @@ seed_v1_3_6_from_v1_9_25() {
   fi
 
   touch "$export_done_file"
+
+  # Bring v1.9.25 service back up after offline export.
+  compose_up geth-v1-9-25
+  wait_for_block_ge "geth-v1-9-25" "http://localhost:8552" "$MIN_BLOCK"
 
   echo "[start-legacy] importing into v1.3.6 from $EXPORT_DIR/$export_file"
   rm -f "$import_marker"
