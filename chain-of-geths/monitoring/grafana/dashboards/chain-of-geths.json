@@ -350,56 +350,50 @@
         "y": 0
       },
       "id": 9,
-       "options": {
-         "colorMode": "value",
-         "graphMode": "none",
-         "justifyMode": "auto",
-         "orientation": "horizontal",
-         "reduceOptions": {
-           "calcs": [
-             "lastNotNull"
-           ],
-           "fields": "",
-           "values": false
-         },
-         "showPercentChange": false,
-         "textMode": "value",
-         "textSize": {
-           "value": 32
-         },
-         "wideLayout": true
-       },
-       "transformations": [
-         {
-           "id": "organize",
-           "options": {
-             "indexByName": {
-               "01. Lighthouse syncing from snapshot": 0,
-               "02. Lighthouse indexing/backfill": 1,
-               "03. Geth v1.16.7 syncing": 2,
-               "04. Geth v1.16.7 exporting data": 3,
-               "05. Geth v1.11.6 importing data": 4,
-               "06. Geth v1.10.0 syncing": 5,
-               "07. Geth v1.9.25 syncing": 6,
-               "08. Geth v1.9.25 exporting data": 7,
-               "09. Geth v1.3.6 importing data": 8,
-               "10. Geth v1.0.3 syncing": 9
-             }
-           }
-         }
-       ],
-        "targets": [
-          {
-            "editorMode": "code",
-            "expr": "chain_stage_status",
-           "instant": true,
-           "legendFormat": "{{stage}}",
-           "range": false,
-           "refId": "A"
-         }
-       ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "stage",
+                "desc": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true
+            },
+            "renameByName": {
+              "stage": "Stage",
+              "Value": "Status"
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "chain_stage_status",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
       "title": "Stage checklist",
-      "type": "stat"
+      "type": "table"
     },
     {
       "datasource": {

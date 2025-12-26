@@ -614,7 +614,12 @@ class Poller:
             # 09) Geth v1.3.6 importing data (RLP import stage)
             v136_importing = False
             v136_import_current = 0
-            if v136_seed_done_path.exists():
+            # NOTE: the *.done marker can become stale if the v1.3.6 datadir is wiped.
+            # Treat it as DONE only if the v1.3.6 node itself is actually at/above cutoff.
+            v136_node_head = node_effective_head.get("Geth v1.3.6", 0)
+            v136_done_effective = v136_seed_done_path.exists() and v136_node_head >= cutoff_block
+
+            if v136_done_effective:
                 set_stage("09. Geth v1.3.6 importing data", 2)
             else:
                 if v136_import_marker_path.exists():
@@ -713,7 +718,9 @@ class Poller:
                 v136_export_up,
             )
 
-            v136_import_done = v136_seed_done_path.exists()
+            # Only treat the import phase as "done" if the node is actually at/above cutoff.
+            # This prevents a stale done marker (after wiping the v1.3.6 datadir) from showing 100%.
+            v136_import_done = v136_done_effective
             v136_import_up = (
                 v136_import_marker_path.exists()
                 or v136_import_log_path.exists()
@@ -723,7 +730,7 @@ class Poller:
             emit_phase_row(
                 "Import (RLP → v1.3.6)",
                 4.60,
-                cutoff_block if v136_import_done else v136_import_current,
+                cutoff_block if v136_import_done else max(v136_import_current, v136_node_head),
                 cutoff_block,
                 (v136_importing and not v136_import_done),
                 v136_import_up,
