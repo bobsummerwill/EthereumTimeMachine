@@ -279,8 +279,11 @@ class Poller:
         # Pre-compute common file paths used by the seeder.
         export_progress_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}.rlp.progress"
         export_file_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}.rlp"
+        export_marker_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}.rlp.exporting"
+        export_done_path = host_output_dir / f"seed-v1.16.7-export-{cutoff_block}.done"
         seed_log_path = host_output_dir / "seed-v1.11.6.log"
         seed_done_path = host_output_dir / f"seed-v1.11.6-{cutoff_block}.done"
+        import_marker_path = host_output_dir / f"seed-v1.11.6-import-{cutoff_block}.importing"
 
         # Legacy (v1.9.25 -> v1.3.6) seeding paths (written by start-legacy-staged.sh).
         v136_export_file_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}-from-v1.9.25.rlp"
@@ -407,6 +410,29 @@ class Poller:
 
             for idx, (name, url) in enumerate(self.nodes, start=1):
                 g_sort_key.labels(node=name).set(idx)
+
+                # Gating: don't show the v1.11.6 bridge as "up" until it's actually been
+                # offline-seeded. Otherwise dashboards look like the bridge is available even
+                # though it cannot serve the historical range yet.
+                #
+                # The export/import progress is still shown via the synthetic phase rows.
+                if name.strip() == "Geth v1.11.6" and not seed_done_path.exists():
+                    g_up.labels(node=name).set(0)
+                    node_up[name] = False
+                    node_syncing[name] = False
+                    node_effective_head[name] = 0
+                    peers[name] = 0
+                    g_block.labels(node=name).set(0)
+                    g_peers.labels(node=name).set(0)
+                    g_syncing.labels(node=name).set(0)
+                    g_sync_current.labels(node=name).set(0)
+                    g_sync_highest.labels(node=name).set(0)
+                    g_sync_remaining.labels(node=name).set(0)
+                    g_effective_head.labels(node=name).set(0)
+                    g_sync_progress_info.labels(node=name, progress="gated (waiting for seed)").set(0)
+                    g_sync_target.labels(node=name).set(0)
+                    g_sync_percent.labels(node=name).set(0)
+                    continue
 
                 # Some nodes should display progress vs a fixed historical target rather than the
                 # node-reported `eth_syncing.highestBlock` (which may be missing/0 on older clients).
@@ -590,21 +616,28 @@ class Poller:
                     set_stage("03. Geth v1.16.7 syncing", 1 if node_syncing.get(top_name, False) else 2)
 
             # 04) Geth v1.16.7 exporting data (seed RLP export)
-            export_last_done = None
-            if export_progress_path.exists():
-                data = _read_json_file(export_progress_path)
-                if isinstance(data, dict) and data.get("last_done") is not None:
-                    try:
-                        export_last_done = int(data.get("last_done"))
-                    except Exception:
-                        export_last_done = None
-            if export_last_done is None:
-                set_stage("04. Geth v1.16.7 exporting data", 0)
+            # Prefer explicit marker/done files (written by seed-v1.11.6-when-ready.sh).
+            if export_done_path.exists():
+                set_stage("04. Geth v1.16.7 exporting data", 2)
+            elif export_marker_path.exists():
+                set_stage("04. Geth v1.16.7 exporting data", 1)
             else:
-                set_stage(
-                    "04. Geth v1.16.7 exporting data",
-                    2 if export_last_done >= cutoff_block else 1,
-                )
+                # Backwards-compatible fallback for any older runs that used a .progress file.
+                export_last_done = None
+                if export_progress_path.exists():
+                    data = _read_json_file(export_progress_path)
+                    if isinstance(data, dict) and data.get("last_done") is not None:
+                        try:
+                            export_last_done = int(data.get("last_done"))
+                        except Exception:
+                            export_last_done = None
+                if export_last_done is None:
+                    set_stage("04. Geth v1.16.7 exporting data", 0)
+                else:
+                    set_stage(
+                        "04. Geth v1.16.7 exporting data",
+                        2 if export_last_done >= cutoff_block else 1,
+                    )
 
             # 05) Geth v1.11.6 importing data
             if seed_done_path.exists():
@@ -635,7 +668,7 @@ class Poller:
                     importing = False
                 set_stage(
                     "05. Geth v1.11.6 importing data",
-                    1 if importing else 0,
+                    1 if (import_marker_path.exists() or importing) else 0,
                 )
 
             # 6-7) Legacy bridge nodes reaching cutoff
@@ -811,9 +844,35 @@ class Poller:
                 g_syncing.labels(node=node_label).set(1 if running else 0)
 
             # Determine export progress for synthetic row.
-            export_current = export_last_done or 0
-            export_running = export_last_done is not None and export_last_done < cutoff_block
-            export_up = export_progress_path.exists() or export_file_path.exists()
+            # IMPORTANT: `geth_up` for phase rows should reflect *active running*, not mere file presence.
+            # (Grafana's "Geth status" panel intentionally ORs node health with phase-row health.)
+            export_current = 0
+            export_running = export_marker_path.exists()
+            export_up = export_running
+
+            if export_done_path.exists():
+                export_current = cutoff_block
+            else:
+                # Best-effort: parse export progress from the seed log if present.
+                # Newer geth logs during export contain:
+                #   "Exporting blocks ... exported=123,456"
+                try:
+                    if seed_log_path.exists():
+                        tail = seed_log_path.read_text(errors="ignore")[-500000:]
+                        m = re.findall(r"Exporting blocks\s+exported=([0-9,]+)", tail)
+                        if m:
+                            export_current = int(m[-1].replace(",", ""))
+                except Exception:
+                    export_current = 0
+
+            # Backwards-compatible fallback if a .progress file exists.
+            if export_current == 0 and export_progress_path.exists():
+                data = _read_json_file(export_progress_path)
+                if isinstance(data, dict) and data.get("last_done") is not None:
+                    try:
+                        export_current = int(data.get("last_done"))
+                    except Exception:
+                        export_current = 0
             emit_phase_row(
                 "Export (v1.16.7 → RLP)",
                 1.50,
@@ -825,10 +884,10 @@ class Poller:
 
             # Determine import progress for synthetic row.
             import_done = seed_done_path.exists()
-            import_running = importing if not import_done else False
+            import_running = (import_marker_path.exists() or importing) if not import_done else False
             # If done, show full cutoff.
             import_display = cutoff_block if import_done else import_current
-            import_up = seed_log_path.exists() or import_done or import_current > 0
+            import_up = import_running
             emit_phase_row(
                 "Import (RLP → v1.11.6)",
                 1.60,
