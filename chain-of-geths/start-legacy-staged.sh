@@ -173,6 +173,41 @@ seed_v1_3_6_from_v1_9_25() {
   local export_log="$ROOT_DIR/generated-files/seed-v1.3.6-export.log"
   local import_log="$ROOT_DIR/generated-files/seed-v1.3.6-import.log"
 
+  ensure_services_up() {
+    # Best-effort: ensure services are not left down after any failure.
+    compose_up geth-v1-10-0 || true
+    compose_up geth-v1-9-25 || true
+  }
+
+  repair_v1_9_25_from_v1_10_0() {
+    echo "[start-legacy] repairing v1.9.25 by importing 0..${CUTOFF_BLOCK} from v1.10.0"
+
+    echo "[start-legacy] stopping geth-v1-10-0 to release DB lock for export"
+    compose_stop geth-v1-10-0
+
+    echo "[start-legacy] exporting 0..${CUTOFF_BLOCK} from v1.10.0 -> $EXPORT_DIR/$repair_export_file"
+    rm -f "$EXPORT_DIR/$repair_export_file"
+    sudo docker run --rm \
+      --entrypoint geth \
+      -v "$ROOT_DIR/generated-files/data/v1.10.0:/data" \
+      -v "$EXPORT_DIR:/exports" \
+      ethereumtimemachine/geth:v1.10.0 \
+      --nousb \
+      --datadir /data export "/exports/$repair_export_file" 0 "$CUTOFF_BLOCK"
+
+    echo "[start-legacy] importing into v1.9.25 from $EXPORT_DIR/$repair_export_file"
+    sudo docker run --rm \
+      --entrypoint geth \
+      -v "$ROOT_DIR/generated-files/data/v1.9.25:/data" \
+      -v "$EXPORT_DIR:/exports" \
+      ethereumtimemachine/geth:v1.9.25 \
+      --nousb \
+      --datadir /data import "/exports/$repair_export_file"
+
+    echo "[start-legacy] restarting geth-v1-10-0"
+    compose_up geth-v1-10-0
+  }
+
   mkdir -p "$EXPORT_DIR" "$ROOT_DIR/generated-files"
 
   if [ -f "$flag_file" ]; then
@@ -202,32 +237,8 @@ seed_v1_3_6_from_v1_9_25() {
   rm -f "$EXPORT_DIR/.probe-v1.9.25-0-1.rlp" || true
 
   if [ "$probe_rc" -ne 0 ]; then
-    echo "[start-legacy] v1.9.25 export probe failed; repairing v1.9.25 by importing 0..${CUTOFF_BLOCK} from v1.10.0"
-
-    echo "[start-legacy] stopping geth-v1-10-0 to release DB lock for export"
-    compose_stop geth-v1-10-0
-
-    echo "[start-legacy] exporting 0..${CUTOFF_BLOCK} from v1.10.0 -> $EXPORT_DIR/$repair_export_file"
-    rm -f "$EXPORT_DIR/$repair_export_file"
-    sudo docker run --rm \
-      --entrypoint geth \
-      -v "$ROOT_DIR/generated-files/data/v1.10.0:/data" \
-      -v "$EXPORT_DIR:/exports" \
-      ethereumtimemachine/geth:v1.10.0 \
-      --nousb \
-      --datadir /data export "/exports/$repair_export_file" 0 "$CUTOFF_BLOCK"
-
-    echo "[start-legacy] importing into v1.9.25 from $EXPORT_DIR/$repair_export_file"
-    sudo docker run --rm \
-      --entrypoint geth \
-      -v "$ROOT_DIR/generated-files/data/v1.9.25:/data" \
-      -v "$EXPORT_DIR:/exports" \
-      ethereumtimemachine/geth:v1.9.25 \
-      --nousb \
-      --datadir /data import "/exports/$repair_export_file"
-
-    echo "[start-legacy] restarting geth-v1-10-0"
-    compose_up geth-v1-10-0
+    echo "[start-legacy] v1.9.25 export probe failed; will repair via v1.10.0"
+    repair_v1_9_25_from_v1_10_0
   else
     echo "[start-legacy] v1.9.25 export probe succeeded; no repair needed"
   fi
@@ -245,6 +256,7 @@ seed_v1_3_6_from_v1_9_25() {
   rm -f "$EXPORT_DIR/$export_file" "$export_done_file"
   rm -f "$export_marker"
   touch "$export_marker"
+  set +e
   {
     echo "[start-legacy] $(date -Is) export begin"
     sudo docker run --rm \
@@ -256,12 +268,59 @@ seed_v1_3_6_from_v1_9_25() {
       --datadir /data export "/exports/$export_file" 0 "$CUTOFF_BLOCK"
     echo "[start-legacy] $(date -Is) export done"
   } 2>&1 | tee -a "$export_log"
+  export_rc=${PIPESTATUS[0]}
+  set -e
   rm -f "$export_marker"
+
+  if [ "$export_rc" -ne 0 ]; then
+    echo "[start-legacy] export failed (rc=$export_rc). Will attempt repair + retry once." | tee -a "$export_log"
+
+    # Clean up any partial output.
+    rm -f "$EXPORT_DIR/$export_file" || true
+
+    # Repair v1.9.25 using v1.10.0 (which should have a complete seeded range).
+    repair_v1_9_25_from_v1_10_0
+
+    # Retry export once.
+    echo "[start-legacy] retrying export 0..${CUTOFF_BLOCK} from v1.9.25" | tee -a "$export_log"
+    rm -f "$EXPORT_DIR/$export_file" || true
+    rm -f "$export_marker" || true
+    touch "$export_marker"
+
+    set +e
+    {
+      echo "[start-legacy] $(date -Is) export retry begin"
+      sudo docker run --rm \
+        --entrypoint geth \
+        -v "$ROOT_DIR/generated-files/data/v1.9.25:/data" \
+        -v "$EXPORT_DIR:/exports" \
+        ethereumtimemachine/geth:v1.9.25 \
+        --nousb \
+        --datadir /data export "/exports/$export_file" 0 "$CUTOFF_BLOCK"
+      echo "[start-legacy] $(date -Is) export retry done"
+    } 2>&1 | tee -a "$export_log"
+    export_rc=${PIPESTATUS[0]}
+    set -e
+    rm -f "$export_marker"
+
+    if [ "$export_rc" -ne 0 ]; then
+      echo "[start-legacy] export failed again after repair (rc=$export_rc). Aborting." | tee -a "$export_log"
+      ensure_services_up
+      return 1
+    fi
+  fi
+
   touch "$export_done_file"
+
+  # Bring v1.9.25 back up while we import into v1.3.6.
+  echo "[start-legacy] restarting geth-v1-9-25"
+  compose_up geth-v1-9-25
+  wait_for_block_ge "geth-v1-9-25" "http://localhost:8552" "$MIN_BLOCK"
 
   echo "[start-legacy] importing into v1.3.6 from $EXPORT_DIR/$export_file"
   rm -f "$import_marker"
   touch "$import_marker"
+  set +e
   {
     echo "[start-legacy] $(date -Is) import begin"
     sudo docker run --rm \
@@ -272,14 +331,21 @@ seed_v1_3_6_from_v1_9_25() {
       --datadir /data import "/exports/$export_file"
     echo "[start-legacy] $(date -Is) import done"
   } 2>&1 | tee -a "$import_log"
+  import_rc=${PIPESTATUS[0]}
+  set -e
   rm -f "$import_marker"
+
+  if [ "$import_rc" -ne 0 ]; then
+    echo "[start-legacy] import failed (rc=$import_rc). Aborting." | tee -a "$import_log"
+    ensure_services_up
+    return 1
+  fi
 
   touch "$flag_file"
   echo "[start-legacy] wrote $flag_file"
 
-  echo "[start-legacy] restarting geth-v1-9-25"
-  compose_up geth-v1-9-25
-  wait_for_block_ge "geth-v1-9-25" "http://localhost:8552" "$MIN_BLOCK"
+  # Ensure we don't leave core services stopped.
+  ensure_services_up
 
   echo "[start-legacy] v1.3.6 seeding completed"
 }
