@@ -389,9 +389,16 @@ class Poller:
             for idx, (name, url) in enumerate(self.nodes, start=1):
                 g_sort_key.labels(node=name).set(idx)
 
-                fixed_target: int | None = (
-                    GETH_V1_0_3_TARGET_BLOCK if name.strip() == "Geth v1.0.3" else None
-                )
+                # Some nodes should display progress vs a fixed historical target rather than the
+                # node-reported `eth_syncing.highestBlock` (which may be missing/0 on older clients).
+                fixed_target: int | None
+                if name.strip() == "Geth v1.0.3":
+                    fixed_target = GETH_V1_0_3_TARGET_BLOCK
+                elif name.strip() == "Geth v1.3.6":
+                    # v1.3.6 is intended to reach the offline cutoff range.
+                    fixed_target = cutoff_block
+                else:
+                    fixed_target = None
                 try:
                     # Required for "up".
                     block_hex = rpc_call_optional(url, "eth_blockNumber")
@@ -419,9 +426,11 @@ class Poller:
                         g_syncing.labels(node=name).set(0)
                         g_sync_current.labels(node=name).set(0)
                         g_sync_highest.labels(node=name).set(0)
-                        g_sync_remaining.labels(node=name).set(0)
                         g_effective_head.labels(node=name).set(block_num)
                         target = fixed_target if fixed_target is not None else block_num
+                        # Even if the node reports "not syncing", for historical targets
+                        # (e.g. v1.0.3, v1.3.6) we still want an informative "remaining".
+                        g_sync_remaining.labels(node=name).set(max(0, target - block_num))
                         pct = (block_num * 100.0 / target) if target > 0 else 0.0
                         progress = f"{block_num}/{target} ({pct:.1f}%)" if target > 0 else "0/0 (0.0%)"
                         g_sync_target.labels(node=name).set(target)
@@ -435,11 +444,13 @@ class Poller:
                         g_syncing.labels(node=name).set(1)
                         g_sync_current.labels(node=name).set(cur)
                         g_sync_highest.labels(node=name).set(hi)
-                        g_sync_remaining.labels(node=name).set(max(0, hi - cur))
                         eff = max(block_num, cur)
                         node_effective_head[name] = eff
                         target = max(hi, eff, fixed_target or 0)
                         g_effective_head.labels(node=name).set(eff)
+                        # Use our best-effort target (not just hi-cur) so older clients that report
+                        # highestBlock=0 still show a meaningful remaining curve.
+                        g_sync_remaining.labels(node=name).set(max(0, target - eff))
                         pct = (eff * 100.0 / target) if target > 0 else 0.0
                         progress = f"{eff}/{target} ({pct:.1f}%)"
                         g_sync_target.labels(node=name).set(target)
