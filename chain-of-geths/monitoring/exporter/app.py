@@ -654,7 +654,7 @@ class Poller:
             if legacy_enabled:
                 legacy_stage("Geth v1.10.0", "06. Geth v1.10.0 syncing")
 
-                # 06b) Geth v1.10.0 exporting data (RLP export for v1.9.25 import)
+                # 07) Geth v1.10.0 exporting data (RLP export for v1.9.25 import)
                 min_export_bytes = 16 * 1024 * 1024
                 v110_export_file_ok = False
                 if v110_export_file_path.exists():
@@ -662,31 +662,34 @@ class Poller:
                         v110_export_file_ok = v110_export_file_path.stat().st_size >= min_export_bytes
                     except Exception:
                         v110_export_file_ok = False
-                v110_export_done = v110_export_done_path.exists() and v110_export_file_ok
+                # If the downstream import is already marked done, treat this export stage as done
+                # as well. (The export file may have been produced earlier, or the done marker may
+                # have been cleaned up, but operationally the stage is complete.)
+                v110_export_done = (v110_export_done_path.exists() and v110_export_file_ok) or v925_import_done_path.exists()
 
                 if v110_export_done:
-                    set_stage("06b. Geth v1.10.0 exporting data", 2)
+                    set_stage("07. Geth v1.10.0 exporting data", 2)
                 elif v110_export_running or v110_export_current > 0:
-                    set_stage("06b. Geth v1.10.0 exporting data", 1)
+                    set_stage("07. Geth v1.10.0 exporting data", 1)
                 else:
-                    set_stage("06b. Geth v1.10.0 exporting data", 0)
+                    set_stage("07. Geth v1.10.0 exporting data", 0)
 
-                # 07) Geth v1.9.25 importing data (optional acceleration step)
+                # 08) Geth v1.9.25 importing data (optional acceleration step)
                 # If we're doing an offline import into v1.9.25, show that explicitly.
                 # Otherwise, fall back to the normal syncing stage.
                 v925_node_head = node_effective_head.get("Geth v1.9.25", 0)
                 if v925_import_done_path.exists():
-                    set_stage("07. Geth v1.9.25 importing data", 2)
+                    set_stage("08. Geth v1.9.25 importing data", 2)
                 elif v925_import_current > 0 or v925_import_log_path.exists():
                     if v925_import_current >= cutoff_block or v925_node_head >= cutoff_block:
-                        set_stage("07. Geth v1.9.25 importing data", 2)
+                        set_stage("08. Geth v1.9.25 importing data", 2)
                     else:
-                        set_stage("07. Geth v1.9.25 importing data", 1)
+                        set_stage("08. Geth v1.9.25 importing data", 1)
                 else:
                     # No import in progress; treat as normal sync stage.
-                    legacy_stage("Geth v1.9.25", "07. Geth v1.9.25 importing data")
+                    legacy_stage("Geth v1.9.25", "08. Geth v1.9.25 importing data")
 
-                # 08) Geth v1.9.25 exporting data (RLP export stage)
+                # 09) Geth v1.9.25 exporting data (RLP export stage)
                 # IMPORTANT: do NOT infer "DONE" from the mere presence of the export file.
                 # A failed/partial `geth export` can leave a tiny/truncated file behind.
                 # We only mark DONE when the script writes the explicit done marker.
@@ -714,18 +717,18 @@ class Poller:
                             v136_export_last_done = None
 
                 if v136_export_done:
-                    set_stage("08. Geth v1.9.25 exporting data", 2)
+                    set_stage("09. Geth v1.9.25 exporting data", 2)
                 elif v136_export_last_done is not None:
                     set_stage(
-                        "08. Geth v1.9.25 exporting data",
+                        "09. Geth v1.9.25 exporting data",
                         2 if v136_export_last_done >= cutoff_block else 1,
                     )
                 elif v136_export_running:
-                    set_stage("08. Geth v1.9.25 exporting data", 1)
+                    set_stage("09. Geth v1.9.25 exporting data", 1)
                 else:
-                    set_stage("08. Geth v1.9.25 exporting data", 0)
+                    set_stage("09. Geth v1.9.25 exporting data", 0)
 
-                # 09) Geth v1.3.6 importing data (RLP import stage)
+                # 10) Geth v1.3.6 importing data (RLP import stage)
                 v136_importing = False
                 v136_import_current = 0
                 # NOTE: the *.done marker can become stale if the v1.3.6 datadir is wiped.
@@ -742,9 +745,9 @@ class Poller:
                 )
 
                 if v136_done_effective:
-                    set_stage("09. Geth v1.3.6 importing data", 2)
+                    set_stage("10. Geth v1.3.6 importing data", 2)
                 elif not v136_export_started:
-                    set_stage("09. Geth v1.3.6 importing data", 0)
+                    set_stage("10. Geth v1.3.6 importing data", 0)
                 else:
                     if v136_import_marker_path.exists():
                         v136_importing = True
@@ -769,19 +772,20 @@ class Poller:
                         pass
 
                     set_stage(
-                        "09. Geth v1.3.6 importing data",
+                        "10. Geth v1.3.6 importing data",
                         1 if v136_importing else 0,
                     )
 
-                # 10) Geth v1.0.3 syncing
-                legacy_stage("Geth v1.0.3", "10. Geth v1.0.3 syncing")
+                # 11) Geth v1.0.3 syncing
+                legacy_stage("Geth v1.0.3", "11. Geth v1.0.3 syncing")
             else:
                 # Legacy chain disabled: force consistent "not started" for all legacy stages.
                 set_stage("06. Geth v1.10.0 syncing", 0)
-                set_stage("07. Geth v1.9.25 importing data", 0)
-                set_stage("08. Geth v1.9.25 exporting data", 0)
-                set_stage("09. Geth v1.3.6 importing data", 0)
-                set_stage("10. Geth v1.0.3 syncing", 0)
+                set_stage("07. Geth v1.10.0 exporting data", 0)
+                set_stage("08. Geth v1.9.25 importing data", 0)
+                set_stage("09. Geth v1.9.25 exporting data", 0)
+                set_stage("10. Geth v1.3.6 importing data", 0)
+                set_stage("11. Geth v1.0.3 syncing", 0)
 
             # --- Synthetic rows for export/import phases in the Sync progress table ---
             # These are displayed as extra rows (between v1.16.7 and v1.11.6) by
@@ -845,7 +849,7 @@ class Poller:
                         v110_export_file_ok = v110_export_file_path.stat().st_size >= min_export_bytes
                     except Exception:
                         v110_export_file_ok = False
-                v110_export_done = v110_export_done_path.exists() and v110_export_file_ok
+                v110_export_done = (v110_export_done_path.exists() and v110_export_file_ok) or v925_import_done_path.exists()
                 v110_export_up = (
                     v110_export_marker_path.exists()
                     or v110_export_file_path.exists()

@@ -6,7 +6,7 @@ chain-of-geths/generated-files/docker-images/
 chain-of-geths/generated-files/docker-images/**
 
 # Generated key material + configs.
-# We commit a small deterministic subset (nodekey/static-nodes/config/genesis) but ignore:
+# We commit a deterministic subset (nodekey/static-nodes/config/genesis) but ignore:
 # - machine-specific SSH state
 # - per-deployment secrets
 # - runtime/export artifacts and large chain DB data
@@ -16,6 +16,13 @@ chain-of-geths/generated-files/known_hosts
 
 # Per-deployment secrets (Engine API JWT)
 chain-of-geths/generated-files/**/jwtsecret
+
+# Runtime artifacts / outputs
+chain-of-geths/generated-files/exports/
+chain-of-geths/generated-files/**/*.log
+chain-of-geths/generated-files/**/*.done
+chain-of-geths/generated-files/**/*.importing
+chain-of-geths/generated-files/**/*.exporting
 
 # Compiled python output
 *.pyc

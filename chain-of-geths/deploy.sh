@@ -142,8 +142,10 @@ done
 # Start base services only (avoid starting the v1.11.6 bridge until seeding is complete).
 # NOTE: `geth-exporter` no longer hard-depends on all legacy geth services.
 echo "Starting base services (top node + monitoring)..."
-sudo docker compose up -d geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui 2>/dev/null || \
-  sudo docker-compose up -d geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui
+# NOTE: geth-exporter and sync-ui are built from local source (docker-compose `build:` sections),
+# so ensure we rebuild them on each deploy.
+sudo docker compose up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui 2>/dev/null || \
+  sudo docker-compose up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui
 
 # Create the bridge container but do not start it yet.
 sudo docker compose create geth-v1-11-6 2>/dev/null || sudo docker-compose create geth-v1-11-6 || true
