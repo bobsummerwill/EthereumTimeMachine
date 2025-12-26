@@ -398,6 +398,10 @@ class Poller:
                 fixed_target: int | None
                 if name.strip() == "Geth v1.0.3":
                     fixed_target = GETH_V1_0_3_TARGET_BLOCK
+                elif name.strip() == "Geth v1.9.25":
+                    # v1.9.25 is used as an offline export source for the pre-DAO cutoff range.
+                    # Show progress/remaining vs the cutoff, not vs the ever-moving mainnet head.
+                    fixed_target = cutoff_block
                 elif name.strip() == "Geth v1.3.6":
                     # v1.3.6 is intended to reach the offline cutoff range.
                     fixed_target = cutoff_block
@@ -450,7 +454,9 @@ class Poller:
                         g_sync_highest.labels(node=name).set(hi)
                         eff = max(block_num, cur)
                         node_effective_head[name] = eff
-                        target = max(hi, eff, fixed_target or 0)
+                        # If a fixed target is configured, we explicitly report remaining vs that
+                        # target (even if the node reports a much higher eth_syncing.highestBlock).
+                        target = fixed_target if fixed_target is not None else max(hi, eff)
                         g_effective_head.labels(node=name).set(eff)
                         # Use our best-effort target (not just hi-cur) so older clients that report
                         # highestBlock=0 still show a meaningful remaining curve.
