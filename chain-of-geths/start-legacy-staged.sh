@@ -479,6 +479,20 @@ accelerate_import_v1_9_25_from_cutoff_rlp() {
     return 0
   fi
 
+  # If a previous manual/ops import already completed (log shows the cutoff), record the done marker.
+  # This makes the pipeline idempotent across restarts.
+  if [ -f "$log" ]; then
+    # Modern geth import logs include: "Imported new chain segment ... number=1234567"
+    last_num=$(grep -Eo 'number=[0-9,]+' "$log" | tail -n 1 | sed -E 's/^number=//' | tr -d ',' || true)
+    if [ -n "${last_num:-}" ] && [ "${last_num:-0}" -ge "$CUTOFF_BLOCK" ]; then
+      touch "$done"
+      echo "[start-legacy] accelerate: detected completed import in $log (number=$last_num); wrote $done"
+      # Ensure the service is running for subsequent RPC-based export.
+      compose_up geth-v1-9-25
+      return 0
+    fi
+  fi
+
   if [ ! -f "$src_rlp" ]; then
     echo "[start-legacy] accelerate: missing cutoff RLP: $src_rlp (skipping)"
     return 0

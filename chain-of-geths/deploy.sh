@@ -87,11 +87,15 @@ scp $SSH_OPTS -i "$SSH_KEY_PATH" -r \
 echo "Running setup on Ubuntu VM..."
 # Pass RESET_LIGHTHOUSE_VOLUMES through to the remote shell explicitly.
 ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
-  "RESET_LIGHTHOUSE_VOLUMES=$RESET_LIGHTHOUSE_VOLUMES BRIDGE_SEED_CUTOFF_BLOCK=$BRIDGE_SEED_CUTOFF_BLOCK bash -s" << 'EOF'
+  "RESET_LIGHTHOUSE_VOLUMES=$RESET_LIGHTHOUSE_VOLUMES BRIDGE_SEED_CUTOFF_BLOCK=$BRIDGE_SEED_CUTOFF_BLOCK ACCELERATE_V1_9_25_IMPORT=${ACCELERATE_V1_9_25_IMPORT:-1} bash -s" << 'EOF'
 cd /home/ubuntu/chain-of-geths
 
 # One-time bridge seeding cutoff (see BRIDGE_SEED_CUTOFF_BLOCK in the local deploy script).
 BRIDGE_SEED_CUTOFF_BLOCK="${BRIDGE_SEED_CUTOFF_BLOCK:-1919999}"
+
+# If set to 1, the legacy runner will offline-import the cutoff RLP into v1.9.25
+# and then immediately continue into v1.9.25 -> v1.3.6 export/import.
+ACCELERATE_V1_9_25_IMPORT="${ACCELERATE_V1_9_25_IMPORT:-1}"
 
 # Install Docker + Compose on the VM if missing.
 if ! command -v docker >/dev/null 2>&1; then
@@ -151,7 +155,10 @@ sudo docker compose create geth-v1-11-6 2>/dev/null || sudo docker-compose creat
 SEED_FLAG="/home/ubuntu/chain-of-geths/generated-files/seed-v1.11.6-${BRIDGE_SEED_CUTOFF_BLOCK}.done"
 if [ -f "$SEED_FLAG" ]; then
   echo "Bridge seeding already done ($SEED_FLAG). Starting legacy geth services..."
-  CUTOFF_BLOCK="$BRIDGE_SEED_CUTOFF_BLOCK" bash /home/ubuntu/chain-of-geths/start-legacy-staged.sh
+  echo "Launching background legacy runner (ACCELERATE_V1_9_25_IMPORT=$ACCELERATE_V1_9_25_IMPORT)"
+  nohup env CUTOFF_BLOCK="$BRIDGE_SEED_CUTOFF_BLOCK" ACCELERATE_V1_9_25_IMPORT="$ACCELERATE_V1_9_25_IMPORT" \
+    bash /home/ubuntu/chain-of-geths/start-legacy-staged.sh \
+    >/home/ubuntu/chain-of-geths/generated-files/start-legacy-staged.nohup.log 2>&1 &
 else
   echo "Launching background bridge seeder (cutoff=$BRIDGE_SEED_CUTOFF_BLOCK)..."
   nohup env CUTOFF_BLOCK="$BRIDGE_SEED_CUTOFF_BLOCK" bash /home/ubuntu/chain-of-geths/seed-v1.11.6-when-ready.sh >/home/ubuntu/chain-of-geths/generated-files/seed-v1.11.6.nohup.log 2>&1 &
