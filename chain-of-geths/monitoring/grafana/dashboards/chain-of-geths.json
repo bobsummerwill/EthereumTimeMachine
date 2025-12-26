@@ -32,7 +32,13 @@
           "color": {
             "mode": "thresholds"
           },
-          "custom": {},
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-background"
+            },
+            "inspect": false
+          },
           "mappings": [
             {
               "options": {
@@ -344,7 +350,7 @@
           ]
       },
       "gridPos": {
-        "h": 9,
+        "h": 12,
         "w": 24,
         "x": 0,
         "y": 0
