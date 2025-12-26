@@ -306,6 +306,9 @@ seed_v1_3_6_from_v1_9_25() {
       --nousb \
       --datadir /data export "/exports/$repair_export_file" 0 "$CUTOFF_BLOCK"
 
+    echo "[start-legacy] stopping geth-v1-9-25 to release DB lock for import"
+    compose_stop geth-v1-9-25 || true
+
     echo "[start-legacy] importing into v1.9.25 from $EXPORT_DIR/$repair_export_file"
     sudo docker run --rm \
       --entrypoint geth \
@@ -314,6 +317,10 @@ seed_v1_3_6_from_v1_9_25() {
       ethereumtimemachine/geth:v1.9.25 \
       --nousb \
       --datadir /data import "/exports/$repair_export_file"
+
+    echo "[start-legacy] restarting geth-v1-9-25"
+    compose_up geth-v1-9-25
+    wait_for_block_ge "geth-v1-9-25" "http://localhost:8552" "$MIN_BLOCK"
 
     echo "[start-legacy] restarting geth-v1-10-0"
     compose_up geth-v1-10-0
