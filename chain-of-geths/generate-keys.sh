@@ -207,18 +207,15 @@ DataDir = "/data"
 [Node.P2P]
 NoDiscovery = true
 ListenAddr = ":${port_by_version[v1.11.6]}"
-# NOTE: In v1.11.x, static-nodes.json is deprecated/ignored when using --config.
-# Use the config field instead (Geth log: "Use P2P.StaticNodes in config.toml instead.")
-StaticNodes = [
-  "${enodes[v1.16.7]}"
-]
+# This node is offline-seeded via export/import and is not intended to dial upstream peers.
+# It should accept inbound peers from the next node down (v1.10.0), with discovery disabled.
+StaticNodes = []
 EOF
 
-# Place static-nodes.json for v1.11.6 under both <datadir>/geth and <datadir>/ for maximum compatibility.
-mkdir -p "$v1_11_6_dir/geth"
-printf '["%s"]\n' "${enodes[v1.16.7]}" > "$v1_11_6_dir/geth/static-nodes.json"
-printf '["%s"]\n' "${enodes[v1.16.7]}" > "$v1_11_6_dir/static-nodes.json"
-echo "Created config.toml + static-nodes.json for v1.11.6 pointing to v1.16.7"
+# With --config, v1.11.x prefers P2P.StaticNodes in config.toml.
+# To ensure we do *not* accidentally retain an old peering config, remove any legacy static-nodes.json files.
+rm -f "$v1_11_6_dir/geth/static-nodes.json" "$v1_11_6_dir/static-nodes.json" 2>/dev/null || true
+echo "Created config.toml for v1.11.6 with discovery disabled and no outbound peering"
 
 # Create static-nodes.json for each non-top version.
 #
