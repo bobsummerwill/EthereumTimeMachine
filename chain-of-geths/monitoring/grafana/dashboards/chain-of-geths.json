@@ -664,7 +664,7 @@
        "targets": [
          {
            "editorMode": "code",
-            "expr": "geth_sync_remaining_blocks{node=~\"^Geth .*\"} and on(node) (geth_up{node=~\"^Geth .*\"} == 1)",
+            "expr": "(geth_sync_remaining_blocks{node=~\"^Geth .*\"} and on(node) (geth_up{node=~\"^Geth .*\"} == 1)) or ((geth_sync_target_block{node=~\"^(Import|Export) .*\"} - geth_effective_head_block{node=~\"^(Import|Export) .*\"}) and on(node) (geth_up{node=~\"^(Import|Export) .*\"} == 1))",
             "legendFormat": "{{node}}",
             "range": true,
             "refId": "A"
@@ -899,14 +899,14 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "geth_up{node=\"Geth v1.16.7\"}",
+          "expr": "max(geth_up{node=\"Geth v1.16.7\"} or geth_up{node=\"Export (v1.16.7 → RLP)\"})",
           "legendFormat": "Geth v1.16.7",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "geth_up{node=\"Geth v1.11.6\"}",
+          "expr": "max(geth_up{node=\"Geth v1.11.6\"} or geth_up{node=\"Import (RLP → v1.11.6)\"})",
           "legendFormat": "Geth v1.11.6",
           "range": true,
           "refId": "B"
@@ -920,14 +920,14 @@
         },
         {
           "editorMode": "code",
-          "expr": "geth_up{node=\"Geth v1.9.25\"}",
+          "expr": "max(geth_up{node=\"Geth v1.9.25\"} or geth_up{node=\"Import (RLP → v1.9.25)\"} or geth_up{node=\"Export (v1.9.25 → RLP)\"})",
           "legendFormat": "Geth v1.9.25",
           "range": true,
           "refId": "D"
         },
         {
           "editorMode": "code",
-          "expr": "geth_up{node=\"Geth v1.3.6\"}",
+          "expr": "max(geth_up{node=\"Geth v1.3.6\"} or geth_up{node=\"Import (RLP → v1.3.6)\"})",
           "legendFormat": "Geth v1.3.6",
           "range": true,
           "refId": "E"
