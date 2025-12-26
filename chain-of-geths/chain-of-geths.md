@@ -19,9 +19,12 @@ Entrypoints:
 ### Protocol bridge chain (down to Frontier)
 
 The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
-
-```
-                           (post-Merge head)
+  
+  ```
+                    Ethereum mainnet P2P (discovery + bootnodes)
+                                |
+                                v
+                            (post-Merge head)
             +-----------------------------------------------+
             | lighthouse v8.0.1 (20th Nov 2025) (CL)        |
             | geth v1.16.7 (4th Nov 2025) (EL)              |
@@ -29,9 +32,9 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
             | Forks added:                                  |
             |   Cancun                                      |
             +-----------------------------------------------+
-                               |
-                               | (offline block export/import up to cutoff)
-                               v
+                                |
+                                | (offline RLP export/import up to cutoff)
+                                v
             +-----------------------------------------------+
             | geth v1.11.6 (20th Apr 2023)                  |
             | eth/66-68                                     |
@@ -41,9 +44,9 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
             |   Gray Glacier                                |
             |   Arrow Glacier                               |
             +-----------------------------------------------+
-                               |
-                               | eth/66
-                               v
+                                |
+                                | P2P eth/66 (protocol bridge)
+                                v
             +-----------------------------------------------+
             | geth v1.10.0 (3rd Mar 2021)                   |
             | eth/64-66                                     |
@@ -51,9 +54,9 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
             |   London                                      |
             |   Berlin                                      |
             +-----------------------------------------------+
-                               |
-                               | eth/64-65
-                               v
+                                |
+                                | (offline RLP export/import up to cutoff)
+                                v
             +-----------------------------------------------+
             | geth v1.9.25 (11th Dec 2020)                  |
             | eth/63-65                                     |
@@ -67,48 +70,52 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
             |   Tangerine Whistle                           |
             |   DAO                                         |
             +-----------------------------------------------+
-                               |
-                                | (offline block export/import up to cutoff)
+                                |
+                                | (offline RLP export/import up to cutoff)
                                 v
-            +-----------------------------------------------+
-            | geth v1.3.6 (1st Apr 2016)                    |
-            | eth/61-63                                     |
-            | Forks added:                                  |
-            |   Homestead                                   |
-            +-----------------------------------------------+
-                               |
-                               | eth/61
-                               v
-            +-----------------------------------------------+
-            | geth v1.0.3 (27th Jan 2014)                   |
-            | eth/60-61                                     |
-            | Forks:                                        |
-            |   Frontier                                    |
-            +-----------------------------------------------+
+             +-----------------------------------------------+
+             | geth v1.3.6 (1st Apr 2016)                    |
+             | eth/61-63                                     |
+             | Forks added:                                  |
+             |   Homestead                                   |
+             +-----------------------------------------------+
+                                |
+                                | P2P eth/61 (protocol bridge)
+                                v
+             +-----------------------------------------------+
+             | geth v1.0.3 (27th Jan 2014)                   |
+             | eth/60-61                                     |
+             | Forks:                                        |
+             |   Frontier                                    |
+             +-----------------------------------------------+
 ```
 
 Services:
-- `geth-v1-16-7`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:4) (line 4)
-- `lighthouse-v8-0-1`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:182) (line 182)
-- `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:43) (line 43)
-- `geth-v1-10-0`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:72) (line 72)
-- `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:101) (line 101)
-- `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:127) (line 127)
-- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:153) (line 153)
-- `geth-exporter`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:216) (line 216)
-- `prometheus`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:246) (line 246)
-- `sync-ui`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:263) (line 263)
-- `grafana`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:277) (line 277)
+- `geth-v1-16-7`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:4)
+- `lighthouse-v8-0-1`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:198)
+- `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:46)
+- `geth-v1-10-0`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:78)
+- `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:110)
+- `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:139)
+- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:166)
+- `geth-exporter`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:232)
+- `prometheus`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:263)
+- `sync-ui`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:280)
+- `grafana`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:294)
 
 ## Offline export/import seeding (bridge workflow)
 
 The stack uses a single consensus client (`lighthouse-v8-0-1`) for the head node.
 
-The bridge workflow seeds older datadirs up to a fixed historical cutoff using **block export/import**:
+The bridge workflow seeds older datadirs up to a fixed historical cutoff using **RLP block export/import**.
 
 1. Let `geth-v1-16-7` + `lighthouse-v8-0-1` sync normally.
-2. Export blocks `0..CUTOFF_BLOCK` from the modern node.
+2. Export blocks `0..CUTOFF_BLOCK` from `geth-v1-16-7`.
 3. Import that block range into `geth-v1-11-6`.
+4. Export blocks `0..CUTOFF_BLOCK` from `geth-v1-10-0`.
+5. Import that block range into `geth-v1-9-25`.
+6. Export blocks `0..CUTOFF_BLOCK` from `geth-v1-9-25`.
+7. Import that block range into `geth-v1-3-6`.
 
 Automation:
 - Bridge seeding orchestration: [`chain-of-geths/seed-v1.11.6-when-ready.sh`](chain-of-geths/seed-v1.11.6-when-ready.sh)
@@ -119,9 +126,14 @@ This avoids the “old chainstate format” / “no compatible consensus client�
 
 ## Static peering (no discovery for older nodes)
 
-Older services run with discovery disabled and peer **only** to the next node in the chain.
+Older services run with discovery disabled and peer **only** to the next node in the chain for protocol bridging.
 
-Exception: `geth-v1-3-6` is expected to be **offline-seeded** from `geth-v1-9-25` (export/import) and does **not** dial upstream peers.
+Offline-seeded nodes do **not** rely on network sync for historical data transfer:
+- `geth-v1-11-6` is populated by import from the `geth-v1-16-7` export.
+- `geth-v1-9-25` is populated by import from the `geth-v1-10-0` export.
+- `geth-v1-3-6` is populated by import from the `geth-v1-9-25` export.
+
+Exception (no outbound peering): `geth-v1-3-6` is expected to be offline-seeded and does **not** dial upstream peers.
 
 `generate-keys.sh` writes deterministic peering/config files under `chain-of-geths/generated-files/`:
 - `nodekey`
