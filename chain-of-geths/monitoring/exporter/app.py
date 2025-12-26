@@ -439,6 +439,13 @@ class Poller:
                 fixed_target: int | None
                 if name.strip() == "Geth v1.0.3":
                     fixed_target = GETH_V1_0_3_TARGET_BLOCK
+                elif name.strip() == "Geth v1.16.7":
+                    # For the seeding/export workflow, it is more meaningful to show v1.16.7 progress
+                    # vs the fixed cutoff until the export step has actually completed.
+                    #
+                    # This makes the row hit CUTOFF_BLOCK only when eth_blockNumber has truly reached
+                    # that height (i.e. blocks are available for export).
+                    fixed_target = cutoff_block if not export_done_path.exists() else None
                 elif name.strip() == "Geth v1.9.25":
                     # v1.9.25 is used as an offline export source for the pre-DAO cutoff range.
                     # Show progress/remaining vs the cutoff, not vs the ever-moving mainnet head.
@@ -493,7 +500,12 @@ class Poller:
                         g_syncing.labels(node=name).set(1)
                         g_sync_current.labels(node=name).set(cur)
                         g_sync_highest.labels(node=name).set(hi)
-                        eff = max(block_num, cur)
+                        # For v1.16.7 (until export done), prefer eth_blockNumber for progress.
+                        # eth_syncing.currentBlock can advance far ahead of fully-imported blocks.
+                        if name.strip() == "Geth v1.16.7" and fixed_target == cutoff_block:
+                            eff = block_num
+                        else:
+                            eff = max(block_num, cur)
                         node_effective_head[name] = eff
                         # If a fixed target is configured, we explicitly report remaining vs that
                         # target (even if the node reports a much higher eth_syncing.highestBlock).
@@ -603,17 +615,12 @@ class Poller:
                     )
 
             # 03) Geth v1.16.7 syncing
-            top_eff = node_effective_head.get(top_name, 0)
             if not node_up.get(top_name, False):
                 set_stage("03. Geth v1.16.7 syncing", 0)
             else:
-                # Treat a totally "cold" node as not started until it has a non-zero effective head.
-                # (`effective head` already accounts for clients where eth_syncing.currentBlock advances first.)
-                # This avoids showing "IN PROGRESS" just because eth_syncing returns a dict at startup.
-                if top_eff <= 0:
-                    set_stage("03. Geth v1.16.7 syncing", 0)
-                else:
-                    set_stage("03. Geth v1.16.7 syncing", 1 if node_syncing.get(top_name, False) else 2)
+                # Consider v1.16.7 "in progress" as soon as it's reachable and reports syncing.
+                # Even while eth_blockNumber is still 0, eth_syncing can be active.
+                set_stage("03. Geth v1.16.7 syncing", 1 if node_syncing.get(top_name, False) else 2)
 
             # 04) Geth v1.16.7 exporting data (seed RLP export)
             # Prefer explicit marker/done files (written by seed-v1.11.6-when-ready.sh).
