@@ -129,6 +129,10 @@ Exception: `geth-v1-3-6` is expected to be **offline-seeded** from `geth-v1-9-25
 - `config.toml` (newer nodes)
 - `genesis.json` (v1.0.3)
 
+It also writes a Windows helper output for peering an *external* (non-Docker) geth v1.1.0 instance to the deployed `geth-v1-3-6`:
+- `generated-files/windows/geth-v1.1.0/static-nodes.json`
+- `generated-files/windows/geth-v1.1.0/README.md`
+
 See: [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh)
 
 This makes peering deterministic across restarts and across the AWS deployment.

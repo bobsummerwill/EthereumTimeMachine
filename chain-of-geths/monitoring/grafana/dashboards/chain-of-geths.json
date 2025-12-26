@@ -253,7 +253,7 @@
            {
              "matcher": {
                "id": "byName",
-               "options": "07. Geth v1.9.25 syncing"
+                "options": "07. Geth v1.9.25 importing data"
              },
             "properties": [
               {
@@ -263,13 +263,13 @@
                     "type": "value",
                     "options": {
                       "0": {
-                        "text": "7. Geth v1.9.25 syncing — TODO"
+                        "text": "7. Geth v1.9.25 importing data — TODO"
                       },
                       "1": {
-                        "text": "7. Geth v1.9.25 syncing — IN PROGRESS"
+                        "text": "7. Geth v1.9.25 importing data — IN PROGRESS"
                       },
                       "2": {
-                        "text": "7. Geth v1.9.25 syncing — DONE"
+                        "text": "7. Geth v1.9.25 importing data — DONE"
                       }
                     }
                   }
@@ -986,7 +986,7 @@
        "targets": [
         {
           "editorMode": "code",
-          "expr": "geth_node_sort_key{node!=\"Lighthouse\",node!=\"Geth v1.3.6\"}",
+          "expr": "geth_node_sort_key{node!=\"Lighthouse\",node!=\"Geth v1.3.6\",node!=\"Geth v1.9.25\"}",
           "format": "table",
           "instant": true,
           "legendFormat": "sort",
@@ -994,7 +994,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "geth_effective_head_block{node!=\"Lighthouse\",node!=\"Geth v1.3.6\"}",
+          "expr": "geth_effective_head_block{node!=\"Lighthouse\",node!=\"Geth v1.3.6\",node!=\"Geth v1.9.25\"}",
           "format": "table",
           "instant": true,
           "legendFormat": "Block",
@@ -1002,7 +1002,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "(geth_sync_target_block{node!=\"Lighthouse\",node!=\"Geth v1.3.6\",node!~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"}) or (1919999 * (geth_node_sort_key{node=~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"} * 0 + 1))",
+          "expr": "(geth_sync_target_block{node!=\"Lighthouse\",node!=\"Geth v1.3.6\",node!=\"Geth v1.9.25\",node!~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"}) or (1919999 * (geth_node_sort_key{node=~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"} * 0 + 1))",
           "format": "table",
           "instant": true,
           "legendFormat": "Head",
@@ -1010,7 +1010,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "(geth_sync_percent{node!=\"Lighthouse\",node!=\"Geth v1.3.6\",node!~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"}) or clamp_max(100 * geth_effective_head_block{node=~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"} / 1919999, 100)",
+          "expr": "(geth_sync_percent{node!=\"Lighthouse\",node!=\"Geth v1.3.6\",node!=\"Geth v1.9.25\",node!~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"}) or clamp_max(100 * geth_effective_head_block{node=~\"^Geth v1[.](11[.]6|10[.]0|9[.]25)$\"} / 1919999, 100)",
           "format": "table",
           "instant": true,
           "legendFormat": "Percentage",

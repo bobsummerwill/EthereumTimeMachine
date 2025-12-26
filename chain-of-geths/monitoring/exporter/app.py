@@ -295,6 +295,10 @@ class Poller:
         v136_import_log_path = host_output_dir / "seed-v1.3.6-import.log"
         v136_seed_done_path = host_output_dir / f"seed-v1.3.6-from-v1.9.25-{cutoff_block}.done"
 
+        # Optional: if we temporarily accelerate seeding by importing the already-exported
+        # v1.16.7 cutoff RLP into v1.9.25, we log it here (manual/ops step).
+        v925_import_log_path = host_output_dir / "seed-v1.9.25-import.log"
+
         while not self._stop.is_set():
             # Clear dynamic label series each round so we don't accumulate stale values.
             g_sync_progress_info.clear()
@@ -483,6 +487,22 @@ class Poller:
                         # If unknown this round, don't overwrite.
                         pass
 
+            # Optional: v1.9.25 import progress (manual acceleration step).
+            # This is used both for the Stage checklist and for the synthetic Sync-progress rows.
+            v925_import_current = 0
+            v925_import_running = False
+            if v925_import_log_path.exists():
+                try:
+                    tail = v925_import_log_path.read_text(errors="ignore")[-500000:]
+                    # v1.9.25 uses the modern log format during import.
+                    m = re.findall(r"Imported new chain segment\s+.*?number=([0-9,]+)", tail)
+                    if m:
+                        v925_import_current = int(m[-1].replace(",", ""))
+                    v925_import_running = (v925_import_current > 0) and (v925_import_current < cutoff_block)
+                except Exception:
+                    v925_import_current = 0
+                    v925_import_running = False
+
             # --- Stage checklist ---
             # Helper to emit 0/1/2 for a stage label.
             def set_stage(stage: str, status: int) -> None:
@@ -567,10 +587,17 @@ class Poller:
                         if "Importing blockchain" in tail or "Imported new chain segment" in tail:
                             importing = True
                         # Best-effort: parse latest imported block number from the log tail.
-                        # Example: "Imported new chain segment               number=487,500"
+                        # Newer geth:
+                        #   "Imported new chain segment               number=487,500"
                         m = re.findall(r"Imported new chain segment\s+number=([0-9,]+)", tail)
                         if m:
                             import_current = int(m[-1].replace(",", ""))
+                        else:
+                            # Old import output (e.g. geth v1.3.6 importer):
+                            #   "imported 2500 block(s) ... #215000 [...]"
+                            m2 = re.findall(r"imported\s+[0-9,]+\s+block\(s\).*?#([0-9,]+)", tail, flags=re.IGNORECASE)
+                            if m2:
+                                import_current = int(m2[-1].replace(",", ""))
                 except Exception:
                     importing = False
                 set_stage(
@@ -592,13 +619,25 @@ class Poller:
                     set_stage(stage_label, 0)
 
             legacy_stage("Geth v1.10.0", "06. Geth v1.10.0 syncing")
-            legacy_stage("Geth v1.9.25", "07. Geth v1.9.25 syncing")
+
+            # 07) Geth v1.9.25 importing data (optional acceleration step)
+            # If we're doing an offline import into v1.9.25, show that explicitly.
+            # Otherwise, fall back to the normal syncing stage.
+            v925_node_head = node_effective_head.get("Geth v1.9.25", 0)
+            if v925_import_current > 0 or v925_import_log_path.exists():
+                if v925_import_current >= cutoff_block or v925_node_head >= cutoff_block:
+                    set_stage("07. Geth v1.9.25 importing data", 2)
+                else:
+                    set_stage("07. Geth v1.9.25 importing data", 1)
+            else:
+                # No import in progress; treat as normal sync stage.
+                legacy_stage("Geth v1.9.25", "07. Geth v1.9.25 importing data")
 
             # 08) Geth v1.9.25 exporting data (RLP export stage)
             # IMPORTANT: do NOT infer "DONE" from the mere presence of the export file.
             # A failed/partial `geth export` can leave a tiny/truncated file behind.
             # We only mark DONE when the script writes the explicit done marker.
-            v136_export_done = v136_seed_done_path.exists() or v136_export_done_path.exists()
+            v136_export_done = v136_export_done_path.exists()
             v136_export_running = v136_export_marker_path.exists()
 
             v136_export_last_done = None
@@ -609,6 +648,14 @@ class Poller:
                         v136_export_last_done = int(data.get("last_done"))
                     except Exception:
                         v136_export_last_done = None
+
+            # Only treat export as DONE if we have evidence of completion in the progress file.
+            # This avoids stale/incorrect done markers causing the Sync Progress panel to jump to 100%.
+            v136_export_done = (
+                v136_export_done_path.exists()
+                and v136_export_last_done is not None
+                and v136_export_last_done >= cutoff_block
+            )
 
             if v136_export_done:
                 set_stage("08. Geth v1.9.25 exporting data", 2)
@@ -643,6 +690,10 @@ class Poller:
                         m = re.findall(r"Imported new chain segment\s+number=([0-9,]+)", tail)
                         if m:
                             v136_import_current = int(m[-1].replace(",", ""))
+                        else:
+                            m2 = re.findall(r"imported\s+[0-9,]+\s+block\(s\).*?#([0-9,]+)", tail, flags=re.IGNORECASE)
+                            if m2:
+                                v136_import_current = int(m2[-1].replace(",", ""))
                 except Exception:
                     pass
                 set_stage(
@@ -705,11 +756,22 @@ class Poller:
             )
 
             # --- Synthetic rows for legacy export/import phases (v1.9.25 -> v1.3.6) ---
+
+            emit_phase_row(
+                "Import (RLP → v1.9.25)",
+                4.40,
+                cutoff_block if v925_import_current >= cutoff_block else v925_import_current,
+                cutoff_block,
+                v925_import_running,
+                v925_import_log_path.exists() or v925_import_current > 0,
+            )
+
             v136_export_up = (
                 v136_export_marker_path.exists()
                 or v136_export_progress_path.exists()
                 or v136_export_file_path.exists()
                 or v136_export_done
+                or v136_export_done_path.exists()
             )
             v136_export_display = (
                 cutoff_block

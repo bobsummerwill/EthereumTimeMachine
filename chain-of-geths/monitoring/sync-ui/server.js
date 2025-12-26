@@ -80,6 +80,9 @@ async function fetchSyncProgress() {
     // Keep this table aligned with the Grafana dashboard: v1.3.6 is seeded via export/import,
     // and we show that progress via synthetic rows instead of the raw node row.
     .filter((r) => r.node !== "Geth v1.3.6")
+    // v1.9.25 is also treated as an offline-seeded node in this workflow; show its import/export phases
+    // via synthetic rows instead of the raw node row.
+    .filter((r) => r.node !== "Geth v1.9.25")
     // Hide raw internal rows if ever introduced; keep the current behavior simple.
     .sort((a, b) => {
       const sa = a.sort ?? Number.POSITIVE_INFINITY;
