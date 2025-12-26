@@ -34,9 +34,6 @@
           },
           "custom": {
             "align": "auto",
-            "cellOptions": {
-              "type": "color-text"
-            },
             "inspect": false
           },
           "mappings": [
@@ -77,6 +74,20 @@
           "max": 2
         },
         "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
            {
              "matcher": {
                "id": "byName",
