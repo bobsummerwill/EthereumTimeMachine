@@ -35,7 +35,7 @@
           "custom": {
             "align": "auto",
             "cellOptions": {
-              "type": "color-background"
+              "type": "color-text"
             },
             "inspect": false
           },
