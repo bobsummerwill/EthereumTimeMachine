@@ -347,7 +347,6 @@ seed_v1_3_6_from_v1_9_25() {
   # If so, `geth export 0..N` fails on #1. We repair this by importing a known-good range
   # exported from v1.10.0 (one step upstream) into v1.9.25.
   echo "[start-legacy] probing v1.9.25 export (0..1) to verify genesis-era blocks exist"
-  # NOTE: geth v1.9.25 does not expose debug_getRawBlock, so we probe via offline `geth export`.
   compose_stop geth-v1-9-25 || true
   set +e
   sudo docker run --rm \
@@ -377,7 +376,6 @@ seed_v1_3_6_from_v1_9_25() {
   echo "[start-legacy] exporting 0..${CUTOFF_BLOCK} from v1.9.25 -> $EXPORT_DIR/$export_file"
   # Start fresh (a failed export can leave a tiny/truncated file behind).
   #
-  # IMPORTANT: geth v1.9.25 does *not* expose debug_getRawBlock over JSON-RPC.
   # Use offline `geth export` (requires stopping the service to release DB lock).
   rm -f "$EXPORT_DIR/$export_file" "$export_done_file" || true
   rm -f "$export_marker" || true

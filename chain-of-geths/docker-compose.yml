@@ -14,7 +14,7 @@ services:
       --http
       --http.addr 0.0.0.0
       --http.vhosts *
-      --http.api eth,net,web3,personal,admin,debug
+      --http.api eth,net,web3,personal,admin
       --authrpc.addr 0.0.0.0
       --authrpc.port 8551
       --authrpc.vhosts *
@@ -118,7 +118,7 @@ services:
       --rpc
       --rpcaddr 0.0.0.0
       --rpcvhosts *
-      --rpcapi eth,net,web3,debug
+      --rpcapi eth,net,web3
       --networkid 1
       --syncmode full
       --port 30310

@@ -313,6 +313,12 @@ class Poller:
             node_syncing: Dict[str, bool] = {}
             node_effective_head: Dict[str, int] = {}
 
+            # Whether the legacy chain (v1.10.0 -> v1.0.3) is intended to be shown.
+            # If these nodes aren't configured in NODE_URLS, we force all legacy stages/rows to 0
+            # so Grafana doesn't show confusing stale progress from old marker/log files.
+            legacy_nodes = {"Geth v1.10.0", "Geth v1.9.25", "Geth v1.3.6", "Geth v1.0.3"}
+            legacy_enabled = any(name.strip() in legacy_nodes for (name, _) in self.nodes)
+
             lighthouse_up = False
             lighthouse_is_syncing = False
             lighthouse_sync_distance = 0
@@ -497,7 +503,7 @@ class Poller:
             # This is used both for the Stage checklist and for the synthetic Sync-progress rows.
             v925_import_current = 0
             v925_import_running = False
-            if v925_import_log_path.exists():
+            if legacy_enabled and v925_import_log_path.exists():
                 try:
                     tail = v925_import_log_path.read_text(errors="ignore")[-500000:]
                     # v1.9.25 uses the modern log format during import.
@@ -624,91 +630,118 @@ class Poller:
                 else:
                     set_stage(stage_label, 0)
 
-            legacy_stage("Geth v1.10.0", "06. Geth v1.10.0 syncing")
+            if legacy_enabled:
+                legacy_stage("Geth v1.10.0", "06. Geth v1.10.0 syncing")
 
-            # 07) Geth v1.9.25 importing data (optional acceleration step)
-            # If we're doing an offline import into v1.9.25, show that explicitly.
-            # Otherwise, fall back to the normal syncing stage.
-            v925_node_head = node_effective_head.get("Geth v1.9.25", 0)
-            if v925_import_current > 0 or v925_import_log_path.exists():
-                if v925_import_current >= cutoff_block or v925_node_head >= cutoff_block:
-                    set_stage("07. Geth v1.9.25 importing data", 2)
+                # 07) Geth v1.9.25 importing data (optional acceleration step)
+                # If we're doing an offline import into v1.9.25, show that explicitly.
+                # Otherwise, fall back to the normal syncing stage.
+                v925_node_head = node_effective_head.get("Geth v1.9.25", 0)
+                if v925_import_current > 0 or v925_import_log_path.exists():
+                    if v925_import_current >= cutoff_block or v925_node_head >= cutoff_block:
+                        set_stage("07. Geth v1.9.25 importing data", 2)
+                    else:
+                        set_stage("07. Geth v1.9.25 importing data", 1)
                 else:
-                    set_stage("07. Geth v1.9.25 importing data", 1)
-            else:
-                # No import in progress; treat as normal sync stage.
-                legacy_stage("Geth v1.9.25", "07. Geth v1.9.25 importing data")
+                    # No import in progress; treat as normal sync stage.
+                    legacy_stage("Geth v1.9.25", "07. Geth v1.9.25 importing data")
 
-            # 08) Geth v1.9.25 exporting data (RLP export stage)
-            # IMPORTANT: do NOT infer "DONE" from the mere presence of the export file.
-            # A failed/partial `geth export` can leave a tiny/truncated file behind.
-            # We only mark DONE when the script writes the explicit done marker.
-            v136_export_done = v136_export_done_path.exists()
-            v136_export_running = v136_export_marker_path.exists()
+                # 08) Geth v1.9.25 exporting data (RLP export stage)
+                # IMPORTANT: do NOT infer "DONE" from the mere presence of the export file.
+                # A failed/partial `geth export` can leave a tiny/truncated file behind.
+                # We only mark DONE when the script writes the explicit done marker.
+                v136_export_running = v136_export_marker_path.exists()
 
-            v136_export_last_done = None
-            if v136_export_progress_path.exists():
-                data = _read_json_file(v136_export_progress_path)
-                if isinstance(data, dict) and data.get("last_done") is not None:
+                # Treat export as DONE when the explicit done marker exists AND the output file
+                # exists and is non-trivially large.
+                # (The marker alone can become stale; the file alone can be tiny/truncated.)
+                min_export_bytes = 16 * 1024 * 1024
+                v136_export_file_ok = False
+                if v136_export_file_path.exists():
                     try:
-                        v136_export_last_done = int(data.get("last_done"))
+                        v136_export_file_ok = v136_export_file_path.stat().st_size >= min_export_bytes
                     except Exception:
-                        v136_export_last_done = None
+                        v136_export_file_ok = False
+                v136_export_done = v136_export_done_path.exists() and v136_export_file_ok
 
-            # Only treat export as DONE if we have evidence of completion in the progress file.
-            # This avoids stale/incorrect done markers causing the Sync Progress panel to jump to 100%.
-            v136_export_done = (
-                v136_export_done_path.exists()
-                and v136_export_last_done is not None
-                and v136_export_last_done >= cutoff_block
-            )
+                v136_export_last_done = None
+                if v136_export_progress_path.exists():
+                    data = _read_json_file(v136_export_progress_path)
+                    if isinstance(data, dict) and data.get("last_done") is not None:
+                        try:
+                            v136_export_last_done = int(data.get("last_done"))
+                        except Exception:
+                            v136_export_last_done = None
 
-            if v136_export_done:
-                set_stage("08. Geth v1.9.25 exporting data", 2)
-            elif v136_export_last_done is not None:
-                set_stage(
-                    "08. Geth v1.9.25 exporting data",
-                    2 if v136_export_last_done >= cutoff_block else 1,
+                if v136_export_done:
+                    set_stage("08. Geth v1.9.25 exporting data", 2)
+                elif v136_export_last_done is not None:
+                    set_stage(
+                        "08. Geth v1.9.25 exporting data",
+                        2 if v136_export_last_done >= cutoff_block else 1,
+                    )
+                elif v136_export_running:
+                    set_stage("08. Geth v1.9.25 exporting data", 1)
+                else:
+                    set_stage("08. Geth v1.9.25 exporting data", 0)
+
+                # 09) Geth v1.3.6 importing data (RLP import stage)
+                v136_importing = False
+                v136_import_current = 0
+                # NOTE: the *.done marker can become stale if the v1.3.6 datadir is wiped.
+                # Treat it as DONE only if the v1.3.6 node itself is actually at/above cutoff.
+                v136_node_head = node_effective_head.get("Geth v1.3.6", 0)
+                v136_done_effective = v136_seed_done_path.exists() and v136_node_head >= cutoff_block
+
+                # If the upstream export step hasn't started, never show v1.3.6 as "importing".
+                # This prevents stale marker/log files from making Stage 09 appear active before Stage 08.
+                v136_export_started = (
+                    v136_export_running
+                    or v136_export_done
+                    or (v136_export_last_done is not None)
                 )
-            elif v136_export_running:
-                set_stage("08. Geth v1.9.25 exporting data", 1)
+
+                if v136_done_effective:
+                    set_stage("09. Geth v1.3.6 importing data", 2)
+                elif not v136_export_started:
+                    set_stage("09. Geth v1.3.6 importing data", 0)
+                else:
+                    if v136_import_marker_path.exists():
+                        v136_importing = True
+
+                    try:
+                        if v136_import_log_path.exists():
+                            tail = v136_import_log_path.read_text(errors="ignore")[-500000:]
+                            if "Importing blockchain" in tail or "Imported new chain segment" in tail:
+                                v136_importing = True
+                            m = re.findall(r"Imported new chain segment\s+number=([0-9,]+)", tail)
+                            if m:
+                                v136_import_current = int(m[-1].replace(",", ""))
+                            else:
+                                m2 = re.findall(
+                                    r"imported\s+[0-9,]+\s+block\(s\).*?#([0-9,]+)",
+                                    tail,
+                                    flags=re.IGNORECASE,
+                                )
+                                if m2:
+                                    v136_import_current = int(m2[-1].replace(",", ""))
+                    except Exception:
+                        pass
+
+                    set_stage(
+                        "09. Geth v1.3.6 importing data",
+                        1 if v136_importing else 0,
+                    )
+
+                # 10) Geth v1.0.3 syncing
+                legacy_stage("Geth v1.0.3", "10. Geth v1.0.3 syncing")
             else:
+                # Legacy chain disabled: force consistent "not started" for all legacy stages.
+                set_stage("06. Geth v1.10.0 syncing", 0)
+                set_stage("07. Geth v1.9.25 importing data", 0)
                 set_stage("08. Geth v1.9.25 exporting data", 0)
-
-            # 09) Geth v1.3.6 importing data (RLP import stage)
-            v136_importing = False
-            v136_import_current = 0
-            # NOTE: the *.done marker can become stale if the v1.3.6 datadir is wiped.
-            # Treat it as DONE only if the v1.3.6 node itself is actually at/above cutoff.
-            v136_node_head = node_effective_head.get("Geth v1.3.6", 0)
-            v136_done_effective = v136_seed_done_path.exists() and v136_node_head >= cutoff_block
-
-            if v136_done_effective:
-                set_stage("09. Geth v1.3.6 importing data", 2)
-            else:
-                if v136_import_marker_path.exists():
-                    v136_importing = True
-                try:
-                    if v136_import_log_path.exists():
-                        tail = v136_import_log_path.read_text(errors="ignore")[-500000:]
-                        if "Importing blockchain" in tail or "Imported new chain segment" in tail:
-                            v136_importing = True
-                        m = re.findall(r"Imported new chain segment\s+number=([0-9,]+)", tail)
-                        if m:
-                            v136_import_current = int(m[-1].replace(",", ""))
-                        else:
-                            m2 = re.findall(r"imported\s+[0-9,]+\s+block\(s\).*?#([0-9,]+)", tail, flags=re.IGNORECASE)
-                            if m2:
-                                v136_import_current = int(m2[-1].replace(",", ""))
-                except Exception:
-                    pass
-                set_stage(
-                    "09. Geth v1.3.6 importing data",
-                    1 if v136_importing else 0,
-                )
-
-            # 10) Geth v1.0.3 syncing
-            legacy_stage("Geth v1.0.3", "10. Geth v1.0.3 syncing")
+                set_stage("09. Geth v1.3.6 importing data", 0)
+                set_stage("10. Geth v1.0.3 syncing", 0)
 
             # --- Synthetic rows for export/import phases in the Sync progress table ---
             # These are displayed as extra rows (between v1.16.7 and v1.11.6) by
@@ -763,57 +796,64 @@ class Poller:
 
             # --- Synthetic rows for legacy export/import phases (v1.9.25 -> v1.3.6) ---
 
-            emit_phase_row(
-                "Import (RLP → v1.9.25)",
-                4.40,
-                cutoff_block if v925_import_current >= cutoff_block else v925_import_current,
-                cutoff_block,
-                v925_import_running,
-                v925_import_log_path.exists() or v925_import_current > 0,
-            )
+            if legacy_enabled:
+                emit_phase_row(
+                    "Import (RLP → v1.9.25)",
+                    4.40,
+                    cutoff_block if v925_import_current >= cutoff_block else v925_import_current,
+                    cutoff_block,
+                    v925_import_running,
+                    v925_import_log_path.exists() or v925_import_current > 0,
+                )
 
-            v136_export_up = (
-                v136_export_marker_path.exists()
-                or v136_export_progress_path.exists()
-                or v136_export_file_path.exists()
-                or v136_export_done
-                or v136_export_done_path.exists()
-            )
-            v136_export_display = (
-                cutoff_block
-                if v136_export_done
-                else (v136_export_last_done if v136_export_last_done is not None else 0)
-            )
-            v136_export_running = (
-                (v136_export_last_done is not None and v136_export_last_done < cutoff_block)
-                or v136_export_marker_path.exists()
-            ) and not v136_export_done
-            emit_phase_row(
-                "Export (v1.9.25 → RLP)",
-                4.50,
-                v136_export_display,
-                cutoff_block,
-                v136_export_running,
-                v136_export_up,
-            )
+                v136_export_up = (
+                    v136_export_marker_path.exists()
+                    or v136_export_progress_path.exists()
+                    or v136_export_file_path.exists()
+                    or v136_export_done
+                    or v136_export_done_path.exists()
+                )
+                v136_export_display = (
+                    cutoff_block
+                    if v136_export_done
+                    else (v136_export_last_done if v136_export_last_done is not None else 0)
+                )
+                v136_export_running = (
+                    (v136_export_last_done is not None and v136_export_last_done < cutoff_block)
+                    or v136_export_marker_path.exists()
+                ) and not v136_export_done
+                emit_phase_row(
+                    "Export (v1.9.25 → RLP)",
+                    4.50,
+                    v136_export_display,
+                    cutoff_block,
+                    v136_export_running,
+                    v136_export_up,
+                )
 
-            # Only treat the import phase as "done" if the node is actually at/above cutoff.
-            # This prevents a stale done marker (after wiping the v1.3.6 datadir) from showing 100%.
-            v136_import_done = v136_done_effective
-            v136_import_up = (
-                v136_import_marker_path.exists()
-                or v136_import_log_path.exists()
-                or v136_import_done
-                or v136_import_current > 0
-            )
-            emit_phase_row(
-                "Import (RLP → v1.3.6)",
-                4.60,
-                cutoff_block if v136_import_done else max(v136_import_current, v136_node_head),
-                cutoff_block,
-                (v136_importing and not v136_import_done),
-                v136_import_up,
-            )
+                # Only treat the import phase as "done" if the node is actually at/above cutoff.
+                # This prevents a stale done marker (after wiping the v1.3.6 datadir) from showing 100%.
+                v136_import_done = v136_done_effective
+                v136_import_up = v136_export_started and (
+                    v136_import_marker_path.exists()
+                    or v136_import_log_path.exists()
+                    or v136_import_done
+                    or v136_import_current > 0
+                )
+                emit_phase_row(
+                    "Import (RLP → v1.3.6)",
+                    4.60,
+                    cutoff_block if v136_import_done else max(v136_import_current, v136_node_head),
+                    cutoff_block,
+                    (v136_importing and not v136_import_done),
+                    v136_import_up,
+                )
+            else:
+                # Explicitly overwrite any previously-exported legacy phase rows so Grafana doesn't
+                # show stale progress when legacy is disabled.
+                emit_phase_row("Import (RLP → v1.9.25)", 4.40, 0, cutoff_block, False, False)
+                emit_phase_row("Export (v1.9.25 → RLP)", 4.50, 0, cutoff_block, False, False)
+                emit_phase_row("Import (RLP → v1.3.6)", 4.60, 0, cutoff_block, False, False)
 
             self._stop.wait(self.interval_seconds)
 

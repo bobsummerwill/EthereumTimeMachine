@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VM-side helper: wait until the modern node (v1.16.7) has synced past a cutoff,
-# then seed v1.11.6 from it once (export/import) and start the legacy chain.
+# then seed v1.11.6 from it once (export/import).
 
 set -euo pipefail
 
@@ -78,20 +78,21 @@ done
 
 echo "[seed] cutoff reached; exporting and importing..." >> "$LOG_FILE"
 
-# Build an import-compatible RLP file by streaming raw blocks from the modern node's JSON-RPC.
-# Requires v1.16.7 to have `debug` enabled on HTTP.
-echo "[seed] streaming raw blocks via debug_getRawBlock -> $EXPORT_DIR/$EXPORT_FILE_NAME" >> "$LOG_FILE"
-env \
-  RPC_URL="http://localhost:8545" \
-  START_BLOCK="0" \
-  END_BLOCK="$CUTOFF_BLOCK" \
-  OUT_FILE="$EXPORT_DIR/$EXPORT_FILE_NAME" \
-  PROGRESS_FILE="$EXPORT_DIR/$EXPORT_FILE_NAME.progress" \
-  BATCH_SIZE="500" \
-  python3 /home/ubuntu/chain-of-geths/seed-rlp-from-rpc.py >> "$LOG_FILE" 2>&1
+# Export an import-compatible RLP file using `geth export`.
+# This is the simplest and most reliable export/import path (no debug RPC).
+echo "[seed] exporting blocks 0..$CUTOFF_BLOCK via geth export -> $EXPORT_DIR/$EXPORT_FILE_NAME" >> "$LOG_FILE"
 
-# Stop nodes that will have their datadirs read/written.
-sudo docker compose stop geth-v1-11-6 geth-v1-10-0 geth-v1-9-25 geth-v1-3-6 >> "$LOG_FILE" 2>&1 || true
+# Stop nodes that will have their datadirs read/written (DB lock).
+sudo docker compose stop geth-v1-16-7 geth-v1-11-6 >> "$LOG_FILE" 2>&1 || true
+
+# Export from v1.16.7 datadir.
+rm -f "$EXPORT_DIR/$EXPORT_FILE_NAME" "$EXPORT_DIR/$EXPORT_FILE_NAME.progress" >> "$LOG_FILE" 2>&1 || true
+sudo docker run --rm \
+  --entrypoint geth \
+  -v "$ROOT_DIR/generated-files/data/v1.16.7:/data" \
+  -v "$EXPORT_DIR:/exports" \
+  ethereum/client-go:v1.16.7 \
+  --datadir /data export "/exports/$EXPORT_FILE_NAME" 0 "$CUTOFF_BLOCK" >> "$LOG_FILE" 2>&1
 
 sudo docker run --rm \
   --entrypoint geth \
@@ -104,9 +105,8 @@ sudo docker run --rm \
   --txlookuplimit 0 \
   import "/exports/$EXPORT_FILE_NAME" >> "$LOG_FILE" 2>&1
 
-# Bring everything back up.
-# Pass cutoff through so downstream offline-seeding steps (e.g. v1.9.25 -> v1.3.6) use the same range.
-CUTOFF_BLOCK="$CUTOFF_BLOCK" bash /home/ubuntu/chain-of-geths/start-legacy-staged.sh >> "$LOG_FILE" 2>&1
+# Bring core services back up.
+sudo docker compose up -d geth-v1-16-7 geth-v1-11-6 >> "$LOG_FILE" 2>&1 || true
 
 touch "$FLAG_FILE"
 echo "[seed] done; wrote $FLAG_FILE" >> "$LOG_FILE"

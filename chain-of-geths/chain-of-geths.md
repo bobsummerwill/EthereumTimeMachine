@@ -108,12 +108,12 @@ The bridge workflow seeds older datadirs up to a fixed historical cutoff using *
 
 1. Let `geth-v1-16-7` + `lighthouse-v8-0-1` sync normally.
 2. Export blocks `0..CUTOFF_BLOCK` from the modern node.
-3. Import that block range into `geth-v1-11-6` (and then bring up the rest of the legacy chain).
+3. Import that block range into `geth-v1-11-6`.
 
 Automation:
 - Bridge seeding orchestration: [`chain-of-geths/seed-v1.11.6-when-ready.sh`](chain-of-geths/seed-v1.11.6-when-ready.sh)
 - One-shot helper for fixed cutoff: [`chain-of-geths/seed-cutoff.sh`](chain-of-geths/seed-cutoff.sh)
-- Export helper (RPC-based): [`chain-of-geths/seed-rlp-from-rpc.py`](chain-of-geths/seed-rlp-from-rpc.py)
+
 
 This avoids the “old chainstate format” / “no compatible consensus client” problem: the modern EL+CL stays authoritative for head sync, while the legacy nodes consume only the historical block range we seeded.
 
@@ -173,4 +173,4 @@ This script:
 3. Copies artifacts + compose stack to the VM
 4. Starts the head node + monitoring
 5. Seeds the bridge via export/import (once)
-6. Starts the rest of the chain
+6. Starts the legacy runner (brings up the rest of the chain)
