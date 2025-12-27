@@ -90,6 +90,9 @@ ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
   "RESET_LIGHTHOUSE_VOLUMES=$RESET_LIGHTHOUSE_VOLUMES BRIDGE_SEED_CUTOFF_BLOCK=$BRIDGE_SEED_CUTOFF_BLOCK bash -s" << 'EOF'
 cd /home/ubuntu/chain-of-geths
 
+# Fail fast on VM-side setup issues. Without this, compose failures can be masked by later steps.
+set -euo pipefail
+
 # Remote deployment behavior tweaks:
 # - Hide the offline-seeded bridge node row from progress tables (it is represented by the Import phase row).
 # - Keep the bridge node non-discovering and with no outbound peers (see generate-keys.sh config.toml).
@@ -128,10 +131,22 @@ if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev
     sudo apt-get install -y docker-compose
 fi
 
+# Decide which compose implementation works *under sudo*.
+# Some VMs may have `docker compose` available for the login user but not for sudo.
+COMPOSE=()
+if sudo docker compose version >/dev/null 2>&1; then
+  COMPOSE=(sudo docker compose)
+elif sudo docker-compose version >/dev/null 2>&1; then
+  COMPOSE=(sudo docker-compose)
+else
+  echo "ERROR: Docker Compose not available under sudo (tried: 'sudo docker compose', 'sudo docker-compose')." >&2
+  exit 1
+fi
+
 # Stop and remove any prior compose stack containers before re-deploying.
 # (We intentionally wipe Grafana's volume so dashboards/users don't get stuck in a bad state.)
 echo "Stopping any prior docker compose stack..."
-sudo docker compose down --remove-orphans 2>/dev/null || sudo docker-compose down --remove-orphans || true
+"${COMPOSE[@]}" down --remove-orphans || true
 
 # Avoid duplicated background processes across repeated deploys.
 # Old `nohup` runners keep writing to the same log file even after we redeploy (they hold an open fd),
@@ -162,12 +177,10 @@ done
 echo "Starting base services (top node + monitoring)..."
 # NOTE: geth-exporter and sync-ui are built from local source (docker-compose `build:` sections),
 # so ensure we rebuild them on each deploy.
-# IMPORTANT: docker compose interpolates environment variables (e.g. HIDE_PROGRESS_NODES_REGEX) when
+# IMPORTANT: compose interpolates environment variables (e.g. HIDE_PROGRESS_NODES_REGEX) when
 # parsing docker-compose.yml. Since we run compose via sudo, explicitly preserve/pass the variable.
 sudo env HIDE_PROGRESS_NODES_REGEX="$HIDE_PROGRESS_NODES_REGEX" \
-  docker compose up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui 2>/dev/null || \
-  sudo env HIDE_PROGRESS_NODES_REGEX="$HIDE_PROGRESS_NODES_REGEX" \
-    docker-compose up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui
+  "${COMPOSE[@]}" up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui
 
 # Optional: post-deploy healthcheck.
 #
@@ -242,7 +255,7 @@ if [ "$POST_DEPLOY_HEALTHCHECK" = "1" ]; then
 fi
 
 # Create the bridge container but do not start it yet.
-sudo docker compose create geth-v1-11-6 2>/dev/null || sudo docker-compose create geth-v1-11-6 || true
+"${COMPOSE[@]}" create geth-v1-11-6 || true
 
 SEED_FLAG="/home/ubuntu/chain-of-geths/generated-files/seed-v1.11.6-${BRIDGE_SEED_CUTOFF_BLOCK}.done"
 if [ -f "$SEED_FLAG" ]; then
@@ -259,7 +272,7 @@ else
     >/home/ubuntu/chain-of-geths/generated-files/start-legacy-staged.nohup.log 2>&1 &
 fi
 
-echo "Chain started. Check logs with: docker-compose logs -f"
+echo "Chain started. Check logs with: sudo docker compose logs -f"
 EOF
 
 echo "Deployment complete."

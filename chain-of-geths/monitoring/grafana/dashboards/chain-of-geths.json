@@ -647,46 +647,46 @@
          "cellHeight": "sm"
        },
        "targets": [
-         {
-           "editorMode": "code",
-            "expr": "geth_node_sort_key",
-           "format": "table",
-           "instant": true,
-           "legendFormat": "sort",
-           "refId": "A"
-         },
-         {
-           "editorMode": "code",
-            "expr": "geth_effective_head_block",
-           "format": "table",
-           "instant": true,
-           "legendFormat": "Block",
-           "refId": "B"
-         },
-         {
-           "editorMode": "code",
-            "expr": "geth_sync_target_block",
-           "format": "table",
-           "instant": true,
-           "legendFormat": "Head",
-           "refId": "C"
-         },
-         {
-           "editorMode": "code",
-            "expr": "geth_sync_percent",
-           "format": "table",
-           "instant": true,
-           "legendFormat": "Percentage",
-           "refId": "D"
-         },
-         {
-           "editorMode": "code",
-           "expr": "2 * ((geth_sync_target_block > bool 0) * on(node) (geth_effective_head_block >= bool on(node) geth_sync_target_block)) + ((geth_sync_target_block > bool 0) * on(node) (geth_effective_head_block > bool 0) * on(node) (geth_effective_head_block < bool on(node) geth_sync_target_block))",
-           "format": "table",
-           "instant": true,
-           "legendFormat": "Status",
-           "refId": "E"
-         }
+          {
+            "editorMode": "code",
+             "expr": "geth_node_sort_key{node!=\"Geth v1.11.6\"}",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "sort",
+            "refId": "A"
+          },
+          {
+            "editorMode": "code",
+             "expr": "geth_effective_head_block{node!=\"Geth v1.11.6\"}",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "Block",
+            "refId": "B"
+          },
+          {
+            "editorMode": "code",
+             "expr": "geth_sync_target_block{node!=\"Geth v1.11.6\"}",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "Head",
+            "refId": "C"
+          },
+          {
+            "editorMode": "code",
+             "expr": "geth_sync_percent{node!=\"Geth v1.11.6\"}",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "Percentage",
+            "refId": "D"
+          },
+          {
+            "editorMode": "code",
+            "expr": "2 * ((geth_sync_target_block{node!=\"Geth v1.11.6\"} > bool 0) * on(node) (geth_effective_head_block{node!=\"Geth v1.11.6\"} >= bool on(node) geth_sync_target_block{node!=\"Geth v1.11.6\"})) + ((geth_sync_target_block{node!=\"Geth v1.11.6\"} > bool 0) * on(node) (geth_effective_head_block{node!=\"Geth v1.11.6\"} > bool 0) * on(node) (geth_effective_head_block{node!=\"Geth v1.11.6\"} < bool on(node) geth_sync_target_block{node!=\"Geth v1.11.6\"}))",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "Status",
+            "refId": "E"
+          }
         ],
         "title": "Stage progress",
         "transformations": [

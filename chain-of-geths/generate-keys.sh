@@ -215,15 +215,26 @@ echo "Created config.toml for v1.11.6 with discovery disabled and no outbound pe
 for version in v1.10.8 v1.9.25 v1.3.6 v1.3.3; do
     datadir="$DATA_ROOT/$version"
 
+    # Starting around the 1.4+ era, Geth expects peer config under <datadir>/geth/.
+    # Some versions still accept <datadir>/static-nodes.json, but others (notably v1.9.x) can ignore it.
+    # To be robust across versions, we write static-nodes.json to BOTH locations when the geth/ subdir is expected.
+    ensure_geth_static_nodes() {
+        local src="$1"
+        mkdir -p "$datadir/geth"
+        cp -f "$src" "$datadir/geth/static-nodes.json"
+    }
+
     case $version in
         v1.10.8)
             next="v1.11.6"
             printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
+            ensure_geth_static_nodes "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;
         v1.9.25)
             next="v1.10.8"
             printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
+            ensure_geth_static_nodes "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;
         v1.3.3)

@@ -141,10 +141,12 @@ services:
     container_name: geth-v1-3-6
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    # v1.3.x uses `--fast` (bool) to enable fast sync; explicitly disable to force full sync.
     command: |
       --datadir /data
       --nodekey /data/nodekey
       --cache 4096
+      --fast=false
       --rpc
       --rpcaddr 0.0.0.0
       --rpcapi eth,net,web3
