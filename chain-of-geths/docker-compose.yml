@@ -204,6 +204,7 @@ services:
       # First node is treated as the “top” reference for lag metrics.
       NODE_URLS: >-
         Geth v1.16.7=http://geth-v1-16-7:8545,
+        Geth v1.11.6=http://geth-v1-11-6:8545,
         Geth v1.10.8=http://geth-v1-10-8:8545,
         Geth v1.9.25=http://geth-v1-9-25:8545,
         Geth v1.3.3=http://geth-v1-3-3:8545
