@@ -274,7 +274,7 @@
        "targets": [
          {
            "editorMode": "code",
-              "expr": "clamp_min(geth_sync_target_block - geth_effective_head_block, 0) and on(node) (geth_up == 1)",
+               "expr": "(clamp_min(geth_sync_target_block - geth_effective_head_block, 0) and on(node) (geth_up == 1)) unless on(node) (geth_effective_head_block{node=\"Geth v1.16.7\"} == 0)",
             "legendFormat": "{{node}}",
             "range": true,
             "refId": "A"
@@ -787,6 +787,6 @@
   "timezone": "browser",
   "title": "Ethereum Time Machine – Sync Progress",
   "uid": "chain-of-geths-sync",
-  "version": 16,
+  "version": 17,
   "weekStart": ""
 }
