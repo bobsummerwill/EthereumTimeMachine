@@ -30,423 +30,6 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "inspect": false
-          },
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "text": "TODO"
-                },
-                "1": {
-                  "text": "IN PROGRESS"
-                },
-                "2": {
-                  "text": "DONE"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "green",
-                "value": 2
-              }
-            ]
-          },
-          "unit": "none",
-          "min": 0,
-          "max": 2
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Status"
-            },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          },
-           {
-             "matcher": {
-               "id": "byName",
-               "options": "01. Lighthouse syncing from snapshot"
-             },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "1. Lighthouse v8.0.1 syncing from snapshot — TODO"
-                      },
-                      "1": {
-                        "text": "1. Lighthouse v8.0.1 syncing from snapshot — IN PROGRESS"
-                      },
-                      "2": {
-                        "text": "1. Lighthouse v8.0.1 syncing from snapshot — DONE"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-           {
-             "matcher": {
-               "id": "byName",
-               "options": "02. Lighthouse indexing/backfill"
-             },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "2. Lighthouse v8.0.1 indexing/backfill — TODO"
-                      },
-                      "1": {
-                        "text": "2. Lighthouse v8.0.1 indexing/backfill — IN PROGRESS"
-                      },
-                      "2": {
-                        "text": "2. Lighthouse v8.0.1 indexing/backfill — DONE"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-           {
-             "matcher": {
-               "id": "byName",
-               "options": "03. Geth v1.16.7 syncing"
-             },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "3. Geth v1.16.7 syncing — TODO"
-                      },
-                      "1": {
-                        "text": "3. Geth v1.16.7 syncing — IN PROGRESS"
-                      },
-                      "2": {
-                        "text": "3. Geth v1.16.7 syncing — DONE"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-           {
-             "matcher": {
-               "id": "byName",
-               "options": "04. Geth v1.16.7 exporting data"
-             },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "4. Geth v1.16.7 exporting data — TODO"
-                      },
-                      "1": {
-                        "text": "4. Geth v1.16.7 exporting data — IN PROGRESS"
-                      },
-                      "2": {
-                        "text": "4. Geth v1.16.7 exporting data — DONE"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-           {
-             "matcher": {
-               "id": "byName",
-               "options": "05. Geth v1.11.6 importing data"
-             },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "5. Geth v1.11.6 importing data — TODO"
-                      },
-                      "1": {
-                        "text": "5. Geth v1.11.6 importing data — IN PROGRESS"
-                      },
-                      "2": {
-                        "text": "5. Geth v1.11.6 importing data — DONE"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-           {
-             "matcher": {
-               "id": "byName",
-               "options": "06. Geth v1.10.8 syncing"
-             },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "6. Geth v1.10.8 syncing — TODO"
-                      },
-                      "1": {
-                        "text": "6. Geth v1.10.8 syncing — IN PROGRESS"
-                      },
-                      "2": {
-                        "text": "6. Geth v1.10.8 syncing — DONE"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-           {
-             "matcher": {
-               "id": "byName",
-               "options": "07. Geth v1.9.25 syncing"
-             },
-             "properties": [
-               {
-                 "id": "mappings",
-                 "value": [
-                   {
-                     "type": "value",
-                     "options": {
-                       "0": {
-                         "text": "7. Geth v1.9.25 syncing — TODO"
-                       },
-                       "1": {
-                         "text": "7. Geth v1.9.25 syncing — IN PROGRESS"
-                       },
-                       "2": {
-                         "text": "7. Geth v1.9.25 syncing — DONE"
-                       }
-                     }
-                   }
-                 ]
-               }
-             ]
-           },
-           {
-             "matcher": {
-               "id": "byName",
-                 "options": "08. Geth v1.3.3 syncing"
-             },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                         "text": "8. Geth v1.3.3 syncing — TODO"
-                      },
-                      "1": {
-                         "text": "8. Geth v1.3.3 syncing — IN PROGRESS"
-                      },
-                      "2": {
-                         "text": "8. Geth v1.3.3 syncing — DONE"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-           {
-             "matcher": {
-               "id": "byName",
-                "options": "09. Geth v1.9.25 exporting data"
-             },
-             "properties": [
-               {
-                 "id": "mappings",
-                 "value": [
-                   {
-                     "type": "value",
-                     "options": {
-                       "0": {
-                          "text": "9. Geth v1.9.25 exporting data — TODO"
-                       },
-                       "1": {
-                          "text": "9. Geth v1.9.25 exporting data — IN PROGRESS"
-                       },
-                       "2": {
-                          "text": "9. Geth v1.9.25 exporting data — DONE"
-                       }
-                     }
-                   }
-                 ]
-               }
-             ]
-           },
-           {
-             "matcher": {
-               "id": "byName",
-                "options": "10. Geth v1.3.6 importing data"
-             },
-             "properties": [
-               {
-                 "id": "mappings",
-                 "value": [
-                   {
-                     "type": "value",
-                     "options": {
-                       "0": {
-                          "text": "10. Geth v1.3.6 importing data — TODO"
-                       },
-                       "1": {
-                          "text": "10. Geth v1.3.6 importing data — IN PROGRESS"
-                       },
-                       "2": {
-                          "text": "10. Geth v1.3.6 importing data — DONE"
-                        }
-                      }
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "matcher": {
-                "id": "byName",
-               "options": "11. Geth v1.0.3 syncing"
-              },
-              "properties": [
-                {
-                  "id": "mappings",
-                  "value": [
-                    {
-                      "type": "value",
-                      "options": {
-                        "0": {
-                         "text": "11. Geth v1.0.3 syncing — TODO"
-                        },
-                        "1": {
-                         "text": "11. Geth v1.0.3 syncing — IN PROGRESS"
-                        },
-                        "2": {
-                         "text": "11. Geth v1.0.3 syncing — DONE"
-                        }
-                      }
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-      },
-      "gridPos": {
-        "h": 13,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 9,
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
-      },
-      "transformations": [
-        {
-          "id": "sortBy",
-          "options": {
-            "sort": [
-              {
-                "field": "stage",
-                "desc": false
-              }
-            ]
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "instance": true,
-              "job": true
-            },
-            "renameByName": {
-              "stage": "Stage",
-              "Value": "Status"
-            }
-          }
-        }
-      ],
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "chain_stage_status",
-          "format": "table",
-          "instant": true,
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Stage checklist",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "Prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
             "mode": "palette-classic"
           },
           "custom": {
@@ -502,7 +85,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 13
+        "y": 22
       },
       "id": 1,
       "options": {
@@ -600,7 +183,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 13
+        "y": 22
       },
       "id": 8,
       "options": {
@@ -674,7 +257,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 35
+        "y": 13
       },
       "id": 3,
       "options": {
@@ -747,7 +330,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 35
+        "y": 13
       },
       "id": 4,
       "options": {
@@ -820,7 +403,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 44
+        "y": 31
       },
       "id": 5,
       "options": {
@@ -904,7 +487,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 44
+        "y": 31
       },
       "id": 6,
       "options": {
@@ -989,6 +572,59 @@
                 "value": 1
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "TODO"
+                      },
+                      "1": {
+                        "text": "IN PROGRESS"
+                      },
+                      "2": {
+                        "text": "DONE"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1
+                    },
+                    {
+                      "color": "green",
+                      "value": 2
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
           }
         ]
       },
@@ -996,7 +632,7 @@
          "h": 13,
          "w": 24,
          "x": 0,
-         "y": 22
+         "y": 0
        },
       "id": 7,
        "options": {
@@ -1004,41 +640,49 @@
          "cellHeight": "sm"
        },
        "targets": [
-        {
-          "editorMode": "code",
-           "expr": "geth_node_sort_key",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "sort",
-          "refId": "A"
-        },
-        {
-          "editorMode": "code",
-           "expr": "geth_effective_head_block",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "Block",
-          "refId": "B"
-        },
-        {
-          "editorMode": "code",
-           "expr": "geth_sync_target_block",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "Head",
-          "refId": "C"
-        },
-        {
-          "editorMode": "code",
-           "expr": "geth_sync_percent",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "Percentage",
-          "refId": "D"
-        }
-       ],
-       "title": "Sync progress",
-       "transformations": [
+         {
+           "editorMode": "code",
+            "expr": "geth_node_sort_key",
+           "format": "table",
+           "instant": true,
+           "legendFormat": "sort",
+           "refId": "A"
+         },
+         {
+           "editorMode": "code",
+            "expr": "geth_effective_head_block",
+           "format": "table",
+           "instant": true,
+           "legendFormat": "Block",
+           "refId": "B"
+         },
+         {
+           "editorMode": "code",
+            "expr": "geth_sync_target_block",
+           "format": "table",
+           "instant": true,
+           "legendFormat": "Head",
+           "refId": "C"
+         },
+         {
+           "editorMode": "code",
+            "expr": "geth_sync_percent",
+           "format": "table",
+           "instant": true,
+           "legendFormat": "Percentage",
+           "refId": "D"
+         },
+         {
+           "editorMode": "code",
+           "expr": "2 * ((geth_sync_target_block > bool 0) * on(node) (geth_effective_head_block >= bool on(node) geth_sync_target_block)) + ((geth_sync_target_block > bool 0) * on(node) (geth_effective_head_block > bool 0) * on(node) (geth_effective_head_block < bool on(node) geth_sync_target_block))",
+           "format": "table",
+           "instant": true,
+           "legendFormat": "Status",
+           "refId": "E"
+         }
+        ],
+        "title": "Stage progress",
+        "transformations": [
          {
            "id": "joinByField",
            "options": {
@@ -1073,8 +717,8 @@
              "indexByName": {
                "node": 0
              },
-            "renameByName": {
-              "node": "Version",
+             "renameByName": {
+               "node": "Stage",
 
               "Value": "_sort",
               "Value 1": "Current",
@@ -1083,15 +727,16 @@
               "Value #A": "_sort",
               "Value #B": "Current",
               "Value #C": "Target",
-              "Value #D": "%",
+               "Value #D": "%",
+               "Value #E": "Status",
 
               "geth_node_sort_key": "_sort",
               "geth_effective_head_block": "Current",
               "geth_sync_target_block": "Target",
-              "geth_sync_percent": "%"
-            }
-          }
-        },
+               "geth_sync_percent": "%"
+             }
+           }
+         },
          {
            "id": "sortBy",
            "options": {
@@ -1104,15 +749,22 @@
              ]
            }
          },
-         {
-           "id": "organize",
-           "options": {
-             "excludeByName": {
-               "_sort": true
-             }
-           }
-         }
-      ],
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "_sort": true
+              },
+              "indexByName": {
+                "Stage": 0,
+                "Status": 1,
+                "Current": 2,
+                "Target": 3,
+                "%": 4
+              }
+            }
+          }
+       ],
       "type": "table"
     }
   ],
@@ -1135,6 +787,6 @@
   "timezone": "browser",
   "title": "Ethereum Time Machine – Sync Progress",
   "uid": "chain-of-geths-sync",
-  "version": 10,
+  "version": 16,
   "weekStart": ""
 }

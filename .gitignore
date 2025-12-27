@@ -1,4 +1,6 @@
 # Generated artifacts
+# Ignore the entire generated-files tree (keys, exports, data dirs, tarballs, logs).
+chain-of-geths/generated-files/
 chain-of-geths/generated-files/**
 
 # Compiled python output

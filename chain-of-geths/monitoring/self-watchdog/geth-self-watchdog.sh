@@ -153,10 +153,25 @@ GETH_PID=$!
 
 echo "[self-watchdog] geth pid=$GETH_PID"
 
+# Ensure Docker stop/restart works reliably.
+#
+# Without an explicit trap, PID 1 (this shell) may not forward SIGTERM/SIGINT cleanly
+# to the backgrounded geth process, which can cause `docker stop` to hang.
+shutdown() {
+  echo "[self-watchdog] received termination signal; stopping geth pid=$GETH_PID"
+  if [ -n "$GETH_PID" ]; then
+    kill "$GETH_PID" 2>/dev/null || true
+    # Give geth time to flush and exit cleanly.
+    wait "$GETH_PID" 2>/dev/null || true
+  fi
+  exit 0
+}
+trap shutdown INT TERM
+
 last_cur=""
 
  # Give geth a brief moment to bring up IPC/HTTP before first sample.
-sleep 10
+ sleep 10
 
 while true; do
 

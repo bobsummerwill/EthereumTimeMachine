@@ -112,10 +112,21 @@ EOF
 			;;
 		v1.3.3)
 			cat >> "$out_file" << 'EOF'
-RUN wget -O /tmp/geth.tar.bz2 https://github.com/ethereum/go-ethereum/releases/download/v1.3.3/geth-Linux64-20160105143200-1.3.3-c541b38.tar.bz2 && \
-	    tar -xjf /tmp/geth.tar.bz2 -C /tmp && \
-	    mv /tmp/geth /usr/local/bin/geth && \
-	    rm -rf /tmp/*
+RUN wget -O /tmp/geth.tar https://github.com/ethereum/go-ethereum/releases/download/v1.3.3/geth-Linux64-20160105143200-1.3.3-c541b38.tar.bz2 && \
+	# GitHub release assets for very old tags can sometimes be served with an unexpected
+	# content-encoding (or the file may not actually be bzip2-compressed). Detect and extract
+	# using a small set of fallbacks instead of hardcoding `tar -xjf`.
+	if bzip2 -t /tmp/geth.tar >/dev/null 2>&1; then \
+	    tar -xjf /tmp/geth.tar -C /tmp; \
+	elif tar -xzf /tmp/geth.tar -C /tmp >/dev/null 2>&1; then \
+	    true; \
+	else \
+	    tar -xf /tmp/geth.tar -C /tmp; \
+	fi && \
+	GETH_BIN=$(find /tmp -maxdepth 2 -type f -name geth | head -n 1) && \
+	test -n "$GETH_BIN" && \
+	mv "$GETH_BIN" /usr/local/bin/geth && \
+	rm -rf /tmp/*
 EOF
 			;;
 	esac

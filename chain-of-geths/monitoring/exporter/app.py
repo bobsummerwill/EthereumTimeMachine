@@ -9,8 +9,6 @@ import requests
 from flask import Flask, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
 from pathlib import Path
-
-
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name, "")
     if not raw:
@@ -248,6 +246,13 @@ class Poller:
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="poller", daemon=True)
 
+        # Last-seen values per node so dashboards can remain informative during brief outages
+        # (e.g. while the seeder intentionally stops the top node for export).
+        #
+        # We always set `geth_up=0` when down, but we keep the last-known progress numbers
+        # instead of hard-resetting to 0/0 (which looks like data loss).
+        self._last_seen: Dict[str, Dict[str, float]] = {}
+
         # Lighthouse backfill activity tracking.
         self._lh_backfill_last_total: float | None = None
         self._lh_backfill_last_inc_ts: float | None = None
@@ -442,6 +447,16 @@ class Poller:
                         g_sync_target.labels(node=name).set(target)
                         g_sync_percent.labels(node=name).set(pct)
                         g_sync_progress_info.labels(node=name, progress=progress).set(1)
+
+                        self._last_seen[name] = {
+                            "block": float(block_num),
+                            "peers": float(peer_count),
+                            "sync_current": 0.0,
+                            "sync_highest": 0.0,
+                            "effective": float(block_num),
+                            "target": float(target),
+                            "percent": float(pct),
+                        }
                     else:
                         # Some clients return a dict with hex values.
                         cur = hex_to_int(syncing.get("currentBlock"))
@@ -465,21 +480,59 @@ class Poller:
                         g_sync_percent.labels(node=name).set(pct)
                         g_sync_progress_info.labels(node=name, progress=progress).set(1)
 
+                        self._last_seen[name] = {
+                            "block": float(block_num),
+                            "peers": float(peer_count),
+                            "sync_current": float(cur),
+                            "sync_highest": float(hi),
+                            "effective": float(eff),
+                            "target": float(target),
+                            "percent": float(pct),
+                        }
+
                 except Exception:
-                    # Mark node as down, keep last-seen metrics for block/peers.
+                    # Mark node as down.
+                    # IMPORTANT: keep last-seen metrics (if any) so dashboards remain stable while
+                    # nodes are intentionally cycled (e.g. seeding export/import).
                     g_up.labels(node=name).set(0)
                     node_up[name] = False
                     node_syncing[name] = False
                     node_effective_head[name] = 0
                     peers[name] = 0
-                    g_syncing.labels(node=name).set(0)
-                    g_sync_current.labels(node=name).set(0)
-                    g_sync_highest.labels(node=name).set(0)
-                    g_sync_remaining.labels(node=name).set(0)
-                    g_effective_head.labels(node=name).set(0)
-                    g_sync_progress_info.labels(node=name, progress="down").set(0)
-                    g_sync_target.labels(node=name).set(0)
-                    g_sync_percent.labels(node=name).set(0)
+
+                    cached = self._last_seen.get(name)
+                    if cached:
+                        block_num = int(cached.get("block") or 0)
+                        peer_count = int(cached.get("peers") or 0)
+                        cur = int(cached.get("sync_current") or 0)
+                        hi = int(cached.get("sync_highest") or 0)
+                        eff = int(cached.get("effective") or 0)
+                        target = int(cached.get("target") or 0)
+                        pct = float(cached.get("percent") or 0.0)
+
+                        g_block.labels(node=name).set(block_num)
+                        g_peers.labels(node=name).set(peer_count)
+                        # Node is down: report syncing=0, but keep last-known numeric progress.
+                        g_syncing.labels(node=name).set(0)
+                        g_sync_current.labels(node=name).set(cur)
+                        g_sync_highest.labels(node=name).set(hi)
+                        g_effective_head.labels(node=name).set(eff)
+                        g_sync_target.labels(node=name).set(target)
+                        g_sync_remaining.labels(node=name).set(max(0, target - eff))
+                        g_sync_percent.labels(node=name).set(pct)
+                        progress = f"{eff}/{target} ({pct:.1f}%) (cached)" if target > 0 else "down"
+                        g_sync_progress_info.labels(node=name, progress=progress).set(1)
+                    else:
+                        g_block.labels(node=name).set(0)
+                        g_peers.labels(node=name).set(0)
+                        g_syncing.labels(node=name).set(0)
+                        g_sync_current.labels(node=name).set(0)
+                        g_sync_highest.labels(node=name).set(0)
+                        g_sync_remaining.labels(node=name).set(0)
+                        g_effective_head.labels(node=name).set(0)
+                        g_sync_target.labels(node=name).set(0)
+                        g_sync_percent.labels(node=name).set(0)
+                        g_sync_progress_info.labels(node=name, progress="down").set(1)
 
             # Lag metrics: compute after all blocks are fetched.
             if top_name in blocks:
@@ -496,56 +549,44 @@ class Poller:
             def set_stage(stage: str, status: int) -> None:
                 g_stage_status.labels(stage=stage).set(status)
 
-            # 01) Lighthouse syncing from snapshot (checkpoint sync + head catchup)
-            # Only show this stage once the Lighthouse API is reachable.
+            # 1) Lighthouse sync/backfill readiness (combined)
+            # Criteria for DONE matches the prior "indexing/backfill" stage:
+            # once backfill is no longer active (or, if we cannot observe backfill directly,
+            # once sync_distance/is_syncing indicate completion).
             if not lighthouse_up:
-                set_stage("01. Lighthouse syncing from snapshot", 0)
+                set_stage("1. Lighthouse sync/backfill", 0)
             else:
-                if lighthouse_is_syncing or lighthouse_sync_distance > 0:
-                    set_stage("01. Lighthouse syncing from snapshot", 1)
-                else:
-                    set_stage("01. Lighthouse syncing from snapshot", 2)
-
-            # 02) Lighthouse indexing/backfill (best-effort based on backfill worker gauge)
-            if not lighthouse_up:
-                set_stage("02. Lighthouse indexing/backfill", 0)
-            else:
-                # More accurate detection combines:
-                #  - active worker gauge (if available)
-                #  - recent progress on the backfill success counter
-                # If neither signal is observable, we fall back to “done once sync_distance is 0”.
                 now_ts = time.time()
                 backfill_recent = (
                     self._lh_backfill_last_inc_ts is not None
                     and (now_ts - self._lh_backfill_last_inc_ts) <= backfill_activity_window_seconds
                 )
-
                 if lighthouse_backfill_workers is not None:
                     active = lighthouse_backfill_workers > 0
                     set_stage(
-                        "02. Lighthouse indexing/backfill",
+                        "1. Lighthouse sync/backfill",
                         1 if (active or backfill_recent) else 2,
                     )
                 else:
                     set_stage(
-                        "02. Lighthouse indexing/backfill",
+                        "1. Lighthouse sync/backfill",
                         1 if (lighthouse_is_syncing or lighthouse_sync_distance > 0) else 2,
                     )
 
-            # 03) Geth v1.16.7 syncing
+            # 2) Geth v1.16.7 syncing
             if not node_up.get(top_name, False):
-                set_stage("03. Geth v1.16.7 syncing", 0)
+                set_stage("2. Geth v1.16.7 syncing", 0)
             else:
                 # Consider v1.16.7 "in progress" as soon as it's reachable and reports syncing.
                 # Even while eth_blockNumber is still 0, eth_syncing can be active.
-                set_stage("03. Geth v1.16.7 syncing", 1 if node_syncing.get(top_name, False) else 2)
+                set_stage("2. Geth v1.16.7 syncing", 1 if node_syncing.get(top_name, False) else 2)
 
-            # 04) Geth v1.16.7 exporting data (seed RLP export)
+            # 3) Geth v1.16.7 exporting data (seed RLP export)
             # Prefer explicit marker/done files (written by seed-v1.11.6-when-ready.sh).
             if export_done_path.exists():
-                set_stage("04. Geth v1.16.7 exporting data", 2)
+                set_stage("3. Geth v1.16.7 exporting data", 2)
             elif export_marker_path.exists():
-                set_stage("04. Geth v1.16.7 exporting data", 1)
+                set_stage("3. Geth v1.16.7 exporting data", 1)
             else:
                 # Backwards-compatible fallback for any older runs that used a .progress file.
                 export_last_done = None
@@ -557,16 +598,16 @@ class Poller:
                         except Exception:
                             export_last_done = None
                 if export_last_done is None:
-                    set_stage("04. Geth v1.16.7 exporting data", 0)
+                    set_stage("3. Geth v1.16.7 exporting data", 0)
                 else:
                     set_stage(
-                        "04. Geth v1.16.7 exporting data",
+                        "3. Geth v1.16.7 exporting data",
                         2 if export_last_done >= cutoff_block else 1,
                     )
 
-            # 05) Geth v1.11.6 importing data
+            # 4) Geth v1.11.6 importing data
             if seed_done_path.exists():
-                set_stage("05. Geth v1.11.6 importing data", 2)
+                set_stage("4. Geth v1.11.6 importing data", 2)
             else:
                 importing = False
                 import_current = 0
@@ -592,11 +633,11 @@ class Poller:
                 except Exception:
                     importing = False
                 set_stage(
-                    "05. Geth v1.11.6 importing data",
+                    "4. Geth v1.11.6 importing data",
                     1 if (import_marker_path.exists() or importing) else 0,
                 )
 
-            # 06-08) Legacy bridge nodes syncing to the cutoff (normal P2P sync via static peering).
+            # 5-7) Legacy bridge nodes syncing to the cutoff (normal P2P sync via static peering).
             def cutoff_sync_stage(node: str, stage_label: str) -> None:
                 if not node_up.get(node, False):
                     set_stage(stage_label, 0)
@@ -609,9 +650,9 @@ class Poller:
                 else:
                     set_stage(stage_label, 0)
 
-            cutoff_sync_stage("Geth v1.10.8", "06. Geth v1.10.8 syncing")
-            cutoff_sync_stage("Geth v1.9.25", "07. Geth v1.9.25 syncing")
-            cutoff_sync_stage("Geth v1.3.3", "08. Geth v1.3.3 syncing")
+            cutoff_sync_stage("Geth v1.10.8", "5. Geth v1.10.8 syncing")
+            cutoff_sync_stage("Geth v1.9.25", "6. Geth v1.9.25 syncing")
+            cutoff_sync_stage("Geth v1.3.3", "7. Geth v1.3.3 syncing")
 
             # --- Synthetic rows for export/import phases in the Sync progress table ---
             # These are displayed as extra rows (between v1.16.7 and v1.11.6) by

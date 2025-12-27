@@ -17,6 +17,14 @@ FLAG_FILE="$ROOT_DIR/generated-files/seed-v1.11.6-${CUTOFF_BLOCK}.done"
 LOCK_FILE="$ROOT_DIR/generated-files/seed-v1.11.6.lock"
 LOG_FILE="$ROOT_DIR/generated-files/seed-v1.11.6.log"
 
+# Docker image `ethereum/client-go` may run as a non-root user.
+# During export/import, geth may need to write small bits of metadata / perform minor repairs.
+# If the container user cannot write to the bind-mounted datadir, go-ethereum can surface this
+# as `pebble: read-only` and abort the export.
+#
+# Force the export/import helper containers to run as root unless overridden.
+DOCKER_RUN_USER="${DOCKER_RUN_USER:-0:0}"
+
 # Marker/done files used by monitoring (Grafana stage checklist + phase rows).
 EXPORT_MARKER_FILE="$EXPORT_DIR/$EXPORT_FILE_NAME.exporting"
 EXPORT_DONE_FILE="$ROOT_DIR/generated-files/seed-v1.16.7-export-${CUTOFF_BLOCK}.done"
@@ -33,12 +41,11 @@ compose_has_v2() {
 }
 
 compose_stop() {
+  # Prefer `docker stop` over `docker compose stop` here.
+  # We use explicit `container_name:` for the geth services, so container names are stable,
+  # and `docker stop` avoids occasional `docker compose stop` hangs on some hosts.
   # shellcheck disable=SC2068
-  if compose_has_v2; then
-    sudo docker compose stop --timeout 120 $@ >>"$LOG_FILE" 2>&1 || true
-  else
-    sudo docker-compose stop -t 120 $@ >>"$LOG_FILE" 2>&1 || true
-  fi
+  sudo docker stop -t 120 $@ >>"$LOG_FILE" 2>&1 || true
 }
 
 compose_up() {
@@ -48,6 +55,40 @@ compose_up() {
   else
     sudo docker-compose up -d $@ >>"$LOG_FILE" 2>&1 || true
   fi
+}
+
+wait_for_lock_release() {
+  # After stopping a geth container, the DB lock may linger briefly.
+  # If `geth export` starts while the LOCK is still held, go-ethereum can open the
+  # DB read-only and later fail when it tries to write repair metadata.
+  local lock_path="$1"
+  local timeout_seconds="${2:-60}"
+
+  # If lsof isn't present, we can't reliably detect a held lock; just sleep briefly.
+  if ! command -v lsof >/dev/null 2>&1; then
+    sleep 2
+    return 0
+  fi
+
+  local start
+  start=$(date +%s)
+  while true; do
+    if [ ! -e "$lock_path" ]; then
+      return 0
+    fi
+    if ! sudo lsof "$lock_path" >/dev/null 2>&1; then
+      return 0
+    fi
+
+    local now
+    now=$(date +%s)
+    if [ $((now - start)) -ge "$timeout_seconds" ]; then
+      echo "[seed] WARNING: DB lock still held after ${timeout_seconds}s: $lock_path" >> "$LOG_FILE"
+      sudo lsof "$lock_path" >> "$LOG_FILE" 2>&1 || true
+      return 0
+    fi
+    sleep 1
+  done
 }
 
 cleanup() {
@@ -154,12 +195,34 @@ echo "[seed] exporting blocks 0..$CUTOFF_BLOCK via geth export -> $EXPORT_DIR/$E
 # Stop nodes that will have their datadirs read/written (DB lock).
 compose_stop geth-v1-16-7 geth-v1-11-6
 
+# Ensure the v1.16.7 chaindata lock is fully released before running `geth export`.
+wait_for_lock_release "$ROOT_DIR/generated-files/data/v1.16.7/geth/chaindata/LOCK" 120
+
+# Preflight: open the v1.16.7 datadir in *read-write* mode (offline) to allow geth
+# to persist any needed head-state repairs.
+#
+# Why: `geth export` opens the database read-only. If the DB requires a small repair
+# (common after an unclean shutdown), export can fail with `pebble: read-only` when
+# it tries to write repair metadata.
+echo "[seed] preflight: ensuring v1.16.7 datadir is consistent before export" >> "$LOG_FILE"
+sudo docker run --rm \
+  --user "$DOCKER_RUN_USER" \
+  --entrypoint sh \
+  -v "$ROOT_DIR/generated-files/data/v1.16.7:/data" \
+  ethereum/client-go:v1.16.7 \
+  -lc 'set -e; command -v timeout >/dev/null 2>&1 || { echo "[seed] WARNING: timeout not found; skipping preflight"; exit 0; }; timeout -s SIGINT 45 geth --datadir /data --networkid 1 --maxpeers 0 --nodiscover --port 0 --http --http.addr 127.0.0.1 --http.port 0 --authrpc.addr 127.0.0.1 --authrpc.port 0 --syncmode full --cache 512 --nousb || true' \
+  >> "$LOG_FILE" 2>&1
+
+# Ensure the DB lock is released after the preflight run.
+wait_for_lock_release "$ROOT_DIR/generated-files/data/v1.16.7/geth/chaindata/LOCK" 120
+
 # Export from v1.16.7 datadir.
 rm -f "$EXPORT_DIR/$EXPORT_FILE_NAME" "$EXPORT_DIR/$EXPORT_FILE_NAME.progress" >> "$LOG_FILE" 2>&1 || true
 rm -f "$EXPORT_DONE_FILE" >> "$LOG_FILE" 2>&1 || true
 rm -f "$EXPORT_MARKER_FILE" >> "$LOG_FILE" 2>&1 || true
 touch "$EXPORT_MARKER_FILE" >> "$LOG_FILE" 2>&1 || true
 sudo docker run --rm \
+  --user "$DOCKER_RUN_USER" \
   --entrypoint geth \
   -v "$ROOT_DIR/generated-files/data/v1.16.7:/data" \
   -v "$EXPORT_DIR:/exports" \
@@ -172,6 +235,7 @@ touch "$EXPORT_DONE_FILE" >> "$LOG_FILE" 2>&1 || true
 rm -f "$IMPORT_MARKER_FILE" >> "$LOG_FILE" 2>&1 || true
 touch "$IMPORT_MARKER_FILE" >> "$LOG_FILE" 2>&1 || true
 sudo docker run --rm \
+  --user "$DOCKER_RUN_USER" \
   --entrypoint geth \
   -v "$ROOT_DIR/generated-files/data/v1.11.6:/data" \
   -v "$EXPORT_DIR:/exports" \

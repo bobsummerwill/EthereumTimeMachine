@@ -5,10 +5,6 @@ services:
     image: ethereum/client-go:v1.16.7
     container_name: geth-v1-16-7
     restart: unless-stopped
-    environment:
-      # Start EL only after the Lighthouse HTTP API is reachable.
-      WAIT_FOR_HTTP_URL: http://lighthouse-v8-0-1:5052/eth/v1/node/health
-      WAIT_FOR_HTTP_MAX_SECONDS: "600"
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     command: |
       --config /data/config.toml
@@ -208,7 +204,6 @@ services:
       # First node is treated as the “top” reference for lag metrics.
       NODE_URLS: >-
         Geth v1.16.7=http://geth-v1-16-7:8545,
-        Geth v1.11.6=http://geth-v1-11-6:8545,
         Geth v1.10.8=http://geth-v1-10-8:8545,
         Geth v1.9.25=http://geth-v1-9-25:8545,
         Geth v1.3.3=http://geth-v1-3-3:8545
