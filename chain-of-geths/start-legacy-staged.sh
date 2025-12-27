@@ -16,8 +16,10 @@ set -euo pipefail
 ROOT_DIR="/home/ubuntu/chain-of-geths"
 cd "$ROOT_DIR"
 
-# Default gate: wait for upstream to reach a small-but-nontrivial height.
-MIN_BLOCK="${MIN_BLOCK:-1000}"
+# Default gate: after the v1.11.6 seeded bridge is serving the cutoff block,
+# downstream legacy nodes only need to confirm *some* chain progress / RPC health.
+# Using >0 keeps startup fast while still avoiding racing against an unready RPC.
+MIN_BLOCK="${MIN_BLOCK:-1}"
 
 # Historical cutoff for the offline-seeded range.
 # Default: last Homestead-era block (right before the DAO fork activates at 1,920,000).
@@ -173,4 +175,3 @@ compose_up geth-v1-3-3
 wait_for_block_ge "geth-v1-3-3" "http://localhost:8549" "$MIN_BLOCK"
 
 echo "[start-legacy] done"
-
