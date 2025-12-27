@@ -658,7 +658,7 @@
          },
           {
             "editorMode": "code",
-             "expr": "(geth_sync_target_block unless on(node) geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25|3\\.3)$\"}) or (geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25)$\"} * 0 + 1919999) or (geth_effective_head_block{node=\"Geth v1.3.3\"} * 0 + 1149999)",
+             "expr": "(geth_sync_target_block unless on(node) (geth_effective_head_block{node=\"Geth v1.10.8\"} or geth_effective_head_block{node=\"Geth v1.9.25\"} or geth_effective_head_block{node=\"Geth v1.3.3\"})) or (geth_effective_head_block{node=\"Geth v1.10.8\"} * 0 + 1919999) or (geth_effective_head_block{node=\"Geth v1.9.25\"} * 0 + 1919999) or (geth_effective_head_block{node=\"Geth v1.3.3\"} * 0 + 1149999)",
             "format": "table",
             "instant": true,
             "legendFormat": "Head",
@@ -666,7 +666,7 @@
           },
           {
             "editorMode": "code",
-             "expr": "100 * clamp_max(geth_effective_head_block / clamp_min(((geth_sync_target_block unless on(node) geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25|3\\.3)$\"}) or (geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25)$\"} * 0 + 1919999) or (geth_effective_head_block{node=\"Geth v1.3.3\"} * 0 + 1149999)), 1), 1)",
+             "expr": "geth_sync_percent",
             "format": "table",
             "instant": true,
             "legendFormat": "Percentage",
@@ -674,7 +674,7 @@
           },
           {
             "editorMode": "code",
-            "expr": "2 * ((((geth_sync_target_block unless on(node) geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25|3\\.3)$\"}) or (geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25)$\"} * 0 + 1919999) or (geth_effective_head_block{node=\"Geth v1.3.3\"} * 0 + 1149999)) > bool 0) * on(node) (geth_effective_head_block >= bool on(node) ((geth_sync_target_block unless on(node) geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25|3\\.3)$\"}) or (geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25)$\"} * 0 + 1919999) or (geth_effective_head_block{node=\"Geth v1.3.3\"} * 0 + 1149999)))) + ((((geth_sync_target_block unless on(node) geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25|3\\.3)$\"}) or (geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25)$\"} * 0 + 1919999) or (geth_effective_head_block{node=\"Geth v1.3.3\"} * 0 + 1149999)) > bool 0) * on(node) (geth_effective_head_block > bool 0) * on(node) (geth_effective_head_block < bool on(node) ((geth_sync_target_block unless on(node) geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25|3\\.3)$\"}) or (geth_effective_head_block{node=~\"^Geth v1\\.(10\\.8|9\\.25)$\"} * 0 + 1919999) or (geth_effective_head_block{node=\"Geth v1.3.3\"} * 0 + 1149999))))",
+            "expr": "2 * ((geth_sync_target_block > bool 0) * on(node) (geth_effective_head_block >= bool on(node) geth_sync_target_block)) + ((geth_sync_target_block > bool 0) * on(node) (geth_effective_head_block > bool 0) * on(node) (geth_effective_head_block < bool on(node) geth_sync_target_block))",
             "format": "table",
             "instant": true,
             "legendFormat": "Status",
