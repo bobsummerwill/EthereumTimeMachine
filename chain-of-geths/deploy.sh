@@ -90,6 +90,18 @@ ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
   "RESET_LIGHTHOUSE_VOLUMES=$RESET_LIGHTHOUSE_VOLUMES BRIDGE_SEED_CUTOFF_BLOCK=$BRIDGE_SEED_CUTOFF_BLOCK bash -s" << 'EOF'
 cd /home/ubuntu/chain-of-geths
 
+# Remote deployment behavior tweaks:
+# - Hide the offline-seeded bridge node row from progress tables (it is represented by the Import phase row).
+# - Keep the bridge node non-discovering and with no outbound peers (see generate-keys.sh config.toml).
+export HIDE_PROGRESS_NODES_REGEX='^Geth v1\.11\.'
+
+# Defensive cleanup: if a previous deployment left static peer files for the bridge node, remove them.
+# (scp does not delete remote files that no longer exist locally.)
+rm -f \
+  /home/ubuntu/chain-of-geths/generated-files/data/v1.11.6/static-nodes.json \
+  /home/ubuntu/chain-of-geths/generated-files/data/v1.11.6/geth/static-nodes.json \
+  2>/dev/null || true
+
 # One-time bridge seeding cutoff (see BRIDGE_SEED_CUTOFF_BLOCK in the local deploy script).
 BRIDGE_SEED_CUTOFF_BLOCK="${BRIDGE_SEED_CUTOFF_BLOCK:-1919999}"
 
@@ -121,6 +133,12 @@ fi
 echo "Stopping any prior docker compose stack..."
 sudo docker compose down --remove-orphans 2>/dev/null || sudo docker-compose down --remove-orphans || true
 
+# Avoid duplicated background processes across repeated deploys.
+# Old `nohup` runners keep writing to the same log file even after we redeploy (they hold an open fd),
+# which makes the status logs misleading and can cause multiple concurrent staged startups.
+sudo pkill -f seed-v1\.11\.6-when-ready\.sh 2>/dev/null || true
+sudo pkill -f start-legacy-staged\.sh 2>/dev/null || true
+
 echo "Deleting Grafana data volume (grafana-data)..."
 # docker-compose names volumes as <project>_<volume>. Match both raw and project-prefixed names.
 sudo docker volume ls -q | grep -E '(^|_)grafana-data$' | xargs -r sudo docker volume rm -f || true
@@ -144,11 +162,18 @@ done
 echo "Starting base services (top node + monitoring)..."
 # NOTE: geth-exporter and sync-ui are built from local source (docker-compose `build:` sections),
 # so ensure we rebuild them on each deploy.
-sudo docker compose up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui 2>/dev/null || \
-  sudo docker-compose up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui
+# IMPORTANT: docker compose interpolates environment variables (e.g. HIDE_PROGRESS_NODES_REGEX) when
+# parsing docker-compose.yml. Since we run compose via sudo, explicitly preserve/pass the variable.
+sudo env HIDE_PROGRESS_NODES_REGEX="$HIDE_PROGRESS_NODES_REGEX" \
+  docker compose up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui 2>/dev/null || \
+  sudo env HIDE_PROGRESS_NODES_REGEX="$HIDE_PROGRESS_NODES_REGEX" \
+    docker-compose up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui
 
-# Optional: post-deploy healthcheck (fail fast on common "stuck at genesis" / "no peers" problems).
-POST_DEPLOY_HEALTHCHECK="${POST_DEPLOY_HEALTHCHECK:-1}"
+# Optional: post-deploy healthcheck.
+#
+# IMPORTANT: on real remote deployments, some nodes (especially legacy ones) can take hours to come up,
+# so this is OFF by default. Enable explicitly with POST_DEPLOY_HEALTHCHECK=1.
+POST_DEPLOY_HEALTHCHECK="${POST_DEPLOY_HEALTHCHECK:-0}"
 if [ "$POST_DEPLOY_HEALTHCHECK" = "1" ]; then
   echo "Running post-deploy healthcheck (POST_DEPLOY_HEALTHCHECK=1)..."
   rpc_hex_to_dec() {
@@ -207,8 +232,9 @@ if [ "$POST_DEPLOY_HEALTHCHECK" = "1" ]; then
 
   # Check head node first.
   wait_for_peers "Geth v1.16.7" 8545 1 120 || true
-  # These may legitimately remain low, but should not be permanently 0.
-  wait_for_peers "Geth v1.11.6" 8546 1 120 || true
+  # NOTE: do NOT peer-check the offline-seeded bridge node (v1.11.x).
+  # It is configured with discovery disabled and no outbound static peers, and may legitimately have 0 peers
+  # depending on whether downstream nodes are up yet.
   wait_for_peers "Geth v1.10.8" 8551 1 120 || true
   wait_for_peers "Geth v1.9.25" 8552 1 120 || true
   wait_for_peers "Geth v1.3.6" 8553 1 120 || true

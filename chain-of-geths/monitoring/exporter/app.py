@@ -257,6 +257,46 @@ class Poller:
         self._lh_backfill_last_total: float | None = None
         self._lh_backfill_last_inc_ts: float | None = None
 
+        # Optional: hide some nodes from *progress* panels (Stage progress / Sync progress tables).
+        # This is useful for offline-seeded "bridge" nodes in remote deployment, where the
+        # export/import synthetic rows are the intended progress signal.
+        self._hide_progress_nodes_pat: re.Pattern[str] | None = None
+        raw_pat = (os.environ.get("HIDE_PROGRESS_NODES_REGEX", "") or "").strip()
+        if raw_pat:
+            try:
+                self._hide_progress_nodes_pat = re.compile(raw_pat)
+            except re.error:
+                # If misconfigured, fail open (don't hide anything) rather than crashing the exporter.
+                self._hide_progress_nodes_pat = None
+
+    def _hide_from_progress(self, node_name: str) -> bool:
+        if not node_name:
+            return False
+        if self._hide_progress_nodes_pat is None:
+            return False
+        return self._hide_progress_nodes_pat.search(node_name) is not None
+
+    def _remove_progress_series(self, node_name: str) -> None:
+        """Remove label series for metrics used by progress panels.
+
+        Prometheus client keeps label series around until explicitly removed.
+        For conditional hiding, we must remove them so Grafana/Sync-UI rows disappear.
+        """
+        for g in (
+            g_sort_key,
+            g_effective_head,
+            g_sync_current,
+            g_sync_highest,
+            g_sync_remaining,
+            g_syncing,
+            g_sync_target,
+            g_sync_percent,
+        ):
+            try:
+                g.remove(node=node_name)
+            except Exception:
+                pass
+
     def start(self) -> None:
         self._thread.start()
 
@@ -377,7 +417,12 @@ class Poller:
                     g_sync_progress_info.labels(node=node_label, progress="down").set(0)
 
             for idx, (name, url) in enumerate(self.nodes, start=1):
-                g_sort_key.labels(node=name).set(idx)
+                hide_from_progress = self._hide_from_progress(name)
+                if hide_from_progress:
+                    # Ensure stale progress-series are removed so the node row disappears.
+                    self._remove_progress_series(name)
+                else:
+                    g_sort_key.labels(node=name).set(idx)
 
                 # Gating: don't show the v1.11.6 bridge as "up" until it's actually been
                 # offline-seeded. Otherwise dashboards look like the bridge is available even
@@ -392,14 +437,15 @@ class Poller:
                     peers[name] = 0
                     g_block.labels(node=name).set(0)
                     g_peers.labels(node=name).set(0)
-                    g_syncing.labels(node=name).set(0)
-                    g_sync_current.labels(node=name).set(0)
-                    g_sync_highest.labels(node=name).set(0)
-                    g_sync_remaining.labels(node=name).set(0)
-                    g_effective_head.labels(node=name).set(0)
-                    g_sync_progress_info.labels(node=name, progress="gated (waiting for seed)").set(0)
-                    g_sync_target.labels(node=name).set(0)
-                    g_sync_percent.labels(node=name).set(0)
+                    if not hide_from_progress:
+                        g_syncing.labels(node=name).set(0)
+                        g_sync_current.labels(node=name).set(0)
+                        g_sync_highest.labels(node=name).set(0)
+                        g_sync_remaining.labels(node=name).set(0)
+                        g_effective_head.labels(node=name).set(0)
+                        g_sync_progress_info.labels(node=name, progress="gated (waiting for seed)").set(0)
+                        g_sync_target.labels(node=name).set(0)
+                        g_sync_percent.labels(node=name).set(0)
                     continue
 
                 # Some nodes should display progress vs a fixed historical target rather than the
@@ -434,61 +480,65 @@ class Poller:
                     if syncing is None or syncing is False:
                         node_syncing[name] = False
                         node_effective_head[name] = block_num
-                        g_syncing.labels(node=name).set(0)
-                        g_sync_current.labels(node=name).set(0)
-                        g_sync_highest.labels(node=name).set(0)
-                        g_effective_head.labels(node=name).set(block_num)
+                        if not hide_from_progress:
+                            g_syncing.labels(node=name).set(0)
+                            g_sync_current.labels(node=name).set(0)
+                            g_sync_highest.labels(node=name).set(0)
+                            g_effective_head.labels(node=name).set(block_num)
                         target = fixed_target if fixed_target is not None else block_num
                         # Even if the node reports "not syncing", for historical targets
                         # (e.g. v1.11.6 seeded cutoff) we still want an informative "remaining".
-                        g_sync_remaining.labels(node=name).set(max(0, target - block_num))
-                        pct = (block_num * 100.0 / target) if target > 0 else 0.0
-                        progress = f"{block_num}/{target} ({pct:.1f}%)" if target > 0 else "0/0 (0.0%)"
-                        g_sync_target.labels(node=name).set(target)
-                        g_sync_percent.labels(node=name).set(pct)
-                        g_sync_progress_info.labels(node=name, progress=progress).set(1)
+                        if not hide_from_progress:
+                            g_sync_remaining.labels(node=name).set(max(0, target - block_num))
+                            pct = (block_num * 100.0 / target) if target > 0 else 0.0
+                            progress = f"{block_num}/{target} ({pct:.1f}%)" if target > 0 else "0/0 (0.0%)"
+                            g_sync_target.labels(node=name).set(target)
+                            g_sync_percent.labels(node=name).set(pct)
+                            g_sync_progress_info.labels(node=name, progress=progress).set(1)
 
-                        self._last_seen[name] = {
-                            "block": float(block_num),
-                            "peers": float(peer_count),
-                            "sync_current": 0.0,
-                            "sync_highest": 0.0,
-                            "effective": float(block_num),
-                            "target": float(target),
-                            "percent": float(pct),
-                        }
+                            self._last_seen[name] = {
+                                "block": float(block_num),
+                                "peers": float(peer_count),
+                                "sync_current": 0.0,
+                                "sync_highest": 0.0,
+                                "effective": float(block_num),
+                                "target": float(target),
+                                "percent": float(pct),
+                            }
                     else:
                         # Some clients return a dict with hex values.
                         cur = hex_to_int(syncing.get("currentBlock"))
                         hi = hex_to_int(syncing.get("highestBlock"))
                         node_syncing[name] = True
-                        g_syncing.labels(node=name).set(1)
-                        g_sync_current.labels(node=name).set(cur)
-                        g_sync_highest.labels(node=name).set(hi)
+                        if not hide_from_progress:
+                            g_syncing.labels(node=name).set(1)
+                            g_sync_current.labels(node=name).set(cur)
+                            g_sync_highest.labels(node=name).set(hi)
                         eff = max(block_num, cur)
                         node_effective_head[name] = eff
                         # If a fixed target is configured, we explicitly report remaining vs that
                         # target (even if the node reports a much higher eth_syncing.highestBlock).
                         target = fixed_target if fixed_target is not None else max(hi, eff)
-                        g_effective_head.labels(node=name).set(eff)
-                        # Use our best-effort target (not just hi-cur) so older clients that report
-                        # highestBlock=0 still show a meaningful remaining curve.
-                        g_sync_remaining.labels(node=name).set(max(0, target - eff))
-                        pct = (eff * 100.0 / target) if target > 0 else 0.0
-                        progress = f"{eff}/{target} ({pct:.1f}%)"
-                        g_sync_target.labels(node=name).set(target)
-                        g_sync_percent.labels(node=name).set(pct)
-                        g_sync_progress_info.labels(node=name, progress=progress).set(1)
+                        if not hide_from_progress:
+                            g_effective_head.labels(node=name).set(eff)
+                            # Use our best-effort target (not just hi-cur) so older clients that report
+                            # highestBlock=0 still show a meaningful remaining curve.
+                            g_sync_remaining.labels(node=name).set(max(0, target - eff))
+                            pct = (eff * 100.0 / target) if target > 0 else 0.0
+                            progress = f"{eff}/{target} ({pct:.1f}%)"
+                            g_sync_target.labels(node=name).set(target)
+                            g_sync_percent.labels(node=name).set(pct)
+                            g_sync_progress_info.labels(node=name, progress=progress).set(1)
 
-                        self._last_seen[name] = {
-                            "block": float(block_num),
-                            "peers": float(peer_count),
-                            "sync_current": float(cur),
-                            "sync_highest": float(hi),
-                            "effective": float(eff),
-                            "target": float(target),
-                            "percent": float(pct),
-                        }
+                            self._last_seen[name] = {
+                                "block": float(block_num),
+                                "peers": float(peer_count),
+                                "sync_current": float(cur),
+                                "sync_highest": float(hi),
+                                "effective": float(eff),
+                                "target": float(target),
+                                "percent": float(pct),
+                            }
 
                 except Exception:
                     # Mark node as down.
@@ -499,6 +549,19 @@ class Poller:
                     node_syncing[name] = False
                     node_effective_head[name] = 0
                     peers[name] = 0
+
+                    if hide_from_progress:
+                        # Ensure all progress series for this node are removed.
+                        self._remove_progress_series(name)
+                        # Still emit the basic series (up/block/peers) so "Geth status" remains meaningful.
+                        cached = self._last_seen.get(name)
+                        if cached:
+                            g_block.labels(node=name).set(int(cached.get("block") or 0))
+                            g_peers.labels(node=name).set(int(cached.get("peers") or 0))
+                        else:
+                            g_block.labels(node=name).set(0)
+                            g_peers.labels(node=name).set(0)
+                        continue
 
                     cached = self._last_seen.get(name)
                     if cached:

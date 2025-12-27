@@ -250,6 +250,9 @@ services:
       HOST_OUTPUT_DIR: /host_output
       CUTOFF_BLOCK: "1919999"
       POLL_INTERVAL_SECONDS: "10"
+      # Optional: hide specific node labels from the progress table (Grafana “Stage progress” / Sync-UI).
+      # Remote deploy uses this to hide the offline-seeded bridge node row (it is represented by the Import phase row).
+      HIDE_PROGRESS_NODES_REGEX: ${HIDE_PROGRESS_NODES_REGEX:-}
     volumes:
       - ./generated-files:/host_output:ro
     ports:
