@@ -226,7 +226,7 @@
            {
              "matcher": {
                "id": "byName",
-               "options": "06. Geth v1.10.0 syncing"
+               "options": "06. Geth v1.10.8 syncing"
              },
             "properties": [
               {
@@ -236,13 +236,13 @@
                     "type": "value",
                     "options": {
                       "0": {
-                        "text": "6. Geth v1.10.0 syncing — TODO"
+                        "text": "6. Geth v1.10.8 syncing — TODO"
                       },
                       "1": {
-                        "text": "6. Geth v1.10.0 syncing — IN PROGRESS"
+                        "text": "6. Geth v1.10.8 syncing — IN PROGRESS"
                       },
                       "2": {
-                        "text": "6. Geth v1.10.0 syncing — DONE"
+                        "text": "6. Geth v1.10.8 syncing — DONE"
                       }
                     }
                   }
@@ -253,7 +253,7 @@
            {
              "matcher": {
                "id": "byName",
-               "options": "07. Geth v1.10.0 exporting data"
+               "options": "07. Geth v1.9.25 syncing"
              },
              "properties": [
                {
@@ -263,13 +263,13 @@
                      "type": "value",
                      "options": {
                        "0": {
-                         "text": "7. Geth v1.10.0 exporting data — TODO"
+                         "text": "7. Geth v1.9.25 syncing — TODO"
                        },
                        "1": {
-                         "text": "7. Geth v1.10.0 exporting data — IN PROGRESS"
+                         "text": "7. Geth v1.9.25 syncing — IN PROGRESS"
                        },
                        "2": {
-                         "text": "7. Geth v1.10.0 exporting data — DONE"
+                         "text": "7. Geth v1.9.25 syncing — DONE"
                        }
                      }
                    }
@@ -280,7 +280,7 @@
            {
              "matcher": {
                "id": "byName",
-                 "options": "08. Geth v1.9.25 importing data"
+                 "options": "08. Geth v1.3.3 syncing"
              },
             "properties": [
               {
@@ -290,13 +290,13 @@
                     "type": "value",
                     "options": {
                       "0": {
-                         "text": "8. Geth v1.9.25 importing data — TODO"
+                         "text": "8. Geth v1.3.3 syncing — TODO"
                       },
                       "1": {
-                         "text": "8. Geth v1.9.25 importing data — IN PROGRESS"
+                         "text": "8. Geth v1.3.3 syncing — IN PROGRESS"
                       },
                       "2": {
-                         "text": "8. Geth v1.9.25 importing data — DONE"
+                         "text": "8. Geth v1.3.3 syncing — DONE"
                       }
                     }
                   }
@@ -691,7 +691,7 @@
        "targets": [
          {
            "editorMode": "code",
-              "expr": "(geth_sync_remaining_blocks{node=~\"^Geth .*\",node!~\"^Geth v1\\\\.(11\\\\.6|3\\\\.6|9\\\\.25)$\"} and on(node) (geth_up{node=~\"^Geth .*\",node!~\"^Geth v1\\\\.(11\\\\.6|3\\\\.6|9\\\\.25)$\"} == 1)) or ((geth_sync_target_block{node=~\"^(Import|Export) .*\"} - geth_effective_head_block{node=~\"^(Import|Export) .*\"}) and on(node) (geth_up{node=~\"^(Import|Export) .*\"} == 1))",
+              "expr": "clamp_min(geth_sync_target_block - geth_effective_head_block, 0) and on(node) (geth_up == 1)",
             "legendFormat": "{{node}}",
             "range": true,
             "refId": "A"
@@ -940,31 +940,24 @@
         },
         {
           "editorMode": "code",
-          "expr": "geth_up{node=\"Geth v1.10.0\"}",
-          "legendFormat": "Geth v1.10.0",
+          "expr": "geth_up{node=\"Geth v1.10.8\"}",
+          "legendFormat": "Geth v1.10.8",
           "range": true,
           "refId": "C"
         },
         {
           "editorMode": "code",
-          "expr": "max(geth_up{node=\"Geth v1.9.25\"} or geth_up{node=\"Import (RLP → v1.9.25)\"} or geth_up{node=\"Export (v1.9.25 → RLP)\"})",
+          "expr": "geth_up{node=\"Geth v1.9.25\"}",
           "legendFormat": "Geth v1.9.25",
           "range": true,
           "refId": "D"
         },
         {
           "editorMode": "code",
-          "expr": "max(geth_up{node=\"Geth v1.3.6\"} or geth_up{node=\"Import (RLP → v1.3.6)\"})",
-          "legendFormat": "Geth v1.3.6",
+          "expr": "geth_up{node=\"Geth v1.3.3\"}",
+          "legendFormat": "Geth v1.3.3",
           "range": true,
           "refId": "E"
-        },
-        {
-          "editorMode": "code",
-          "expr": "geth_up{node=\"Geth v1.0.3\"}",
-          "legendFormat": "Geth v1.0.3",
-          "range": true,
-          "refId": "F"
         }
       ],
       "title": "Geth status",
@@ -1013,7 +1006,7 @@
        "targets": [
         {
           "editorMode": "code",
-           "expr": "geth_node_sort_key{node!=\"Lighthouse\",node!=\"Geth v1.11.6\",node!=\"Geth v1.3.6\",node!=\"Geth v1.9.25\"}",
+           "expr": "geth_node_sort_key",
           "format": "table",
           "instant": true,
           "legendFormat": "sort",
@@ -1021,7 +1014,7 @@
         },
         {
           "editorMode": "code",
-           "expr": "geth_effective_head_block{node!=\"Lighthouse\",node!=\"Geth v1.11.6\",node!=\"Geth v1.3.6\",node!=\"Geth v1.9.25\"}",
+           "expr": "geth_effective_head_block",
           "format": "table",
           "instant": true,
           "legendFormat": "Block",
@@ -1029,7 +1022,7 @@
         },
         {
           "editorMode": "code",
-           "expr": "(geth_sync_target_block{node!=\"Lighthouse\",node!=\"Geth v1.11.6\",node!=\"Geth v1.3.6\",node!=\"Geth v1.9.25\",node!~\"^Geth v1[.](10[.]0)$\"}) or (1919999 * (geth_node_sort_key{node=~\"^Geth v1[.](10[.]0)$\"} * 0 + 1))",
+           "expr": "geth_sync_target_block",
           "format": "table",
           "instant": true,
           "legendFormat": "Head",
@@ -1037,7 +1030,7 @@
         },
         {
           "editorMode": "code",
-           "expr": "(geth_sync_percent{node!=\"Lighthouse\",node!=\"Geth v1.11.6\",node!=\"Geth v1.3.6\",node!=\"Geth v1.9.25\",node!~\"^Geth v1[.](10[.]0)$\"}) or clamp_max(100 * geth_effective_head_block{node=~\"^Geth v1[.](10[.]0)$\"} / 1919999, 100)",
+           "expr": "geth_sync_percent",
           "format": "table",
           "instant": true,
           "legendFormat": "Percentage",

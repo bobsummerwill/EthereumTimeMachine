@@ -44,7 +44,7 @@ services:
   #   1) Export an RLP block range 0..CUTOFF_BLOCK (see `seed-v1.11.6-when-ready.sh`).
   #   2) Import that RLP into this node's datadir (`geth import`).
   #
-  # Once seeded, `geth-v1-11-6` serves as a *protocol bridge* down to `geth-v1-10-0` (and below)
+  # Once seeded, `geth-v1-11-6` serves as a *protocol bridge* down to `geth-v1-10-8` (and below)
   # so older clients can access the historical chain range without needing to speak to modern mainnet.
   geth-v1-11-6:
     image: ethereumtimemachine/geth:v1.11.6
@@ -76,10 +76,10 @@ services:
         ipv4_address: 172.20.0.15
 
   # Bridge node: eth/66<->eth/65 compatibility.
-  # Geth v1.10.0 supports ETH64/65/66.
-  geth-v1-10-0:
-    image: ethereumtimemachine/geth:v1.10.0
-    container_name: geth-v1-10-0
+  # Geth v1.10.8 supports eth/65, eth/66.
+  geth-v1-10-8:
+    image: ethereumtimemachine/geth:v1.10.8
+    container_name: geth-v1-10-8
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     command: |
@@ -98,7 +98,7 @@ services:
       - "30309:30309/tcp"
       - "30309:30309/udp"
     volumes:
-      - ./generated-files/data/v1.10.0:/data
+      - ./generated-files/data/v1.10.8:/data
       - ./monitoring/self-watchdog:/watchdog:ro
     depends_on:
       - geth-v1-11-6
@@ -132,14 +132,14 @@ services:
       - ./generated-files/data/v1.9.25:/data
       - ./monitoring/self-watchdog:/watchdog:ro
     depends_on:
-      - geth-v1-10-0
+      - geth-v1-10-8
     networks:
       ethereum:
         ipv4_address: 172.20.0.17
 
-  geth-v1-3-6:
-    image: ethereumtimemachine/geth:v1.3.6
-    container_name: geth-v1-3-6
+  geth-v1-3-3:
+    image: ethereumtimemachine/geth:v1.3.3
+    container_name: geth-v1-3-3
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     command: |
@@ -157,41 +157,13 @@ services:
       - "30307:30307/tcp"
       - "30307:30307/udp"
     volumes:
-      - ./generated-files/data/v1.3.6:/data
+      - ./generated-files/data/v1.3.3:/data
       - ./monitoring/self-watchdog:/watchdog:ro
+    depends_on:
+      - geth-v1-9-25
     networks:
       ethereum:
         ipv4_address: 172.20.0.14
-
-  # Frontier-era node: discovery disabled; intended to dial only its single configured peer (v1.3.6).
-  geth-v1-0-3:
-    image: ethereumtimemachine/geth:v1.0.3
-    container_name: geth-v1-0-3
-    restart: unless-stopped
-    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
-    command: |
-      --genesis /data/genesis.json
-      --datadir /data
-      --nodekey /data/nodekey
-      --cache 2048
-      --rpc
-      --rpcaddr 0.0.0.0
-      --rpcapi eth,net,web3
-      --networkid 1
-      --port 30305
-      --nodiscover
-    ports:
-      - "8553:8545"
-      - "30305:30305/tcp"
-      - "30305:30305/udp"
-    volumes:
-      - ./generated-files/data/v1.0.3:/data
-      - ./monitoring/self-watchdog:/watchdog:ro
-    depends_on:
-      - geth-v1-3-6
-    networks:
-      ethereum:
-        ipv4_address: 172.20.0.13
 
   # Consensus client (beacon node) for the *modern feeder* execution node.
   # We keep this single CL instance so the modern EL can progress on post-Merge mainnet
@@ -237,10 +209,9 @@ services:
       NODE_URLS: >-
         Geth v1.16.7=http://geth-v1-16-7:8545,
         Geth v1.11.6=http://geth-v1-11-6:8545,
-        Geth v1.10.0=http://geth-v1-10-0:8545,
+        Geth v1.10.8=http://geth-v1-10-8:8545,
         Geth v1.9.25=http://geth-v1-9-25:8545,
-        Geth v1.3.6=http://geth-v1-3-6:8545,
-        Geth v1.0.3=http://geth-v1-0-3:8545
+        Geth v1.3.3=http://geth-v1-3-3:8545
       # Used to add a Lighthouse row in the same “Sync progress” table.
       LIGHTHOUSE_API_URL: http://lighthouse-v8-0-1:5052
       # Stable label for the Lighthouse row (emit from startup even if the API is still booting).

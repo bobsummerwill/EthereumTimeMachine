@@ -39,25 +39,23 @@ mkdir -p "$DATA_ROOT"
 # Versions and their (docker-network) IPs/ports. Must match docker-compose.yml.
 # NOTE: Some adjacent releases don't overlap in `eth/*` protocol versions.
 # These bridge nodes are required for stable peering:
-# - v1.11.6: ETH66/67/68 (bridges v1.16.7 <-> v1.10.0)
-# - v1.10.0: ETH64/65/66 (bridges v1.11.6 <-> v1.9.25)
-# - v1.9.25:  eth63/64/65 (bridges v1.10.0 <-> v1.3.6)
-versions=(v1.16.7 v1.11.6 v1.10.0 v1.9.25 v1.3.6 v1.0.3)
+# - v1.11.6: eth/66–68 (bridges v1.16.7 <-> v1.10.8)
+# - v1.10.8: eth/65–66 (bridges v1.11.6 <-> v1.9.25)
+# - v1.9.25:  eth/63–65 (bridges v1.10.8 <-> v1.3.3)
+versions=(v1.16.7 v1.11.6 v1.10.8 v1.9.25 v1.3.3)
 declare -A ip_by_version=(
     ["v1.16.7"]="172.20.0.18"
     ["v1.11.6"]="172.20.0.15"
-    ["v1.10.0"]="172.20.0.16"
+    ["v1.10.8"]="172.20.0.16"
     ["v1.9.25"]="172.20.0.17"
-    ["v1.3.6"]="172.20.0.14"
-    ["v1.0.3"]="172.20.0.13"
+    ["v1.3.3"]="172.20.0.14"
 )
 declare -A port_by_version=(
     ["v1.16.7"]="30306"
     ["v1.11.6"]="30308"
-    ["v1.10.0"]="30309"
+    ["v1.10.8"]="30309"
     ["v1.9.25"]="30310"
-    ["v1.3.6"]="30307"
-    ["v1.0.3"]="30305"
+    ["v1.3.3"]="30307"
 )
 
 
@@ -153,29 +151,6 @@ ensure_jwtsecret() {
 
 ensure_jwtsecret v1.16.7
 
-# Geth v1.0.3 requires the genesis block to be explicitly provided/inserted.
-# We generate a canonical mainnet genesis.json using a modern geth binary.
-ensure_mainnet_genesis_for_v1_0_3() {
-    local dest="$DATA_ROOT/v1.0.3/genesis.json"
-    if [[ -f "$dest" ]]; then
-        return 0
-    fi
-    echo "Generating mainnet genesis.json for v1.0.3..."
-    mkdir -p "$(dirname "$dest")"
-
-    local tmp
-    tmp="${dest}.tmp"
-    rm -f "$tmp"
-
-    # dumpgenesis is a read-only operation and does not require chain data.
-    # Note: ethereum/client-go images have entrypoint set to `geth`, so we call the subcommand directly.
-    # Use the built-in mainnet preset so we don't depend on any local chain DB.
-    docker run --rm ethereum/client-go:v1.16.7 dumpgenesis --mainnet > "$tmp"
-    mv "$tmp" "$dest"
-}
-
-ensure_mainnet_genesis_for_v1_0_3
-
 # v1.16.7 is the top node; it peers with mainnet via discovery.
 v1_16_7_dir="$DATA_ROOT/v1.16.7"
 cat > "$v1_16_7_dir/config.toml" <<EOF
@@ -208,7 +183,7 @@ DataDir = "/data"
 NoDiscovery = true
 ListenAddr = ":${port_by_version[v1.11.6]}"
 # This node is offline-seeded via export/import and is not intended to dial upstream peers.
-# It should accept inbound peers from the next node down (v1.10.0), with discovery disabled.
+# It should accept inbound peers from the next node down (v1.10.8), with discovery disabled.
 StaticNodes = []
 EOF
 
@@ -217,32 +192,23 @@ EOF
 rm -f "$v1_11_6_dir/geth/static-nodes.json" "$v1_11_6_dir/static-nodes.json" 2>/dev/null || true
 echo "Created config.toml for v1.11.6 with discovery disabled and no outbound peering"
 
-# Create static-nodes.json for each non-top version.
-#
-# IMPORTANT: We intentionally do *not* statically peer v1.3.6 upstream to v1.9.25.
-# v1.3.6 is expected to be seeded via export/import (offline) and then serve blocks
-# downstream (to v1.0.3) without outbound peering.
-for version in v1.10.0 v1.9.25 v1.3.6 v1.0.3; do
+# Create static-nodes.json for each non-top version (except v1.11.6, which is offline-seeded and has no outbound peers).
+for version in v1.10.8 v1.9.25 v1.3.3; do
     datadir="$DATA_ROOT/$version"
 
     case $version in
-        v1.10.0)
+        v1.10.8)
             next="v1.11.6"
             printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;
         v1.9.25)
-            next="v1.10.0"
+            next="v1.10.8"
             printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;
-        v1.3.6)
-            # No outbound pairing: allow only inbound peers (e.g. v1.0.3).
-            printf '[]\n' > "$datadir/static-nodes.json"
-            echo "Created static-nodes.json for $version (empty; no outbound peering)"
-            ;;
-        v1.0.3)
-            next="v1.3.6"
+        v1.3.3)
+            next="v1.9.25"
             printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;
@@ -250,97 +216,3 @@ for version in v1.10.0 v1.9.25 v1.3.6 v1.0.3; do
 done
 
 echo "Wrote: $DATA_ROOT/*/{nodekey,static-nodes.json}"
-
-# --- Windows helper: Geth v1.1.0 static peering to the deployed v1.3.6 node ---
-#
-# This repo runs geth-v1-3-6 on the VM and exposes its P2P port on the host.
-# A Windows machine running an old geth binary (v1.1.0) can statically peer to it
-# (discovery disabled) using a static-nodes.json containing that VM-reachable enode.
-get_vm_ip() {
-    # Priority:
-    #   1) explicit environment variable
-    #   2) parse the default VM_IP from deploy.sh
-    if [[ -n "${VM_IP:-}" ]]; then
-        echo "${VM_IP}";
-        return 0
-    fi
-    local deploy_sh="$SCRIPT_DIR/deploy.sh"
-    if [[ -f "$deploy_sh" ]]; then
-        # Match: VM_IP="x.x.x.x" (or without quotes)
-        local ip
-        ip=$(grep -E '^VM_IP=' "$deploy_sh" | head -n 1 | sed -E 's/^VM_IP=\"?([^\" ]+)\"?.*$/\1/')
-        if [[ -n "$ip" ]]; then
-            echo "$ip"
-            return 0
-        fi
-    fi
-    echo ""
-}
-
-VM_IP_FOR_WINDOWS="$(get_vm_ip)"
-if [[ -n "$VM_IP_FOR_WINDOWS" ]]; then
-    v1_3_6_enode_in_docker_net="${enodes[v1.3.6]}"
-    v1_3_6_pubkey=$(echo "$v1_3_6_enode_in_docker_net" | sed -E 's#^enode://([^@]+)@.*#\1#')
-    v1_3_6_host_port="${port_by_version[v1.3.6]}"
-    v1_3_6_windows_enode="enode://$v1_3_6_pubkey@$VM_IP_FOR_WINDOWS:$v1_3_6_host_port?discport=0"
-
-    WIN_OUT_DIR="$OUTPUT_DIR/windows/geth-v1.1.0"
-    mkdir -p "$WIN_OUT_DIR"
-
-    printf '["%s"]\n' "$v1_3_6_windows_enode" > "$WIN_OUT_DIR/static-nodes.json"
-
- cat > "$WIN_OUT_DIR/README.md" <<EOF
- # Windows Geth v1.1.0 (Win64) -> static peer to VM geth v1.3.6
- 
- This directory is generated by [
- \`generate-keys.sh\`
- ](chain-of-geths/generate-keys.sh:1).
-
- ## Static peer (VM geth v1.3.6)
- 
- - VM host: \
-   \
-   \`$VM_IP_FOR_WINDOWS\`
- - VM P2P port (host): \
-   \
-   \`$v1_3_6_host_port\`
- - Enode (use in static-nodes.json): \
-   \
-   \`$v1_3_6_windows_enode\`
-
- The file [
- \`static-nodes.json\`
- ](chain-of-geths/generated-files/windows/geth-v1.1.0/static-nodes.json:1) already contains this enode.
-
-## Running geth v1.1.0 on Windows
-
-1. Download geth v1.1.0 Win64 zip:
-
-   https://github.com/ethereum/go-ethereum/releases/download/v1.1.0/Geth-Win64-20150825140940-1.1.0-fd512fa.zip
-
- 2. Extract and choose a datadir, for example:
- 
-    \`C:\\Ethereum\\Geth-1.1.0\\data\`
- 
- 3. Copy [
- \`static-nodes.json\`
- ](chain-of-geths/generated-files/windows/geth-v1.1.0/static-nodes.json:1) into that datadir.
-
- 4. Start geth with manual peering only:
- 
-    geth.exe --datadir "C:\\Ethereum\\Geth-1.1.0\\data" --networkid 1 --port 30303 --nodiscover --bootnodes "" --maxpeers 1
- 
- Notes:
- - If \`30303\` is in use, change \`--port\`.
- - This only configures peering. You still need appropriate chain data for an ancient client to do anything useful.
-EOF
-
-    echo "Created Windows v1.1.0 helper files: $WIN_OUT_DIR/{static-nodes.json,README.md}"
-else
-    cat >&2 <<'EOF'
-NOTE: Could not determine VM public IP for the Windows v1.1.0 helper output.
-
-To generate it, re-run with an explicit VM_IP:
-  VM_IP=<your-vm-public-ip> ./generate-keys.sh
-EOF
-fi

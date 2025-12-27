@@ -61,7 +61,7 @@ DOCKER_IMAGES_DIR="$SCRIPT_DIR/generated-files/docker-images"
 mkdir -p "$DOCKER_IMAGES_DIR"
 # Avoid carrying forward stale tarballs for versions that are no longer in the stack.
 rm -f "$DOCKER_IMAGES_DIR"/*.tar
-for version in v1.0.3 v1.11.6 v1.10.0 v1.9.25 v1.3.6; do
+for version in v1.11.6 v1.10.8 v1.9.25 v1.3.3; do
     docker save ethereumtimemachine/geth:$version > "$DOCKER_IMAGES_DIR/geth-$version.tar"
 done
 

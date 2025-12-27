@@ -37,7 +37,7 @@ def parse_node_urls(spec: str) -> List[Tuple[str, str]]:
     Format:
       name=url,name=url
     Example:
-      v1.16.7=http://geth-v1-16-7:8545,v1.10.0=http://geth-v1-10-0:8545
+      v1.16.7=http://geth-v1-16-7:8545,v1.10.8=http://geth-v1-10-8:8545
     """
     spec = (spec or "").strip()
     if not spec:
@@ -173,10 +173,6 @@ def hex_to_int(value: Any) -> int:
 app = Flask(__name__)
 
 
-# Geth v1.0.3 cannot practically follow modern mainnet beyond a certain point.
-# For dashboards, it is more useful to show its progress vs a fixed historical target.
-GETH_V1_0_3_TARGET_BLOCK = 1_149_999
-
 g_up = Gauge("geth_up", "Whether the exporter can query the node (1=up, 0=down)", ["node"])
 g_block = Gauge("geth_block_number", "Latest known head block number", ["node"])
 # Some clients may keep `eth_blockNumber` behind `eth_syncing.currentBlock` while syncing.
@@ -284,32 +280,6 @@ class Poller:
         seed_done_path = host_output_dir / f"seed-v1.11.6-{cutoff_block}.done"
         import_marker_path = host_output_dir / f"seed-v1.11.6-import-{cutoff_block}.importing"
 
-        # Legacy (v1.9.25 -> v1.3.6) seeding paths (written by start-legacy-staged.sh).
-        v136_export_file_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}-from-v1.9.25.rlp"
-        v136_export_progress_path = (
-            host_output_dir / "exports" / f"mainnet-0-{cutoff_block}-from-v1.9.25.rlp.progress"
-        )
-        v136_export_marker_path = (
-            host_output_dir / "exports" / f"mainnet-0-{cutoff_block}-from-v1.9.25.rlp.exporting"
-        )
-        v136_export_done_path = host_output_dir / f"seed-v1.3.6-export-{cutoff_block}.done"
-        v136_import_marker_path = host_output_dir / f"seed-v1.3.6-import-{cutoff_block}.importing"
-        v136_import_log_path = host_output_dir / "seed-v1.3.6-import.log"
-        v136_seed_done_path = host_output_dir / f"seed-v1.3.6-from-v1.9.25-{cutoff_block}.done"
-
-        # Optional: if we temporarily accelerate seeding by importing the already-exported
-        # v1.10.0-exported cutoff RLP into v1.9.25, we log it here.
-        v925_import_log_path = host_output_dir / "seed-v1.9.25-import.log"
-        v925_import_done_path = host_output_dir / f"seed-v1.9.25-import-{cutoff_block}.done"
-
-        # v1.10.0 -> v1.9.25 export/import bridge paths.
-        v110_export_file_path = host_output_dir / "exports" / f"mainnet-0-{cutoff_block}-from-v1.10.0.rlp"
-        v110_export_marker_path = (
-            host_output_dir / "exports" / f"mainnet-0-{cutoff_block}-from-v1.10.0.rlp.exporting"
-        )
-        v110_export_log_path = host_output_dir / "seed-v1.10.0-export.log"
-        v110_export_done_path = host_output_dir / f"seed-v1.10.0-export-{cutoff_block}.done"
-
         while not self._stop.is_set():
             # Clear dynamic label series each round so we don't accumulate stale values.
             g_sync_progress_info.clear()
@@ -323,12 +293,6 @@ class Poller:
             node_up: Dict[str, bool] = {}
             node_syncing: Dict[str, bool] = {}
             node_effective_head: Dict[str, int] = {}
-
-            # Whether the legacy chain (v1.10.0 -> v1.0.3) is intended to be shown.
-            # If these nodes aren't configured in NODE_URLS, we force all legacy stages/rows to 0
-            # so Grafana doesn't show confusing stale progress from old marker/log files.
-            legacy_nodes = {"Geth v1.10.0", "Geth v1.9.25", "Geth v1.3.6", "Geth v1.0.3"}
-            legacy_enabled = any(name.strip() in legacy_nodes for (name, _) in self.nodes)
 
             lighthouse_up = False
             lighthouse_is_syncing = False
@@ -436,14 +400,8 @@ class Poller:
                 # Some nodes should display progress vs a fixed historical target rather than the
                 # node-reported `eth_syncing.highestBlock` (which may be missing/0 on older clients).
                 fixed_target: int | None
-                if name.strip() == "Geth v1.0.3":
-                    fixed_target = GETH_V1_0_3_TARGET_BLOCK
-                elif name.strip() == "Geth v1.9.25":
-                    # v1.9.25 is used as an offline export source for the pre-DAO cutoff range.
-                    # Show progress/remaining vs the cutoff, not vs the ever-moving mainnet head.
-                    fixed_target = cutoff_block
-                elif name.strip() == "Geth v1.3.6":
-                    # v1.3.6 is intended to reach the offline cutoff range.
+                if name.strip() in {"Geth v1.11.6", "Geth v1.10.8", "Geth v1.9.25", "Geth v1.3.3"}:
+                    # These nodes are expected to sync up to the fixed historical cutoff.
                     fixed_target = cutoff_block
                 else:
                     fixed_target = None
@@ -477,7 +435,7 @@ class Poller:
                         g_effective_head.labels(node=name).set(block_num)
                         target = fixed_target if fixed_target is not None else block_num
                         # Even if the node reports "not syncing", for historical targets
-                        # (e.g. v1.0.3, v1.3.6) we still want an informative "remaining".
+                        # (e.g. v1.11.6 seeded cutoff) we still want an informative "remaining".
                         g_sync_remaining.labels(node=name).set(max(0, target - block_num))
                         pct = (block_num * 100.0 / target) if target > 0 else 0.0
                         progress = f"{block_num}/{target} ({pct:.1f}%)" if target > 0 else "0/0 (0.0%)"
@@ -532,34 +490,6 @@ class Poller:
                     else:
                         # If unknown this round, don't overwrite.
                         pass
-
-            # Optional: v1.9.25 import progress (manual acceleration step).
-            # This is used both for the Stage checklist and for the synthetic Sync-progress rows.
-            v925_import_current = 0
-            v925_import_running = False
-            if legacy_enabled and v925_import_log_path.exists():
-                try:
-                    tail = v925_import_log_path.read_text(errors="ignore")[-500000:]
-                    # v1.9.25 uses the modern log format during import.
-                    m = re.findall(r"Imported new chain segment\s+.*?number=([0-9,]+)", tail)
-                    if m:
-                        v925_import_current = int(m[-1].replace(",", ""))
-                    v925_import_running = (v925_import_current > 0) and (v925_import_current < cutoff_block)
-                except Exception:
-                    v925_import_current = 0
-                    v925_import_running = False
-
-            # v1.10.0 export progress (used for Stage checklist + synthetic rows).
-            v110_export_current = 0
-            v110_export_running = legacy_enabled and v110_export_marker_path.exists()
-            if legacy_enabled and v110_export_log_path.exists():
-                try:
-                    tail = v110_export_log_path.read_text(errors="ignore")[-500000:]
-                    m = re.findall(r"Exporting blocks\s+exported=([0-9,]+)", tail)
-                    if m:
-                        v110_export_current = int(m[-1].replace(",", ""))
-                except Exception:
-                    v110_export_current = 0
 
             # --- Stage checklist ---
             # Helper to emit 0/1/2 for a stage label.
@@ -654,7 +584,7 @@ class Poller:
                         if m:
                             import_current = int(m[-1].replace(",", ""))
                         else:
-                            # Old import output (e.g. geth v1.3.6 importer):
+                            # Old geth import output:
                             #   "imported 2500 block(s) ... #215000 [...]"
                             m2 = re.findall(r"imported\s+[0-9,]+\s+block\(s\).*?#([0-9,]+)", tail, flags=re.IGNORECASE)
                             if m2:
@@ -666,8 +596,8 @@ class Poller:
                     1 if (import_marker_path.exists() or importing) else 0,
                 )
 
-            # 6-7) Legacy bridge nodes reaching cutoff
-            def legacy_stage(node: str, stage_label: str) -> None:
+            # 06-08) Legacy bridge nodes syncing to the cutoff (normal P2P sync via static peering).
+            def cutoff_sync_stage(node: str, stage_label: str) -> None:
                 if not node_up.get(node, False):
                     set_stage(stage_label, 0)
                     return
@@ -679,155 +609,9 @@ class Poller:
                 else:
                     set_stage(stage_label, 0)
 
-            if legacy_enabled:
-                legacy_stage("Geth v1.10.0", "06. Geth v1.10.0 syncing")
-
-                # 07) Geth v1.10.0 exporting data (RLP export for v1.9.25 import)
-                min_export_bytes = 16 * 1024 * 1024
-                v110_export_file_ok = False
-                if v110_export_file_path.exists():
-                    try:
-                        v110_export_file_ok = v110_export_file_path.stat().st_size >= min_export_bytes
-                    except Exception:
-                        v110_export_file_ok = False
-                # If the downstream import is already marked done, treat this export stage as done
-                # as well. (The export file may have been produced earlier, or the done marker may
-                # have been cleaned up, but operationally the stage is complete.)
-                v110_export_done = (v110_export_done_path.exists() and v110_export_file_ok) or v925_import_done_path.exists()
-
-                if v110_export_done:
-                    set_stage("07. Geth v1.10.0 exporting data", 2)
-                elif v110_export_running or v110_export_current > 0:
-                    set_stage("07. Geth v1.10.0 exporting data", 1)
-                else:
-                    set_stage("07. Geth v1.10.0 exporting data", 0)
-
-                # 08) Geth v1.9.25 importing data (optional acceleration step)
-                # If we're doing an offline import into v1.9.25, show that explicitly.
-                # Otherwise, fall back to the normal syncing stage.
-                v925_node_head = node_effective_head.get("Geth v1.9.25", 0)
-                if v925_import_done_path.exists():
-                    set_stage("08. Geth v1.9.25 importing data", 2)
-                elif v925_import_current > 0 or v925_import_log_path.exists():
-                    if v925_import_current >= cutoff_block or v925_node_head >= cutoff_block:
-                        set_stage("08. Geth v1.9.25 importing data", 2)
-                    else:
-                        set_stage("08. Geth v1.9.25 importing data", 1)
-                else:
-                    # No import in progress; treat as normal sync stage.
-                    legacy_stage("Geth v1.9.25", "08. Geth v1.9.25 importing data")
-
-                # 09) Geth v1.9.25 exporting data (RLP export stage)
-                # IMPORTANT: do NOT infer "DONE" from the mere presence of the export file.
-                # A failed/partial `geth export` can leave a tiny/truncated file behind.
-                # We only mark DONE when the script writes the explicit done marker.
-                v136_export_running = v136_export_marker_path.exists()
-
-                # Treat export as DONE when the explicit done marker exists AND the output file
-                # exists and is non-trivially large.
-                # (The marker alone can become stale; the file alone can be tiny/truncated.)
-                min_export_bytes = 16 * 1024 * 1024
-                v136_export_file_ok = False
-                if v136_export_file_path.exists():
-                    try:
-                        v136_export_file_ok = v136_export_file_path.stat().st_size >= min_export_bytes
-                    except Exception:
-                        v136_export_file_ok = False
-                v136_export_done = v136_export_done_path.exists() and v136_export_file_ok
-
-                v136_export_last_done = None
-                if v136_export_progress_path.exists():
-                    data = _read_json_file(v136_export_progress_path)
-                    if isinstance(data, dict) and data.get("last_done") is not None:
-                        try:
-                            v136_export_last_done = int(data.get("last_done"))
-                        except Exception:
-                            v136_export_last_done = None
-
-                if v136_export_done:
-                    set_stage("09. Geth v1.9.25 exporting data", 2)
-                elif v136_export_last_done is not None:
-                    set_stage(
-                        "09. Geth v1.9.25 exporting data",
-                        2 if v136_export_last_done >= cutoff_block else 1,
-                    )
-                elif v136_export_running:
-                    set_stage("09. Geth v1.9.25 exporting data", 1)
-                else:
-                    set_stage("09. Geth v1.9.25 exporting data", 0)
-
-                # 10) Geth v1.3.6 importing data (RLP import stage)
-                v136_importing = False
-                v136_import_current = 0
-                # NOTE: the *.done marker can become stale if the v1.3.6 datadir is wiped.
-                # Treat it as DONE only if the v1.3.6 node itself is actually at/above cutoff.
-                v136_node_head = node_effective_head.get("Geth v1.3.6", 0)
-                v136_done_effective = v136_seed_done_path.exists() and v136_node_head >= cutoff_block
-
-                # If the upstream export step hasn't started, never show v1.3.6 as "importing".
-                # This prevents stale marker/log files from making Stage 09 appear active before Stage 08.
-                v136_export_started = (
-                    v136_export_running
-                    or v136_export_done
-                    or (v136_export_last_done is not None)
-                )
-
-                if v136_done_effective:
-                    set_stage("10. Geth v1.3.6 importing data", 2)
-                elif not v136_export_started:
-                    set_stage("10. Geth v1.3.6 importing data", 0)
-                else:
-                    if v136_import_marker_path.exists():
-                        v136_importing = True
-
-                    try:
-                        if v136_import_log_path.exists():
-                            tail = v136_import_log_path.read_text(errors="ignore")[-500000:]
-                            if "Importing blockchain" in tail or "Imported new chain segment" in tail:
-                                v136_importing = True
-                            m = re.findall(r"Imported new chain segment\s+number=([0-9,]+)", tail)
-                            if m:
-                                v136_import_current = int(m[-1].replace(",", ""))
-                            else:
-                                m2 = re.findall(
-                                    r"imported\s+[0-9,]+\s+block\(s\).*?#([0-9,]+)",
-                                    tail,
-                                    flags=re.IGNORECASE,
-                                )
-                                if m2:
-                                    v136_import_current = int(m2[-1].replace(",", ""))
-                    except Exception:
-                        pass
-
-                    set_stage(
-                        "10. Geth v1.3.6 importing data",
-                        1 if v136_importing else 0,
-                    )
-
-                # 11) Geth v1.0.3 syncing
-                #
-                # Unlike other legacy stages, v1.0.3 cannot realistically reach the offline cutoff.
-                # For the dashboard checklist, treat it as "DONE" once it reaches the historical
-                # target block we use for progress calculations.
-                v103_label = "Geth v1.0.3"
-                if not node_up.get(v103_label, False):
-                    set_stage("11. Geth v1.0.3 syncing", 0)
-                else:
-                    eff = node_effective_head.get(v103_label, 0)
-                    if eff >= GETH_V1_0_3_TARGET_BLOCK:
-                        set_stage("11. Geth v1.0.3 syncing", 2)
-                    elif eff > 0:
-                        set_stage("11. Geth v1.0.3 syncing", 1)
-                    else:
-                        set_stage("11. Geth v1.0.3 syncing", 0)
-            else:
-                # Legacy chain disabled: force consistent "not started" for all legacy stages.
-                set_stage("06. Geth v1.10.0 syncing", 0)
-                set_stage("07. Geth v1.10.0 exporting data", 0)
-                set_stage("08. Geth v1.9.25 importing data", 0)
-                set_stage("09. Geth v1.9.25 exporting data", 0)
-                set_stage("10. Geth v1.3.6 importing data", 0)
-                set_stage("11. Geth v1.0.3 syncing", 0)
+            cutoff_sync_stage("Geth v1.10.8", "06. Geth v1.10.8 syncing")
+            cutoff_sync_stage("Geth v1.9.25", "07. Geth v1.9.25 syncing")
+            cutoff_sync_stage("Geth v1.3.3", "08. Geth v1.3.3 syncing")
 
             # --- Synthetic rows for export/import phases in the Sync progress table ---
             # These are displayed as extra rows (between v1.16.7 and v1.11.6) by
@@ -846,6 +630,7 @@ class Poller:
                 g_up.labels(node=node_label).set(1 if up else 0)
                 g_effective_head.labels(node=node_label).set(current)
                 g_sync_target.labels(node=node_label).set(target)
+                g_sync_remaining.labels(node=node_label).set(max(0, target - current))
                 pct = (current * 100.0 / target) if target > 0 else 0.0
                 g_sync_percent.labels(node=node_label).set(pct)
                 progress = f"{current}/{target} ({pct:.1f}%)" if target > 0 else "0/0 (0.0%)"
@@ -905,92 +690,6 @@ class Poller:
                 import_running,
                 import_up,
             )
-
-            # --- Synthetic rows for legacy export/import phases (v1.9.25 -> v1.3.6) ---
-
-            if legacy_enabled:
-                # v1.10.0 export synthetic row (feeds v1.9.25 import).
-                min_export_bytes = 16 * 1024 * 1024
-                v110_export_file_ok = False
-                if v110_export_file_path.exists():
-                    try:
-                        v110_export_file_ok = v110_export_file_path.stat().st_size >= min_export_bytes
-                    except Exception:
-                        v110_export_file_ok = False
-                v110_export_done = (v110_export_done_path.exists() and v110_export_file_ok) or v925_import_done_path.exists()
-                v110_export_up = (
-                    v110_export_marker_path.exists()
-                    or v110_export_file_path.exists()
-                    or v110_export_done_path.exists()
-                    or v110_export_log_path.exists()
-                )
-                emit_phase_row(
-                    "Export (v1.10.0 → RLP)",
-                    3.50,
-                    cutoff_block if v110_export_done else v110_export_current,
-                    cutoff_block,
-                    (v110_export_running and not v110_export_done),
-                    v110_export_up,
-                )
-
-                emit_phase_row(
-                    "Import (RLP → v1.9.25)",
-                    4.40,
-                    cutoff_block if v925_import_current >= cutoff_block else v925_import_current,
-                    cutoff_block,
-                    v925_import_running,
-                    v925_import_log_path.exists() or v925_import_done_path.exists() or v925_import_current > 0,
-                )
-
-                v136_export_up = (
-                    v136_export_marker_path.exists()
-                    or v136_export_progress_path.exists()
-                    or v136_export_file_path.exists()
-                    or v136_export_done
-                    or v136_export_done_path.exists()
-                )
-                v136_export_display = (
-                    cutoff_block
-                    if v136_export_done
-                    else (v136_export_last_done if v136_export_last_done is not None else 0)
-                )
-                v136_export_running = (
-                    (v136_export_last_done is not None and v136_export_last_done < cutoff_block)
-                    or v136_export_marker_path.exists()
-                ) and not v136_export_done
-                emit_phase_row(
-                    "Export (v1.9.25 → RLP)",
-                    4.50,
-                    v136_export_display,
-                    cutoff_block,
-                    v136_export_running,
-                    v136_export_up,
-                )
-
-                # Only treat the import phase as "done" if the node is actually at/above cutoff.
-                # This prevents a stale done marker (after wiping the v1.3.6 datadir) from showing 100%.
-                v136_import_done = v136_done_effective
-                v136_import_up = v136_export_started and (
-                    v136_import_marker_path.exists()
-                    or v136_import_log_path.exists()
-                    or v136_import_done
-                    or v136_import_current > 0
-                )
-                emit_phase_row(
-                    "Import (RLP → v1.3.6)",
-                    4.60,
-                    cutoff_block if v136_import_done else max(v136_import_current, v136_node_head),
-                    cutoff_block,
-                    (v136_importing and not v136_import_done),
-                    v136_import_up,
-                )
-            else:
-                # Explicitly overwrite any previously-exported legacy phase rows so Grafana doesn't
-                # show stale progress when legacy is disabled.
-                emit_phase_row("Export (v1.10.0 → RLP)", 3.50, 0, cutoff_block, False, False)
-                emit_phase_row("Import (RLP → v1.9.25)", 4.40, 0, cutoff_block, False, False)
-                emit_phase_row("Export (v1.9.25 → RLP)", 4.50, 0, cutoff_block, False, False)
-                emit_phase_row("Import (RLP → v1.3.6)", 4.60, 0, cutoff_block, False, False)
 
             self._stop.wait(self.interval_seconds)
 

@@ -16,7 +16,7 @@ Entrypoints:
   - Services: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
   - `geth-v1-16-7` exposes HTTP JSON-RPC on host port `8545`.
 
-### Protocol bridge chain (down to Frontier)
+### Protocol bridge chain (down to Homestead)
 
 The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
   
@@ -48,14 +48,14 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
                                 | P2P eth/66 (protocol bridge)
                                 v
             +-----------------------------------------------+
-            | geth v1.10.0 (3rd Mar 2021)                   |
-            | eth/64-66                                     |
+            | geth v1.10.8 (21st Sep 2021)                  |
+            | eth/65-66                                     |
             | Forks added:                                  |
             |   London                                      |
             |   Berlin                                      |
             +-----------------------------------------------+
                                 |
-                                | (offline RLP export/import up to cutoff)
+                                | P2P eth/65 (protocol bridge)
                                 v
             +-----------------------------------------------+
             | geth v1.9.25 (11th Dec 2020)                  |
@@ -71,33 +71,24 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
             |   DAO                                         |
             +-----------------------------------------------+
                                 |
-                                | (offline RLP export/import up to cutoff)
+                                | P2P eth/63 (protocol bridge)
                                 v
              +-----------------------------------------------+
-             | geth v1.3.6 (1st Apr 2016)                    |
+             | geth v1.3.3 (5th Jan 2016)                    |
              | eth/61-63                                     |
-             | Forks added:                                  |
+             | Forks supported:                              |
              |   Homestead                                   |
-             +-----------------------------------------------+
-                                |
-                                | P2P eth/61 (protocol bridge)
-                                v
-             +-----------------------------------------------+
-             | geth v1.0.3 (2nd Sep 2015)                    |
-             | eth/60-61                                     |
-             | Forks:                                        |
              |   Frontier                                    |
-             +-----------------------------------------------+
+              +-------------------------------------------- -+
 ```
 
 Services:
 - `geth-v1-16-7`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:4)
 - `lighthouse-v8-0-1`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:198)
 - `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:46)
-- `geth-v1-10-0`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:78)
+- `geth-v1-10-8`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:78)
 - `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:110)
-- `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:139)
-- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:166)
+- `geth-v1-3-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:140)
 - `geth-exporter`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:232)
 - `prometheus`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:263)
 - `sync-ui`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:280)
@@ -107,15 +98,12 @@ Services:
 
 The stack uses a single consensus client (`lighthouse-v8-0-1`) for the head node.
 
-The bridge workflow seeds older datadirs up to a fixed historical cutoff using **RLP block export/import**.
+The bridge workflow seeds the post-Merge-incompatible execution client (v1.11.6) up to a fixed historical cutoff using **RLP block export/import**.
 
 1. Let `geth-v1-16-7` + `lighthouse-v8-0-1` sync normally.
 2. Export blocks `0..CUTOFF_BLOCK` from `geth-v1-16-7`.
 3. Import that block range into `geth-v1-11-6`.
-4. Export blocks `0..CUTOFF_BLOCK` from `geth-v1-10-0`.
-5. Import that block range into `geth-v1-9-25`.
-6. Export blocks `0..CUTOFF_BLOCK` from `geth-v1-9-25`.
-7. Import that block range into `geth-v1-3-6`.
+4. Start the downstream legacy nodes; they sync via normal P2P from their upstream bridge peers (static peering).
 
 Automation:
 - Bridge seeding orchestration: [`chain-of-geths/seed-v1.11.6-when-ready.sh`](chain-of-geths/seed-v1.11.6-when-ready.sh)
@@ -128,22 +116,14 @@ This avoids the “old chainstate format” / “no compatible consensus client�
 
 Older services run with discovery disabled and peer **only** to the next node in the chain for protocol bridging.
 
-Offline-seeded nodes do **not** rely on network sync for historical data transfer:
+Offline-seeded node:
 - `geth-v1-11-6` is populated by import from the `geth-v1-16-7` export.
-- `geth-v1-9-25` is populated by import from the `geth-v1-10-0` export.
-- `geth-v1-3-6` is populated by import from the `geth-v1-9-25` export.
-
-Exception (no outbound peering): `geth-v1-3-6` is expected to be offline-seeded and does **not** dial upstream peers.
 
 `generate-keys.sh` writes deterministic peering/config files under `chain-of-geths/generated-files/`:
 - `nodekey`
 - `static-nodes.json`
 - `config.toml` (newer nodes)
-- `genesis.json` (v1.0.3)
-
-It also writes a Windows helper output for peering an *external* (non-Docker) geth v1.1.0 instance to the deployed `geth-v1-3-6`:
-- `generated-files/windows/geth-v1.1.0/static-nodes.json`
-- `generated-files/windows/geth-v1.1.0/README.md`
+- (no genesis.json needed for this chain)
 
 See: [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh)
 

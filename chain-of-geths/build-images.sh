@@ -20,8 +20,8 @@ RUN apt-get update \
 
 # Download and install geth binary
 EOF
-    case $version in
-        v1.0.3)
+	case $version in
+		v1.0.3)
             # Build from source: no maintained prebuilt Linux binaries for these very early releases.
             # We compile using a downloaded Go 1.4.x toolchain (DockerHub no longer serves schema1 images like golang:1.4).
             cat > "$out_file" << 'EOF'
@@ -85,40 +85,40 @@ EXPOSE 8545 30303
 
 ENTRYPOINT ["geth"]
 EOF
-            ;;
-        v1.11.6)
+			;;
+		v1.11.6)
             cat >> "$out_file" << 'EOF'
 RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.11.6-ea9e62ca.tar.gz && \
     tar -xzf /tmp/geth.tar.gz -C /tmp && \
     mv /tmp/geth-linux-amd64-1.11.6-ea9e62ca/geth /usr/local/bin/geth && \
     rm -rf /tmp/*
 EOF
-            ;;
-        v1.10.0)
-            cat >> "$out_file" << 'EOF'
-RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.10.0-56dec25a.tar.gz && \
-    tar -xzf /tmp/geth.tar.gz -C /tmp && \
-    mv /tmp/geth-linux-amd64-1.10.0-56dec25a/geth /usr/local/bin/geth && \
-    rm -rf /tmp/*
+			;;
+		v1.10.8)
+			cat >> "$out_file" << 'EOF'
+RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.10.8-26675454.tar.gz && \
+	    tar -xzf /tmp/geth.tar.gz -C /tmp && \
+	    mv /tmp/geth-linux-amd64-1.10.8-26675454/geth /usr/local/bin/geth && \
+	    rm -rf /tmp/*
 EOF
-            ;;
-        v1.9.25)
+			;;
+		v1.9.25)
             cat >> "$out_file" << 'EOF'
 RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.9.25-e7872729.tar.gz && \
     tar -xzf /tmp/geth.tar.gz -C /tmp && \
     mv /tmp/geth-linux-amd64-1.9.25-e7872729/geth /usr/local/bin/geth && \
     rm -rf /tmp/*
 EOF
-            ;;
-        v1.3.6)
-            cat >> "$out_file" << 'EOF'
-RUN wget -O /tmp/geth.tar.bz2 https://github.com/ethereum/go-ethereum/releases/download/v1.3.6/geth-Linux64-20160402135800-1.3.6-9e323d6.tar.bz2 && \
-    tar -xjf /tmp/geth.tar.bz2 -C /tmp && \
-    mv /tmp/geth /usr/local/bin/geth && \
-    rm -rf /tmp/*
+			;;
+		v1.3.3)
+			cat >> "$out_file" << 'EOF'
+RUN wget -O /tmp/geth.tar.bz2 https://github.com/ethereum/go-ethereum/releases/download/v1.3.3/geth-Linux64-20160105143200-1.3.3-c541b38.tar.bz2 && \
+	    tar -xjf /tmp/geth.tar.bz2 -C /tmp && \
+	    mv /tmp/geth /usr/local/bin/geth && \
+	    rm -rf /tmp/*
 EOF
-            ;;
-    esac
+			;;
+	esac
 
     # v1.0.3 has a fully-defined multi-stage Dockerfile already.
     if [[ "$version" == "v1.0.3" ]]; then
@@ -142,11 +142,10 @@ EOF
 
 # Build images
 versions=(
-    "v1.0.3"
-    "v1.11.6"
-    "v1.10.0"
-    "v1.9.25"
-    "v1.3.6"
+	"v1.11.6"
+	"v1.10.8"
+	"v1.9.25"
+	"v1.3.3"
 )
 
 # Optional: build only a single version (faster iteration).
