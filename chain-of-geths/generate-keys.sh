@@ -118,8 +118,15 @@ generate_enode() {
         echo "Failed to extract pubkey from enode output for $version. Raw: '$raw'" >&2
         exit 1
     fi
-    # Keep discport=0 for maximum cross-version compatibility (especially for older clients).
-    echo "enode://$pubkey@$ip:$port?discport=0"
+    # NOTE: Extremely old Geth versions (e.g. v1.3.3 / Frontier-era) may not parse the
+    # modern enode URL query string (`?discport=0`). If they can't parse it, they won't
+    # dial static peers at all.
+    if [[ "$version" == "v1.3.3" ]]; then
+        echo "enode://$pubkey@$ip:$port"
+    else
+        # Keep discport=0 for maximum cross-version compatibility.
+        echo "enode://$pubkey@$ip:$port?discport=0"
+    fi
 }
 
 # Generate for each version

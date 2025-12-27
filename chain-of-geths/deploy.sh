@@ -147,6 +147,73 @@ echo "Starting base services (top node + monitoring)..."
 sudo docker compose up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui 2>/dev/null || \
   sudo docker-compose up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui
 
+# Optional: post-deploy healthcheck (fail fast on common "stuck at genesis" / "no peers" problems).
+POST_DEPLOY_HEALTHCHECK="${POST_DEPLOY_HEALTHCHECK:-1}"
+if [ "$POST_DEPLOY_HEALTHCHECK" = "1" ]; then
+  echo "Running post-deploy healthcheck (POST_DEPLOY_HEALTHCHECK=1)..."
+  rpc_hex_to_dec() {
+    # Usage: rpc_hex_to_dec 0x1a
+    local hex="$1"
+    hex="${hex#0x}"
+    if [ -z "$hex" ]; then
+      echo 0
+      return
+    fi
+    echo $((16#$hex))
+  }
+
+  rpc_call() {
+    # Usage: rpc_call <port> <method>
+    local port="$1"
+    local method="$2"
+    curl -sS --max-time 3 -H 'Content-Type: application/json' \
+      -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$method\",\"params\":[]}" \
+      "http://127.0.0.1:$port" 2>/dev/null || true
+  }
+
+  rpc_get_result() {
+    # Extract the JSON-RPC "result" string without jq.
+    # Usage: rpc_get_result "<json>"
+    echo "$1" | sed -n 's/.*"result"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1
+  }
+
+  wait_for_peers() {
+    # Usage: wait_for_peers <name> <port> <minPeers> <timeoutSeconds>
+    local name="$1" port="$2" minPeers="$3" timeout="$4"
+    local start
+    start=$(date +%s)
+    while true; do
+      local json res peers_hex peers
+      json=$(rpc_call "$port" net_peerCount)
+      res=$(rpc_get_result "$json")
+      peers_hex="$res"
+      peers=$(rpc_hex_to_dec "$peers_hex")
+
+      if [ "$peers" -ge "$minPeers" ]; then
+        echo "OK: $name has peers=$peers"
+        return 0
+      fi
+
+      local now elapsed
+      now=$(date +%s)
+      elapsed=$((now - start))
+      if [ "$elapsed" -ge "$timeout" ]; then
+        echo "WARN: $name still has peers=$peers after ${timeout}s"
+        return 1
+      fi
+      sleep 5
+    done
+  }
+
+  # Check head node first.
+  wait_for_peers "Geth v1.16.7" 8545 1 120 || true
+  # These may legitimately remain low, but should not be permanently 0.
+  wait_for_peers "Geth v1.11.6" 8546 1 120 || true
+  wait_for_peers "Geth v1.10.8" 8551 1 120 || true
+  wait_for_peers "Geth v1.9.25" 8552 1 120 || true
+  wait_for_peers "Geth v1.3.3" 8549 1 120 || true
+fi
+
 # Create the bridge container but do not start it yet.
 sudo docker compose create geth-v1-11-6 2>/dev/null || sudo docker-compose create geth-v1-11-6 || true
 
