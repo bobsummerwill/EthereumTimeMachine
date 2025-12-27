@@ -6,9 +6,9 @@
 
  ## Static peer (VM geth v1.3.6)
  
- - VM host:       `54.81.90.194`
+ - VM host:       `52.0.234.84`
  - VM P2P port (host):       `30307`
- - Enode (use in static-nodes.json):       `enode://23b9ce0d434ddf399ee2200e5749f3b992afa322333069a859d8b09f36e9159095507b1ac36aa010272479f2b4390e55fac4d80468993c1e55081e48649968f1@54.81.90.194:30307?discport=0`
+ - Enode (use in static-nodes.json):       `enode://23b9ce0d434ddf399ee2200e5749f3b992afa322333069a859d8b09f36e9159095507b1ac36aa010272479f2b4390e55fac4d80468993c1e55081e48649968f1@52.0.234.84:30307?discport=0`
 
  The file [
  `static-nodes.json`

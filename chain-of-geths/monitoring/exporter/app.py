@@ -179,9 +179,8 @@ GETH_V1_0_3_TARGET_BLOCK = 1_149_999
 
 g_up = Gauge("geth_up", "Whether the exporter can query the node (1=up, 0=down)", ["node"])
 g_block = Gauge("geth_block_number", "Latest known head block number", ["node"])
-# During snap/beacon-style sync, some clients may keep `eth_blockNumber` pinned
-# while `eth_syncing.currentBlock` advances. This metric provides a less confusing
-# single “best estimate” of the node's progress.
+# Some clients may keep `eth_blockNumber` behind `eth_syncing.currentBlock` while syncing.
+# This metric provides a single best-effort “progress head” for dashboards.
 g_effective_head = Gauge(
     "geth_effective_head_block",
     "Best-effort progress head: if syncing then max(eth_blockNumber, eth_syncing.currentBlock) else eth_blockNumber",
@@ -439,13 +438,6 @@ class Poller:
                 fixed_target: int | None
                 if name.strip() == "Geth v1.0.3":
                     fixed_target = GETH_V1_0_3_TARGET_BLOCK
-                elif name.strip() == "Geth v1.16.7":
-                    # For the seeding/export workflow, it is more meaningful to show v1.16.7 progress
-                    # vs the fixed cutoff until the export step has actually completed.
-                    #
-                    # This makes the row hit CUTOFF_BLOCK only when eth_blockNumber has truly reached
-                    # that height (i.e. blocks are available for export).
-                    fixed_target = cutoff_block if not export_done_path.exists() else None
                 elif name.strip() == "Geth v1.9.25":
                     # v1.9.25 is used as an offline export source for the pre-DAO cutoff range.
                     # Show progress/remaining vs the cutoff, not vs the ever-moving mainnet head.
@@ -500,12 +492,7 @@ class Poller:
                         g_syncing.labels(node=name).set(1)
                         g_sync_current.labels(node=name).set(cur)
                         g_sync_highest.labels(node=name).set(hi)
-                        # For v1.16.7 (until export done), prefer eth_blockNumber for progress.
-                        # eth_syncing.currentBlock can advance far ahead of fully-imported blocks.
-                        if name.strip() == "Geth v1.16.7" and fixed_target == cutoff_block:
-                            eff = block_num
-                        else:
-                            eff = max(block_num, cur)
+                        eff = max(block_num, cur)
                         node_effective_head[name] = eff
                         # If a fixed target is configured, we explicitly report remaining vs that
                         # target (even if the node reports a much higher eth_syncing.highestBlock).
@@ -580,6 +567,7 @@ class Poller:
                 g_stage_status.labels(stage=stage).set(status)
 
             # 01) Lighthouse syncing from snapshot (checkpoint sync + head catchup)
+            # Only show this stage once the Lighthouse API is reachable.
             if not lighthouse_up:
                 set_stage("01. Lighthouse syncing from snapshot", 0)
             else:

@@ -24,6 +24,10 @@ IMPORT_MARKER_FILE="$ROOT_DIR/generated-files/seed-v1.11.6-import-${CUTOFF_BLOCK
 
 mkdir -p "$ROOT_DIR/generated-files" "$EXPORT_DIR"
 
+# Ensure we always capture errors (including early RPC connection failures) in the seed log.
+# This script can start before the JSON-RPC endpoint is ready; we want to keep retrying.
+exec >>"$LOG_FILE" 2>&1
+
 compose_has_v2() {
   sudo docker compose version >/dev/null 2>&1
 }
@@ -83,9 +87,12 @@ current_exec_block() {
   # Rationale: during snap-style sync, eth_syncing.currentBlock can advance far ahead of
   # fully-available blocks/bodies. Kicking off an offline `geth export 0..CUTOFF` based on
   # currentBlock can fail (and/or require freezer truncation/repair).
-  curl -s -X POST localhost:8545 -H 'Content-Type: application/json' \
+  # NOTE: tolerate RPC not being ready yet.
+  local resp
+  resp=$(curl -sS -X POST localhost:8545 -H 'Content-Type: application/json' \
     --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
-    | sed -n 's/.*"result":"\(0x[0-9a-fA-F]*\)".*/\1/p'
+    || true)
+  echo "$resp" | sed -n 's/.*"result":"\(0x[0-9a-fA-F]*\)".*/\1/p'
 }
 
 cutoff_block_hash() {
@@ -93,8 +100,12 @@ cutoff_block_hash() {
   # Empty means block not available yet.
   local hex
   hex=$(printf '0x%x' "$CUTOFF_BLOCK")
-  curl -s -X POST localhost:8545 -H 'Content-Type: application/json' \
+  # NOTE: tolerate RPC not being ready yet.
+  local resp
+  resp=$(curl -sS -X POST localhost:8545 -H 'Content-Type: application/json' \
     --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"$hex\",false],\"id\":1}" \
+    || true)
+  echo "$resp" \
     | sed -n 's/.*"hash":"\(0x[0-9a-fA-F]*\)".*/\1/p' \
     | head -n 1
 }

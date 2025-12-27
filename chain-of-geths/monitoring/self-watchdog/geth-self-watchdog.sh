@@ -16,6 +16,12 @@ SAMPLE_INTERVAL_SECONDS="${SAMPLE_INTERVAL_SECONDS:-600}"
 TARGET_MARGIN_BLOCKS="${TARGET_MARGIN_BLOCKS:-10}"
 IPC_PATH="${IPC_PATH:-/data/geth.ipc}"
 
+# Optional startup gate: wait for some HTTP endpoint to be reachable before starting geth.
+#
+# Intended use: delay the EL until the Lighthouse HTTP API is up.
+WAIT_FOR_HTTP_URL="${WAIT_FOR_HTTP_URL:-}"
+WAIT_FOR_HTTP_MAX_SECONDS="${WAIT_FOR_HTTP_MAX_SECONDS:-600}"
+
 num_to_dec() {
   # Accept 0x-prefixed hex or decimal strings.
   # Portable across dash: use 0x... arithmetic, avoid base#number.
@@ -122,6 +128,24 @@ current_and_target() {
 }
 
 echo "[self-watchdog] starting geth (wrapper pid=$$)"
+
+if [ -n "$WAIT_FOR_HTTP_URL" ]; then
+  echo "[self-watchdog] waiting for HTTP endpoint before starting geth: $WAIT_FOR_HTTP_URL (max ${WAIT_FOR_HTTP_MAX_SECONDS}s)"
+  elapsed=0
+  # Use wget (present in the official ethereum/client-go image).
+  while true; do
+    if wget -qO- --timeout=2 --tries=1 "$WAIT_FOR_HTTP_URL" >/dev/null 2>&1; then
+      echo "[self-watchdog] HTTP endpoint is reachable; continuing"
+      break
+    fi
+    elapsed=$((elapsed + 2))
+    if [ "$elapsed" -ge "$WAIT_FOR_HTTP_MAX_SECONDS" ]; then
+      echo "[self-watchdog] timeout waiting for $WAIT_FOR_HTTP_URL; continuing anyway"
+      break
+    fi
+    sleep 2
+  done
+fi
 
 # Start geth as a child process.
 geth "$@" &

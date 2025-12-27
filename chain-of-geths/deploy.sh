@@ -36,7 +36,7 @@ else
     exit 1
 fi
 
-VM_IP="54.81.90.194"
+VM_IP="52.0.234.84"
 VM_USER="ubuntu"
 
 # Update this to your PEM key path. Note: don't quote ~ (tilde expansion doesn't happen in quotes).

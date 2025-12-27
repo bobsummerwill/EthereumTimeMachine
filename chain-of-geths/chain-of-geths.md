@@ -83,7 +83,7 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
                                 | P2P eth/61 (protocol bridge)
                                 v
              +-----------------------------------------------+
-             | geth v1.0.3 (27th Jan 2014)                   |
+             | geth v1.0.3 (2nd Sep 2015)                    |
              | eth/60-61                                     |
              | Forks:                                        |
              |   Frontier                                    |
