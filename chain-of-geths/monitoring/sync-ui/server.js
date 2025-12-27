@@ -96,7 +96,7 @@ function normalizeForDisplay(row) {
 
   // Match the Grafana dashboard behavior: for selected legacy nodes, display a fixed cutoff target.
   // Grafana does this in the panel query by substituting 1919999 for these nodes.
-  const legacyFixedTarget = /^Geth v1\.(11\.6|10\.8|9\.25|3\.3)$/.test(node);
+  const legacyFixedTarget = /^Geth v1\.(11\.6|10\.8|9\.25|3\.6|3\.3)$/.test(node);
   if (legacyFixedTarget && Number.isFinite(CUTOFF_BLOCK) && CUTOFF_BLOCK > 0) {
     tgt = CUTOFF_BLOCK;
     pct = Math.min(100, (cur * 100.0) / CUTOFF_BLOCK);

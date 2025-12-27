@@ -133,6 +133,37 @@ services:
       ethereum:
         ipv4_address: 172.20.0.17
 
+  # Bridge node: eth/63<->Frontier-era compatibility.
+  # Geth v1.3.6 supports eth/62-63-ish and can still talk to v1.9.25.
+  # This exists because v1.3.3 is too old to speak directly to v1.9.25.
+  geth-v1-3-6:
+    image: ethereumtimemachine/geth:v1.3.6
+    container_name: geth-v1-3-6
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    command: |
+      --datadir /data
+      --nodekey /data/nodekey
+      --cache 4096
+      --rpc
+      --rpcaddr 0.0.0.0
+      --rpcapi eth,net,web3
+      --networkid 1
+      --port 30311
+      --nodiscover
+    ports:
+      - "8553:8545"
+      - "30311:30311/tcp"
+      - "30311:30311/udp"
+    volumes:
+      - ./generated-files/data/v1.3.6:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
+    depends_on:
+      - geth-v1-9-25
+    networks:
+      ethereum:
+        ipv4_address: 172.20.0.13
+
   geth-v1-3-3:
     image: ethereumtimemachine/geth:v1.3.3
     container_name: geth-v1-3-3
@@ -156,7 +187,7 @@ services:
       - ./generated-files/data/v1.3.3:/data
       - ./monitoring/self-watchdog:/watchdog:ro
     depends_on:
-      - geth-v1-9-25
+      - geth-v1-3-6
     networks:
       ethereum:
         ipv4_address: 172.20.0.14
@@ -207,6 +238,7 @@ services:
         Geth v1.11.6=http://geth-v1-11-6:8545,
         Geth v1.10.8=http://geth-v1-10-8:8545,
         Geth v1.9.25=http://geth-v1-9-25:8545,
+        Geth v1.3.6=http://geth-v1-3-6:8545,
         Geth v1.3.3=http://geth-v1-3-3:8545
       # Used to add a Lighthouse row in the same “Sync progress” table.
       LIGHTHOUSE_API_URL: http://lighthouse-v8-0-1:5052

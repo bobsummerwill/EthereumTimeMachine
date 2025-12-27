@@ -405,7 +405,7 @@ class Poller:
                 # Some nodes should display progress vs a fixed historical target rather than the
                 # node-reported `eth_syncing.highestBlock` (which may be missing/0 on older clients).
                 fixed_target: int | None
-                if name.strip() in {"Geth v1.11.6", "Geth v1.10.8", "Geth v1.9.25", "Geth v1.3.3"}:
+                if name.strip() in {"Geth v1.11.6", "Geth v1.10.8", "Geth v1.9.25", "Geth v1.3.6", "Geth v1.3.3"}:
                     # These nodes are expected to sync up to the fixed historical cutoff.
                     fixed_target = cutoff_block
                 else:
@@ -652,7 +652,8 @@ class Poller:
 
             cutoff_sync_stage("Geth v1.10.8", "5. Geth v1.10.8 syncing")
             cutoff_sync_stage("Geth v1.9.25", "6. Geth v1.9.25 syncing")
-            cutoff_sync_stage("Geth v1.3.3", "7. Geth v1.3.3 syncing")
+            cutoff_sync_stage("Geth v1.3.6", "7. Geth v1.3.6 syncing")
+            cutoff_sync_stage("Geth v1.3.3", "8. Geth v1.3.3 syncing")
 
             # --- Synthetic rows for export/import phases in the Sync progress table ---
             # These are displayed as extra rows (between v1.16.7 and v1.11.6) by

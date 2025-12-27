@@ -6,6 +6,7 @@
 #   geth v1.11.6 (offline-seeded from v1.16.7)
 #   geth v1.10.8
 #   geth v1.9.25
+#   geth v1.3.6
 #   geth v1.3.3
 #
 # Only the v1.16.7 -> v1.11.6 hop uses offline export/import seeding.
@@ -169,6 +170,10 @@ wait_for_block_ge "geth-v1-10-8" "http://localhost:8551" "$MIN_BLOCK"
 echo "[start-legacy] starting geth-v1-9-25"
 compose_up geth-v1-9-25
 wait_for_block_ge "geth-v1-9-25" "http://localhost:8552" "$MIN_BLOCK"
+
+echo "[start-legacy] starting geth-v1-3-6"
+compose_up geth-v1-3-6
+wait_for_block_ge "geth-v1-3-6" "http://localhost:8553" "$MIN_BLOCK"
 
 echo "[start-legacy] starting geth-v1-3-3"
 compose_up geth-v1-3-3

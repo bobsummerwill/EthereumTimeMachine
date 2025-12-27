@@ -129,6 +129,25 @@ RUN wget -O /tmp/geth.tar https://github.com/ethereum/go-ethereum/releases/downl
 	rm -rf /tmp/*
 EOF
 			;;
+		v1.3.6)
+			cat >> "$out_file" << 'EOF'
+RUN wget -O /tmp/geth.tar https://github.com/ethereum/go-ethereum/releases/download/v1.3.6/geth-Linux64-20160402135800-1.3.6-9e323d6.tar.bz2 && \
+	# GitHub release assets for very old tags can sometimes be served with an unexpected
+	# content-encoding (or the file may not actually be bzip2-compressed). Detect and extract
+	# using a small set of fallbacks instead of hardcoding `tar -xjf`.
+	if bzip2 -t /tmp/geth.tar >/dev/null 2>&1; then \
+	    tar -xjf /tmp/geth.tar -C /tmp; \
+	elif tar -xzf /tmp/geth.tar -C /tmp >/dev/null 2>&1; then \
+	    true; \
+	else \
+	    tar -xf /tmp/geth.tar -C /tmp; \
+	fi && \
+	GETH_BIN=$(find /tmp -maxdepth 2 -type f -name geth | head -n 1) && \
+	test -n "$GETH_BIN" && \
+	mv "$GETH_BIN" /usr/local/bin/geth && \
+	rm -rf /tmp/*
+EOF
+			;;
 	esac
 
     # v1.0.3 has a fully-defined multi-stage Dockerfile already.
@@ -156,6 +175,7 @@ versions=(
 	"v1.11.6"
 	"v1.10.8"
 	"v1.9.25"
+	"v1.3.6"
 	"v1.3.3"
 )
 

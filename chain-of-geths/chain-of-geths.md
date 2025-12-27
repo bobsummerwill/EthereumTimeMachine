@@ -70,29 +70,40 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
             |   Tangerine Whistle                           |
             |   DAO                                         |
             +-----------------------------------------------+
-                                |
-                                | P2P eth/63 (protocol bridge)
-                                v
+                                 |
+                                 | P2P eth/63 (protocol bridge)
+                                 v
+             +-----------------------------------------------+
+             | geth v1.3.6 (1st Apr 2016)                    |
+             | eth/62-63                                     |
+             | Forks supported:                              |
+             |   Homestead                                   |
+             |   Frontier                                    |
+             +-----------------------------------------------+
+                                 |
+                                 | P2P eth/62 (protocol bridge)
+                                 v
              +-----------------------------------------------+
              | geth v1.3.3 (5th Jan 2016)                    |
              | eth/61-63                                     |
              | Forks supported:                              |
              |   Homestead                                   |
              |   Frontier                                    |
-              +-------------------------------------------- -+
+             +-----------------------------------------------+
 ```
 
 Services:
 - `geth-v1-16-7`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:4)
 - `lighthouse-v8-0-1`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:198)
-- `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:46)
-- `geth-v1-10-8`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:78)
-- `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:110)
-- `geth-v1-3-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:140)
-- `geth-exporter`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:232)
-- `prometheus`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:263)
-- `sync-ui`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:280)
-- `grafana`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:294)
+- `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:45)
+- `geth-v1-10-8`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:76)
+- `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:107)
+- `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:139)
+- `geth-v1-3-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:167)
+- `geth-exporter`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:230)
+- `prometheus`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:261)
+- `sync-ui`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:278)
+- `grafana`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:292)
 
 ## Offline export/import seeding (bridge workflow)
 
