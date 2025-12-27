@@ -817,7 +817,21 @@ class Poller:
                     )
 
                 # 11) Geth v1.0.3 syncing
-                legacy_stage("Geth v1.0.3", "11. Geth v1.0.3 syncing")
+                #
+                # Unlike other legacy stages, v1.0.3 cannot realistically reach the offline cutoff.
+                # For the dashboard checklist, treat it as "DONE" once it reaches the historical
+                # target block we use for progress calculations.
+                v103_label = "Geth v1.0.3"
+                if not node_up.get(v103_label, False):
+                    set_stage("11. Geth v1.0.3 syncing", 0)
+                else:
+                    eff = node_effective_head.get(v103_label, 0)
+                    if eff >= GETH_V1_0_3_TARGET_BLOCK:
+                        set_stage("11. Geth v1.0.3 syncing", 2)
+                    elif eff > 0:
+                        set_stage("11. Geth v1.0.3 syncing", 1)
+                    else:
+                        set_stage("11. Geth v1.0.3 syncing", 0)
             else:
                 # Legacy chain disabled: force consistent "not started" for all legacy stages.
                 set_stage("06. Geth v1.10.0 syncing", 0)
