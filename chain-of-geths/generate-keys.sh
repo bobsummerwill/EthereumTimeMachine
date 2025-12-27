@@ -129,6 +129,15 @@ generate_enode() {
     fi
 }
 
+# Very old Geth releases (e.g. v1.3.3) may not parse enode URLs that include
+# a query string like `?discport=0`. When writing static-nodes.json for those
+# clients, strip any query component.
+strip_enode_query() {
+    local enode="$1"
+    # Remove anything from the first '?' onward.
+    echo "${enode%%\?*}"
+}
+
 # Generate for each version
 declare -A enodes
 for version in "${versions[@]}"; do
@@ -216,7 +225,8 @@ for version in v1.10.8 v1.9.25 v1.3.3; do
             ;;
         v1.3.3)
             next="v1.9.25"
-            printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
+            # v1.3.3 may not parse `?discport=0` in enode URLs.
+            printf '["%s"]\n' "$(strip_enode_query "${enodes[$next]}")" > "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;
     esac
