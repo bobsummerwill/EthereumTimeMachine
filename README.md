@@ -5,7 +5,7 @@ Tools to run historical Ethereum clients and related workflows.
 
 The primary implementation in this repo is **Chain of Geths**: a Docker Compose stack of multiple Geth versions (plus Lighthouse) where adjacent nodes share overlapping `eth/*` subprotocols.
 
-Documentation: [`chain-of-geths/chain-of-geths.md`](chain-of-geths/chain-of-geths.md)
+Documentation: [`chain-of-geths/README.md`](chain-of-geths/README.md)
 
 Entrypoints:
 - Compose stack: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
