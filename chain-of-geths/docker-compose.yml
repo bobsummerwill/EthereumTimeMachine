@@ -19,8 +19,6 @@ services:
       --authrpc.port 8551
       --authrpc.vhosts *
       --authrpc.jwtsecret /data/geth/jwtsecret
-      # Default to full sync for the export workflow; the seeder can later restart this node
-      # in a faster sync mode (e.g. snap) by setting GETH_V1_16_7_SYNCMODE.
       --syncmode ${GETH_V1_16_7_SYNCMODE:-full}
       --networkid 1
       --port 30306
