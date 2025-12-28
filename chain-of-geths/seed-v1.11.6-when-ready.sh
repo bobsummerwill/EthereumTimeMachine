@@ -40,6 +40,14 @@ compose_has_v2() {
   sudo docker compose version >/dev/null 2>&1
 }
 
+# Decide which compose implementation works under sudo.
+COMPOSE=()
+if compose_has_v2; then
+  COMPOSE=(sudo docker compose)
+else
+  COMPOSE=(sudo docker-compose)
+fi
+
 compose_stop() {
   # Prefer `docker stop` over `docker compose stop` here.
   # We use explicit `container_name:` for the geth services, so container names are stable,
@@ -50,11 +58,7 @@ compose_stop() {
 
 compose_up() {
   # shellcheck disable=SC2068
-  if compose_has_v2; then
-    sudo docker compose up -d $@ >>"$LOG_FILE" 2>&1 || true
-  else
-    sudo docker-compose up -d $@ >>"$LOG_FILE" 2>&1 || true
-  fi
+  "${COMPOSE[@]}" up -d $@ >>"$LOG_FILE" 2>&1 || true
 }
 
 wait_for_lock_release() {
@@ -249,7 +253,15 @@ sudo docker run --rm \
 rm -f "$IMPORT_MARKER_FILE" >> "$LOG_FILE" 2>&1 || true
 
 # Bring core services back up.
-compose_up geth-v1-16-7 geth-v1-11-6
+
+# After export is complete, restart the modern node in the fastest sync mode.
+# For geth v1.16.7 this is typically `snap` (the default).
+POST_EXPORT_SYNCMODE="${POST_EXPORT_SYNCMODE:-snap}"
+echo "[seed] restarting geth-v1-16-7 in post-export sync mode: $POST_EXPORT_SYNCMODE" >> "$LOG_FILE"
+
+# Force recreate so the updated env/command takes effect.
+sudo env GETH_V1_16_7_SYNCMODE="$POST_EXPORT_SYNCMODE" "${COMPOSE[@]}" up -d --force-recreate geth-v1-16-7 >>"$LOG_FILE" 2>&1 || true
+"${COMPOSE[@]}" up -d geth-v1-11-6 >>"$LOG_FILE" 2>&1 || true
 
 touch "$FLAG_FILE"
 echo "[seed] done; wrote $FLAG_FILE" >> "$LOG_FILE"

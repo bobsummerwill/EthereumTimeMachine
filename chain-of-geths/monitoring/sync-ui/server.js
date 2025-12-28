@@ -336,13 +336,15 @@ app.get("/", async (req, res) => {
         display: block;
         white-space: nowrap;
         overflow-x: auto;
-        overflow-y: hidden;
+        /* Keep enough vertical space for multi-line cards (fork lists) without clipping. */
+        overflow-y: visible;
         gap: 10px;
         padding: 12px;
+        padding-bottom: 34px; /* room for arrow labels below */
         border: 1px solid #2a2a2a;
         border-radius: 10px;
         background: rgba(255,255,255,0.02);
-        min-height: 150px;
+        min-height: 270px;
       }
 
       .node-card {
@@ -382,19 +384,28 @@ app.get("/", async (req, res) => {
       }
       /* Moving stripes for IN PROGRESS */
       .status-1 .fill {
-        background: repeating-linear-gradient(
+        background: currentColor;
+      }
+      .status-1 .fill::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        /* Overlay subtle stripes (darker, not bright) to avoid blocky artifacts. */
+        background-image: repeating-linear-gradient(
           45deg,
-          rgba(0,0,0,0.25),
-          rgba(0,0,0,0.25) 6px,
+          rgba(0,0,0,0.35) 0,
+          rgba(0,0,0,0.35) 6px,
           rgba(255,255,255,0.10) 6px,
           rgba(255,255,255,0.10) 12px
         );
-        background-size: 40px 40px;
+        background-size: 24px 24px;
         animation: stripes 1.2s linear infinite;
+        opacity: 0.9;
+        pointer-events: none;
       }
       @keyframes stripes {
         from { background-position: 0 0; }
-        to { background-position: 40px 0; }
+        to { background-position: 24px 0; }
       }
 
       .arrow {
@@ -429,7 +440,7 @@ app.get("/", async (req, res) => {
           rgba(255,255,255,0.08) 10px,
           rgba(255,255,255,0.08) 16px
         );
-        background-size: 32px 4px;
+        background-size: 24px 4px;
         animation: flow 1.2s linear infinite;
       }
       .arrow::after {
@@ -457,7 +468,7 @@ app.get("/", async (req, res) => {
       }
       @keyframes flow {
         from { background-position: 0 0; }
-        to { background-position: 32px 0; }
+        to { background-position: 24px 0; }
       }
     </style>
   </head>
@@ -552,8 +563,8 @@ app.get("/", async (req, res) => {
             'Geth v1.16.7': { date: '4th Nov 2025', proto: 'eth/68-69', forks: ['Cancun'] },
             'Geth v1.10.8': { date: '21st Sep 2021', proto: 'eth/65-66', forks: ['London', 'Berlin'] },
             'Geth v1.9.25': { date: '11th Dec 2020', proto: 'eth/63-65', forks: ['Muir Glacier', 'Istanbul', 'Petersburg', 'Constantinople', 'Byzantium', 'Spurious Dragon', 'Tangerine Whistle', 'DAO'] },
-            'Geth v1.3.6': { date: '1st Apr 2016', proto: 'eth/62-63', forks: ['Homestead', 'Frontier'] },
-            'Geth v1.3.3': { date: '5th Jan 2016', proto: 'eth/61-63', forks: ['Homestead', 'Frontier'] },
+            'Geth v1.3.6': { date: '1st Apr 2016', proto: 'eth/62-63', forks: ['Homestead'] },
+            'Geth v1.3.3': { date: '5th Jan 2016', proto: 'eth/61-63', forks: ['Frontier'] },
           };
           const meta = metaMap[node];
           const metaLines = [];

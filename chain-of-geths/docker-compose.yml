@@ -19,7 +19,9 @@ services:
       --authrpc.port 8551
       --authrpc.vhosts *
       --authrpc.jwtsecret /data/geth/jwtsecret
-      --syncmode full
+      # Default to full sync for the export workflow; the seeder can later restart this node
+      # in a faster sync mode (e.g. snap) by setting GETH_V1_16_7_SYNCMODE.
+      --syncmode ${GETH_V1_16_7_SYNCMODE:-full}
       --networkid 1
       --port 30306
     ports:
@@ -78,9 +80,14 @@ services:
     container_name: geth-v1-10-8
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    # Troubleshooting: disable snapshots to prevent v1.10.8 from falling into fast/snapshot recovery,
+    # which can cause it to drop the offline-seeded upstream peer as "unsynced".
+    # Also bump verbosity temporarily to capture peer/drop reasons.
     command: |
       --datadir /data
       --cache 2048
+      --snapshot=false
+      --verbosity=4
       --http
       --http.addr 0.0.0.0
       --http.vhosts *
@@ -120,6 +127,8 @@ services:
       --syncmode full
       --port 30310
       --nodiscover
+      --snapshot=false
+      --nousb
     ports:
       - "8552:8545"
       - "30310:30310/tcp"
