@@ -102,9 +102,14 @@ get_current_and_target() {
 
   # Grab first two numbers.
   first=$(first_hex_or_dec "$out")
+  # If output isn't parseable yet (e.g. "undefined"), treat as not-ready.
+  if [ -z "$first" ]; then
+    echo ""; echo ""; return 0
+  fi
   # remove up to first occurrence so the next grep finds the second
   rest=$(printf "%s" "$out" | sed "0,/$first/s//X/")
   second=$(first_hex_or_dec "$rest")
+  [ -z "$second" ] && second="$first"
 
   printf "%s\n%s\n" "$first" "$second"
 }
