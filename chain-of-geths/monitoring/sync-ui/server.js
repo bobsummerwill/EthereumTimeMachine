@@ -260,30 +260,32 @@ app.get("/", async (req, res) => {
       const s = computeStageStatus(cur, tgt);
       const color = s === 2 ? "#69db7c" : s === 1 ? "#ffd166" : "#ff5b5b";
       const meta = nodeMeta(r.node);
-      const metaLines = [];
-      if (meta) {
-        metaLines.push(`<div class=\"line\">${escapeHtml(meta.date)}</div>`);
-        metaLines.push(`<div class=\"line\">${escapeHtml(meta.proto)}</div>`);
-      }
+      const releasedLine = meta ? `<div class=\"released\">released ${escapeHtml(meta.date)}</div>` : "";
+      const protoLine = meta ? `<div class=\"proto\">supports ${escapeHtml(meta.proto)}</div>` : "";
+
+      const forksLines =
+        meta && Array.isArray(meta.forks) && meta.forks.length
+          ? (
+              '<div class="line"><span class="forks-label">Forks:</span></div>' +
+              meta.forks.map((f) => '<div class="line">' + escapeHtml(f) + '</div>').join('')
+            )
+          : '';
 
       const parts = [
         '<div class="node-card status-' + s + '" style="color:' + color + '">' +
-          '<div class="label">' + escapeHtml(r.node) + '</div>' +
-          '<div class="meta">' + metaLines.join("") + '</div>' +
+          '<div class="header">' +
+            '<div class="label">' + escapeHtml(r.node) + '</div>' +
+            releasedLine +
+            protoLine +
+          '</div>' +
+          '<div class="progress">' +
+            '<div class="line">' + escapeHtml(fmtInt(cur)) + '/' + escapeHtml(fmtInt(tgt)) + '</div>' +
+            '<div class="line"><span class="status">' + escapeHtml(statusText(s)) + '</span> <span class="pct">(' + escapeHtml(fmtPct(pct)) + ')</span></div>' +
+          '</div>' +
           '<div class="tank" title="' + escapeHtml(statusText(s)) + ' · ' + escapeHtml(fmtPct(pct)) + '">' +
             '<div class="fill" style="height:' + pct.toFixed(1) + '%"></div>' +
           '</div>' +
-          '<div class="stats">' +
-            '<div class="line status">' + escapeHtml(statusText(s)) + '</div>' +
-            '<div class="line">' + escapeHtml(fmtInt(cur)) + '/' + escapeHtml(fmtInt(tgt)) + '</div>' +
-            '<div class="line">' + escapeHtml(fmtPct(pct)) + '</div>' +
-            (meta && Array.isArray(meta.forks) && meta.forks.length
-              ? (
-                  '<div class="line"><span class="forks-label">Forks:</span></div>' +
-                  meta.forks.map((f) => '<div class="line">' + escapeHtml(f) + '</div>').join('')
-                )
-              : '') +
-          '</div>' +
+          '<div class="meta">' + forksLines + '</div>' +
         '</div>',
       ];
 
@@ -357,14 +359,63 @@ app.get("/", async (req, res) => {
         vertical-align: top;
         white-space: normal;
         margin-right: 10px;
+        /* User request: center-align all text within each card. */
+        text-align: center;
       }
-      .node-card .label { font-size: 12px; font-weight: 700; line-height: 1.2; margin-bottom: 8px; }
-      .node-card .meta { font-size: 11px; opacity: 0.85; line-height: 1.25; margin-bottom: 8px; }
+      .node-card .header {
+        margin-bottom: 6px;
+        /* Keep tank top aligned across cards even when titles wrap. */
+        min-height: 58px;
+      }
+      .node-card .label {
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.2;
+        margin: 0;
+      }
+      .node-card .released {
+        margin-top: 4px;
+        font-size: 11px;
+        opacity: 0.85;
+        line-height: 1.2;
+      }
+      .node-card .proto {
+        margin-top: 4px;
+        font-size: 11px;
+        opacity: 0.85;
+        line-height: 1.2;
+      }
+
+      /* Text block ABOVE the tank (requested ordering). */
+      .node-card .progress {
+        font-size: 11px;
+        opacity: 0.95;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.25;
+        margin-bottom: 4px;
+        /* Ensure consistent spacing above the image across all cards. */
+        min-height: 46px;
+        /* Keep the tank aligned while avoiding a “blank line” gap before it. */
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap: 2px;
+      }
+      .node-card .progress .line { margin: 0; }
+      .node-card .progress .status { font-weight: 800; letter-spacing: 0.3px; }
+      .node-card .progress .pct { font-weight: 400; letter-spacing: 0; }
+
+      /* Text block BELOW the tank (release/proto + forks). */
+      .node-card .meta {
+        font-size: 11px;
+        opacity: 0.85;
+        line-height: 1.25;
+        margin-top: 8px;
+      }
+      .node-card .meta:empty { display: none; }
       .node-card .meta .line { margin: 2px 0; }
-      .node-card .stats { font-size: 11px; opacity: 0.9; margin-top: 8px; font-variant-numeric: tabular-nums; }
-      .node-card .stats .line { margin: 2px 0; }
-      .node-card .stats .status { font-weight: 800; letter-spacing: 0.3px; }
-      .node-card .stats .forks-label { font-weight: 800; }
+      .node-card .meta .meta-label { font-weight: 800; }
+      .node-card .meta .forks-label { font-weight: 800; }
       .tank {
         position: relative;
         height: 84px;
@@ -567,30 +618,31 @@ app.get("/", async (req, res) => {
             'Geth v1.3.3': { date: '5th Jan 2016', proto: 'eth/61-63', forks: ['Frontier'] },
           };
           const meta = metaMap[node];
-          const metaLines = [];
-          if (meta) {
-            metaLines.push('<div class="line">' + esc(meta.date) + '</div>');
-            metaLines.push('<div class="line">' + esc(meta.proto) + '</div>');
-          }
+          const releasedLine = meta ? '<div class="released">released ' + esc(meta.date) + '</div>' : '';
+          const protoLine = meta ? '<div class="proto">supports ' + esc(meta.proto) + '</div>' : '';
+
+          const forksLines = (meta && Array.isArray(meta.forks) && meta.forks.length)
+            ? (
+                '<div class="line"><span class="forks-label">Forks:</span></div>' +
+                meta.forks.map((f) => '<div class="line">' + esc(f) + '</div>').join('')
+              )
+            : '';
 
           parts.push(
             '<div class="node-card ' + statusClass(s) + '" style="color:' + color + '">' +
-              '<div class="label">' + esc(node) + '</div>' +
-              '<div class="meta">' + metaLines.join('') + '</div>' +
+              '<div class="header">' +
+                '<div class="label">' + esc(node) + '</div>' +
+                releasedLine +
+                protoLine +
+              '</div>' +
+              '<div class="progress">' +
+                '<div class="line">' + esc(fmtInt(cur)) + '/' + esc(fmtInt(tgt)) + '</div>' +
+                '<div class="line"><span class="status">' + esc(statusText(s)) + '</span> <span class="pct">(' + esc(fmtPct(pctClamped)) + ')</span></div>' +
+              '</div>' +
               '<div class="tank" title="' + esc(statusText(s)) + ' · ' + esc(fmtPct(pctClamped)) + '">' +
                 '<div class="fill" style="height:' + pctClamped.toFixed(1) + '%"></div>' +
               '</div>' +
-              '<div class="stats">' +
-                '<div class="line status">' + esc(statusText(s)) + '</div>' +
-                '<div class="line">' + esc(fmtInt(cur)) + '/' + esc(fmtInt(tgt)) + '</div>' +
-                '<div class="line">' + esc(fmtPct(pctClamped)) + '</div>' +
-                (meta && Array.isArray(meta.forks) && meta.forks.length
-                  ? (
-                      '<div class="line"><span class="forks-label">Forks:</span></div>' +
-                      meta.forks.map((f) => '<div class="line">' + esc(f) + '</div>').join('')
-                    )
-                  : '') +
-              '</div>' +
+              '<div class="meta">' + forksLines + '</div>' +
             '</div>'
           );
 

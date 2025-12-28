@@ -1,0 +1,25 @@
+diff --git a/eth/backend.go b/eth/backend.go
+index 4e5e8dfdd..b8e5f6d8c 100644
+--- a/eth/backend.go
++++ b/eth/backend.go
+@@ -207,11 +207,17 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
+ 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
+ 
+ 	// Permit the downloader to use the trie cache allowance during fast sync
+ 	cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit + cacheConfig.SnapshotLimit
+ 	checkpoint := config.Checkpoint
+ 	if checkpoint == nil {
+-		checkpoint = params.TrustedCheckpoints[genesisHash]
++		// EthereumTimeMachine build: disable hardcoded trusted checkpoints.
++		//
++		// v1.10.x populates a checkpoint based on the genesis hash (e.g. mainnet) and
++		// then enforces a checkpoint header challenge during sync/handshake. On a
++		// cutoff/bridged historical chain, that causes v1.10.x to request headers at
++		// the hardcoded pivot (~12.9M) which the upstream peer will never have.
++		checkpoint = nil
+ 	}
+ 	if eth.handler, err = newHandler(&handlerConfig{
+ 		Database:   chainDb,
+ 		Chain:      eth.blockchain,
+ 		TxPool:     eth.txPool,
+ 		Network:    config.NetworkId,

@@ -95,12 +95,49 @@ RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth
 EOF
 			;;
 		v1.10.8)
-			cat >> "$out_file" << 'EOF'
-RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.10.8-26675454.tar.gz && \
-	    tar -xzf /tmp/geth.tar.gz -C /tmp && \
-	    mv /tmp/geth-linux-amd64-1.10.8-26675454/geth /usr/local/bin/geth && \
-	    rm -rf /tmp/*
+			# Build from source with a small patch to disable hardcoded trusted checkpoints.
+			# See: ./patches/geth-v1.10.8-disable-trusted-checkpoints.patch
+			cat > "$out_file" << 'EOF'
+FROM golang:1.16-bullseye AS build
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git make gcc g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src/go-ethereum
+RUN git clone https://github.com/ethereum/go-ethereum.git . \
+    && git checkout v1.10.8
+
+# Apply our local patch (copied from the build context).
+COPY patches/geth-v1.10.8-disable-trusted-checkpoints.patch /patches/disable-trusted-checkpoints.patch
+RUN git apply /patches/disable-trusted-checkpoints.patch
+
+# Build logs for debugging/reproducibility
+RUN echo "[build] go version: $(go version)" \
+    && echo "[build] git rev:   $(git rev-parse --short HEAD)" \
+    && echo "[build] git tag:   v1.10.8"
+
+RUN make geth \
+    && mkdir -p /out \
+    && install -m 0755 build/bin/geth /out/geth \
+    && /out/geth version || true
+
+FROM debian:bullseye-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates libgmp10 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /out/geth /usr/local/bin/geth
+RUN chmod +x /usr/local/bin/geth
+
+RUN mkdir -p /data
+
+EXPOSE 8545 30303
+
+ENTRYPOINT ["geth"]
 EOF
+			return 0
 			;;
 		v1.9.25)
             cat >> "$out_file" << 'EOF'

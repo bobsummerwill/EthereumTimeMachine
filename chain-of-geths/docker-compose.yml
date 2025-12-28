@@ -85,7 +85,6 @@ services:
       --datadir /data
       --cache 2048
       --snapshot=false
-      --verbosity=4
       --http
       --http.addr 0.0.0.0
       --http.vhosts *
