@@ -74,17 +74,12 @@ function nodeMeta(node) {
       proto: "eth/68-69",
       forks: ["Cancun"],
     },
-    "Geth v1.16.7 (export RLP)": {
-      date: "4th Nov 2025",
-      proto: "eth/68-69",
-      forks: ["Cancun"],
-    },
     "Geth v1.11.6": {
       date: "30th Apr 2023",
       proto: "eth/66-68",
       forks: ["Shanghai", "Paris (Merge)", "Gray Glacier", "Arrow Glacier"],
     },
-    "Geth v1.11.6 (import RLP)": {
+    "Geth v1.11.6 (import)": {
       date: "30th Apr 2023",
       // NOTE: this should ideally be queried from the running node's `admin_nodeInfo` / peer caps.
       // For now we keep the same range as the v1.11.6 bridge.
@@ -126,13 +121,13 @@ function nodeMeta(node) {
 
 function isSyntheticRow(node) {
   const s = String(node || "");
-  return s.includes("(export RLP)") || s.includes("(import RLP)");
+  return s.includes("(export)") || s.includes("(import)");
 }
 
 function edgeLabel(upstreamNode, downstreamNode) {
   // User request: no label on arrows that involve Export; but do label Import -> v1.10.8.
-  if (String(upstreamNode || "").includes("(export RLP)") || String(downstreamNode || "").includes("(export RLP)")) return "";
-  if (String(upstreamNode || "").includes("(import RLP)") && downstreamNode === "Geth v1.10.8") return "eth/66";
+  if (String(upstreamNode || "").includes("(export)") || String(downstreamNode || "").includes("(export)")) return "";
+  if (String(upstreamNode || "").includes("(import)") && downstreamNode === "Geth v1.10.8") return "eth/66";
   if (isSyntheticRow(upstreamNode) || isSyntheticRow(downstreamNode)) return "";
   // Only label protocol bridges between execution clients.
   const key = `${upstreamNode} -> ${downstreamNode}`;
@@ -624,8 +619,8 @@ app.get("/", async (req, res) => {
           const metaMap = {
             'Lighthouse v8.0.1': { date: '20th Nov 2025', proto: 'CL', forks: ['Cancun'] },
             'Geth v1.16.7': { date: '4th Nov 2025', proto: 'eth/68-69', forks: ['Cancun'] },
-            'Geth v1.16.7 (export RLP)': { date: '4th Nov 2025', proto: 'eth/68-69', forks: ['Cancun'] },
-            'Geth v1.11.6 (import RLP)': { date: '30th Apr 2023', proto: 'eth/66-68', forks: ['Shanghai', 'Paris (Merge)', 'Gray Glacier', 'Arrow Glacier'] },
+            // User request: export node should be label-only (no date/proto lines), so no meta entry here.
+            'Geth v1.11.6 (import)': { date: '30th Apr 2023', proto: 'eth/66-68', forks: ['Shanghai', 'Paris (Merge)', 'Gray Glacier', 'Arrow Glacier'] },
             'Geth v1.10.8': { date: '21st Sep 2021', proto: 'eth/65-66', forks: ['London', 'Berlin'] },
             'Geth v1.9.25': { date: '11th Dec 2020', proto: 'eth/63-65', forks: ['Muir Glacier', 'Istanbul', 'Petersburg', 'Constantinople', 'Byzantium', 'Spurious Dragon', 'Tangerine Whistle', 'DAO'] },
             'Geth v1.3.6': { date: '1st Apr 2016', proto: 'eth/62-63', forks: ['Homestead'] },
@@ -668,16 +663,16 @@ app.get("/", async (req, res) => {
 
             const isSynthetic = (n) => {
               const s = String(n || '');
-              return s.includes('(export RLP)') || s.includes('(import RLP)');
+              return s.includes('(export)') || s.includes('(import)');
             };
             const edgeMap = {
-              'Geth v1.11.6 (import RLP) -> Geth v1.10.8': 'eth/66',
+              'Geth v1.11.6 (import) -> Geth v1.10.8': 'eth/66',
               'Geth v1.10.8 -> Geth v1.9.25': 'eth/65',
               'Geth v1.9.25 -> Geth v1.3.6': 'eth/63',
               'Geth v1.3.6 -> Geth v1.3.3': 'eth/62',
             };
             const key = String(node) + ' -> ' + String(next.node);
-            const noLabelBecauseExport = String(node || '').includes('(export RLP)') || String(next.node || '').includes('(export RLP)');
+            const noLabelBecauseExport = String(node || '').includes('(export)') || String(next.node || '').includes('(export)');
             const lbl = noLabelBecauseExport ? '' : (edgeMap[key] || ((isSynthetic(node) || isSynthetic(next.node)) ? '' : ''));
             const labelHtml = lbl ? '<div class="arrow-label">' + esc(lbl) + '</div>' : '';
 
