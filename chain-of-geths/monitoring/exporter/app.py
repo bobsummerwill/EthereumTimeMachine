@@ -647,9 +647,9 @@ class Poller:
             # 3) Geth v1.16.7 exporting data (seed RLP export)
             # Prefer explicit marker/done files (written by seed-v1.11.6-when-ready.sh).
             if export_done_path.exists():
-                set_stage("3. Geth v1.16.7 exporting data", 2)
+                set_stage("3. Geth v1.16.7 (export RLP)", 2)
             elif export_marker_path.exists():
-                set_stage("3. Geth v1.16.7 exporting data", 1)
+                set_stage("3. Geth v1.16.7 (export RLP)", 1)
             else:
                 # Backwards-compatible fallback for any older runs that used a .progress file.
                 export_last_done = None
@@ -661,16 +661,16 @@ class Poller:
                         except Exception:
                             export_last_done = None
                 if export_last_done is None:
-                    set_stage("3. Geth v1.16.7 exporting data", 0)
+                    set_stage("3. Geth v1.16.7 (export RLP)", 0)
                 else:
                     set_stage(
-                        "3. Geth v1.16.7 exporting data",
+                        "3. Geth v1.16.7 (export RLP)",
                         2 if export_last_done >= cutoff_block else 1,
                     )
 
             # 4) Geth v1.11.6 importing data
             if seed_done_path.exists():
-                set_stage("4. Geth v1.11.6 importing data", 2)
+                set_stage("4. Geth v1.11.6 (import RLP)", 2)
             else:
                 importing = False
                 import_current = 0
@@ -696,7 +696,7 @@ class Poller:
                 except Exception:
                     importing = False
                 set_stage(
-                    "4. Geth v1.11.6 importing data",
+                    "4. Geth v1.11.6 (import RLP)",
                     1 if (import_marker_path.exists() or importing) else 0,
                 )
 
@@ -773,7 +773,7 @@ class Poller:
                     except Exception:
                         export_current = 0
             emit_phase_row(
-                "Export (v1.16.7 → RLP)",
+                "Geth v1.16.7 (export RLP)",
                 1.50,
                 export_current,
                 cutoff_block,
@@ -788,7 +788,7 @@ class Poller:
             import_display = cutoff_block if import_done else import_current
             import_up = import_running
             emit_phase_row(
-                "Import (RLP → v1.11.6)",
+                "Geth v1.11.6 (import RLP)",
                 1.60,
                 import_display,
                 cutoff_block,
