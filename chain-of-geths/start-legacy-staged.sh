@@ -21,6 +21,17 @@ cd "$ROOT_DIR"
 # Default: last Homestead-era block (right before the DAO fork activates at 1,920,000).
 CUTOFF_BLOCK="${CUTOFF_BLOCK:-1919999}"
 
+# Startup gating for downstream nodes.
+#
+# Rationale: the ETH protocol status message is exchanged only at initial peer handshake.
+# If we start a downstream node (e.g. v1.9.25) while its upstream bridge peer (e.g. v1.10.8)
+# is still at genesis / not yet serving blocks, the downstream node can latch onto a "genesis"
+# status and then never start syncing, even after the upstream finishes syncing.
+#
+# Historical behavior: wait until each node can serve at least block 1000 before bringing up
+# the next node down.
+MIN_SERVE_BLOCK="${MIN_SERVE_BLOCK:-1000}"
+
 compose_up() {
   # shellcheck disable=SC2068
   sudo docker compose up -d $@ 2>/dev/null || sudo docker-compose up -d $@
@@ -120,17 +131,21 @@ wait_for_serving_block "geth-v1-11-6" "http://localhost:8546" "$CUTOFF_BLOCK"
 echo "[start-legacy] starting geth-v1-10-8"
 compose_up geth-v1-10-8
 wait_for_rpc "geth-v1-10-8" "http://localhost:8551"
+wait_for_serving_block "geth-v1-10-8" "http://localhost:8551" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] starting geth-v1-9-25"
 compose_up geth-v1-9-25
 wait_for_rpc "geth-v1-9-25" "http://localhost:8552"
+wait_for_serving_block "geth-v1-9-25" "http://localhost:8552" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] starting geth-v1-3-6"
 compose_up geth-v1-3-6
 wait_for_rpc "geth-v1-3-6" "http://localhost:8553"
+wait_for_serving_block "geth-v1-3-6" "http://localhost:8553" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] starting geth-v1-3-3"
 compose_up geth-v1-3-3
 wait_for_rpc "geth-v1-3-3" "http://localhost:8549"
+wait_for_serving_block "geth-v1-3-3" "http://localhost:8549" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] done"

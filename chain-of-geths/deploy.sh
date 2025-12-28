@@ -36,8 +36,8 @@ else
     exit 1
 fi
 
-VM_IP="52.0.234.84"
-VM_USER="ubuntu"
+VM_IP="${VM_IP:-52.0.234.84}"
+VM_USER="${VM_USER:-ubuntu}"
 
 # Update this to your PEM key path. Note: don't quote ~ (tilde expansion doesn't happen in quotes).
 SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/Downloads/chain-of-geths-keys.pem}"

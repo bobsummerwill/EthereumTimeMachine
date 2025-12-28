@@ -15,7 +15,7 @@ cd "$SCRIPT_DIR"
 # We store known_hosts under generated-files/ so it doesn't pollute the user's global ~/.ssh/known_hosts.
 SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$SCRIPT_DIR/generated-files/known_hosts"
 
-VM_IP="54.81.90.194"
+VM_IP="${VM_IP:-52.0.234.84}"
 VM_USER="ubuntu"
 
 # Update this to your PEM key path. Note: don't quote ~ (tilde expansion doesn't happen in quotes).
