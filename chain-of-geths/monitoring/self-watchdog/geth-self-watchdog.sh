@@ -14,6 +14,9 @@ set -e
 
 SAMPLE_INTERVAL_SECONDS="${SAMPLE_INTERVAL_SECONDS:-600}"
 TARGET_MARGIN_BLOCKS="${TARGET_MARGIN_BLOCKS:-10}"
+# How many consecutive "no progress" samples are required before restarting geth.
+# User request: require 2 intervals to reduce false positives during long DB maintenance (freezer/compaction).
+STALL_REQUIRED_SAMPLES="${STALL_REQUIRED_SAMPLES:-2}"
 IPC_PATH="${IPC_PATH:-/data/geth.ipc}"
 
 # Optional startup gate: wait for some HTTP endpoint to be reachable before starting geth.
@@ -174,6 +177,7 @@ shutdown() {
 trap shutdown INT TERM
 
 last_cur=""
+stall_count=0
 
  # Give geth a brief moment to bring up IPC/HTTP before first sample.
  sleep 10
@@ -201,16 +205,24 @@ while true; do
   # If we are basically at target, don't reboot for lack of progress.
   if [ $((cur + TARGET_MARGIN_BLOCKS)) -gt "$tgt" ]; then
     last_cur="$cur"
+    stall_count=0
     sleep "$SAMPLE_INTERVAL_SECONDS"
     continue
   fi
 
   if [ -n "$last_cur" ] && [ "$cur" = "$last_cur" ]; then
-    echo "[self-watchdog] stalled for ${SAMPLE_INTERVAL_SECONDS}s (current=$cur target=$tgt); rebooting container"
-    kill "$GETH_PID" 2>/dev/null || true
-    sleep 2
-    kill -9 "$GETH_PID" 2>/dev/null || true
-    exit 1
+    stall_count=$((stall_count + 1))
+    echo "[self-watchdog] stalled sample ${stall_count}/${STALL_REQUIRED_SAMPLES} (current=$cur target=$tgt)"
+    if [ "$stall_count" -ge "$STALL_REQUIRED_SAMPLES" ]; then
+      echo "[self-watchdog] stalled for ${stall_count} consecutive samples; restarting container"
+      # Gentler restart: SIGTERM and let Docker restart the container via restart policy.
+      kill "$GETH_PID" 2>/dev/null || true
+      # Give geth time to flush and exit cleanly.
+      wait "$GETH_PID" 2>/dev/null || true
+      exit 1
+    fi
+  else
+    stall_count=0
   fi
 
   last_cur="$cur"
