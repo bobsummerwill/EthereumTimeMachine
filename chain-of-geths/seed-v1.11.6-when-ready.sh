@@ -236,6 +236,26 @@ sudo docker run --rm \
 rm -f "$EXPORT_MARKER_FILE" >> "$LOG_FILE" 2>&1 || true
 touch "$EXPORT_DONE_FILE" >> "$LOG_FILE" 2>&1 || true
 
+# Optional: wipe the v1.16.7 execution DB after export so that the subsequent snap sync
+# starts from a clean genesis datadir.
+#
+# User request: keep config.toml, nodekey, and jwtsecret, but remove all execution DB state.
+WIPE_V1_16_7_AFTER_EXPORT="${WIPE_V1_16_7_AFTER_EXPORT:-1}"
+if [ "$WIPE_V1_16_7_AFTER_EXPORT" = "1" ]; then
+  echo "[seed] wiping v1.16.7 execution DB after export (to force fresh snap sync)" >> "$LOG_FILE"
+  V167="$ROOT_DIR/generated-files/data/v1.16.7"
+  # Defensive: remove both leveldb and ancient/freezer stores + caches.
+  sudo rm -rf \
+    "$V167/geth/chaindata" \
+    "$V167/geth/nodes" \
+    "$V167/geth/triecache" \
+    "$V167/geth/lightchaindata" \
+    "$V167/geth.ipc" \
+    >> "$LOG_FILE" 2>&1 || true
+  # Remove any lingering LOCK files (some versions place LOCK under chaindata).
+  sudo find "$V167" -maxdepth 4 -name LOCK -delete >> "$LOG_FILE" 2>&1 || true
+fi
+
 rm -f "$IMPORT_MARKER_FILE" >> "$LOG_FILE" 2>&1 || true
 touch "$IMPORT_MARKER_FILE" >> "$LOG_FILE" 2>&1 || true
 sudo docker run --rm \
