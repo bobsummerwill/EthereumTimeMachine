@@ -477,41 +477,6 @@ app.get("/", async (req, res) => {
       .status-1 .fill {
         background: currentColor;
       }
-      /*
-        IN PROGRESS animation: keep it robust.
-        
-        Instead of animating a repeating pattern (which can cause visible seams + loop jumps depending on
-        renderer and fractional pixels), use a single diagonal "shimmer" band that is:
-          - transform-animated (GPU/composited)
-          - starts/ends fully transparent (no visible jump at loop)
-      */
-      .status-1 .fill::after {
-        content: "";
-        position: absolute;
-        inset: -60%;
-        pointer-events: none;
-        z-index: 2;
-        opacity: 0.55;
-        background: linear-gradient(
-          60deg,
-          rgba(255,255,255,0.00) 0%,
-          rgba(255,255,255,0.00) 35%,
-          rgba(255,255,255,0.22) 50%,
-          rgba(255,255,255,0.00) 65%,
-          rgba(255,255,255,0.00) 100%
-        );
-        transform: translate3d(-30%, 0, 0);
-        animation: tank-shimmer 1.25s linear infinite;
-        will-change: transform;
-      }
-      @keyframes tank-shimmer {
-        from { transform: translate3d(-30%, 0, 0); }
-        to { transform: translate3d(30%, 0, 0); }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .status-1 .fill::after { animation: none; }
-      }
 
       .arrow {
         width: 36px;
