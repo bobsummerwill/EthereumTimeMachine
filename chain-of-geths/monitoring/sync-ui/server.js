@@ -477,42 +477,36 @@ app.get("/", async (req, res) => {
       .status-1 .fill {
         background: currentColor;
       }
+      /*
+        IN PROGRESS animation: keep it robust.
+        
+        Instead of animating a repeating pattern (which can cause visible seams + loop jumps depending on
+        renderer and fractional pixels), use a single diagonal "shimmer" band that is:
+          - transform-animated (GPU/composited)
+          - starts/ends fully transparent (no visible jump at loop)
+      */
       .status-1 .fill::after {
         content: "";
         position: absolute;
-        /*
-          Use transform-based animation (composited) instead of background-position.
-          This avoids:
-            - visible tile seams (no background-size)
-            - jerky repaints on slower/VM browsers
-            - loop jumps (translate distance matches gradient period)
-        */
-        left: -60%;
-        top: -60%;
-        width: 220%;
-        height: 220%;
-        /*
-          Smooth chevron/stripe motion.
-          - No tiled squares: avoid background-size (it creates visible seams in some renderers).
-          - Seamless loop: animation distance matches the gradient period.
-        */
-        background-image: repeating-linear-gradient(
-          45deg,
-          rgba(0,0,0,0.38) 0,
-          rgba(0,0,0,0.38) 8px,
-          rgba(255,255,255,0.10) 8px,
-          rgba(255,255,255,0.10) 16px
-        );
-        transform: translate3d(0, 0, 0);
-        animation: stripes-pan 650ms linear infinite;
-        opacity: 0.92;
+        inset: -60%;
         pointer-events: none;
-        will-change: transform;
         z-index: 2;
+        opacity: 0.55;
+        background: linear-gradient(
+          60deg,
+          rgba(255,255,255,0.00) 0%,
+          rgba(255,255,255,0.00) 35%,
+          rgba(255,255,255,0.22) 50%,
+          rgba(255,255,255,0.00) 65%,
+          rgba(255,255,255,0.00) 100%
+        );
+        transform: translate3d(-30%, 0, 0);
+        animation: tank-shimmer 1.25s linear infinite;
+        will-change: transform;
       }
-      @keyframes stripes-pan {
-        from { transform: translate3d(0, 0, 0); }
-        to { transform: translate3d(-16px, -16px, 0); }
+      @keyframes tank-shimmer {
+        from { transform: translate3d(-30%, 0, 0); }
+        to { transform: translate3d(30%, 0, 0); }
       }
 
       @media (prefers-reduced-motion: reduce) {
