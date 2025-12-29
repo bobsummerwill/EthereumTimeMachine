@@ -95,6 +95,7 @@ services:
     # Also bump verbosity temporarily to capture peer/drop reasons.
     command: |
       --datadir /data
+      --nodekey /data/nodekey
       --cache 2048
       --snapshot=false
       --http
@@ -130,6 +131,7 @@ services:
       SAMPLE_INTERVAL_SECONDS: ${LEGACY_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-300}
     command: |
       --datadir /data
+      --nodekey /data/nodekey
       --cache 2048
       --rpc
       --rpcaddr 0.0.0.0
