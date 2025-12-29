@@ -56,9 +56,17 @@ RPC_STUCK_TIMEOUT_SECONDS="${RPC_STUCK_TIMEOUT_SECONDS:-900}"
 # Strategy when downstream_head > upstream_head:
 # - "reset": wipe downstream DB and restart immediately (recommended for unattended runs)
 # - "wait":  stop downstream and wait for upstream to reach downstream head (legacy behavior)
-AHEAD_STRATEGY="${AHEAD_STRATEGY:-reset}"
+# - "hybrid": wait for a bounded time; if upstream doesn't catch up, reset downstream
+# Default to hybrid to avoid unnecessary wipes of already-synced downstream state.
+AHEAD_STRATEGY="${AHEAD_STRATEGY:-hybrid}"
 # Only reset on ahead-condition when the gap is at least this many blocks.
 AHEAD_RESET_THRESHOLD="${AHEAD_RESET_THRESHOLD:-10000}"
+
+# Hybrid strategy knobs.
+# If upstream has not reached downstream head within this window, fall back to reset.
+AHEAD_WAIT_BEFORE_RESET_SECONDS="${AHEAD_WAIT_BEFORE_RESET_SECONDS:-1200}"
+# Poll cadence while waiting.
+AHEAD_WAIT_POLL_SECONDS="${AHEAD_WAIT_POLL_SECONDS:-30}"
 
 compose_up() {
   # shellcheck disable=SC2068
@@ -340,11 +348,54 @@ ensure_not_ahead_of_upstream() {
   local gap
   gap=$((d - u))
 
-  if [ "${AHEAD_STRATEGY:-wait}" = "reset" ] && [ -n "$data_dir" ] && [ "$gap" -ge "${AHEAD_RESET_THRESHOLD}" ]; then
-    echo "[start-legacy] ahead-check strategy=reset (gap=$gap >= ${AHEAD_RESET_THRESHOLD}); wiping downstream DB and restarting"
-    reset_service_datadir "$svc" "$downstream_label" "$downstream_url" "$data_dir"
-    return 0
-  fi
+  case "${AHEAD_STRATEGY:-wait}" in
+    reset)
+      if [ -n "$data_dir" ] && [ "$gap" -ge "${AHEAD_RESET_THRESHOLD}" ]; then
+        echo "[start-legacy] ahead-check strategy=reset (gap=$gap >= ${AHEAD_RESET_THRESHOLD}); wiping downstream DB and restarting"
+        reset_service_datadir "$svc" "$downstream_label" "$downstream_url" "$data_dir"
+        return 0
+      fi
+      # If reset is selected but we can't/won't reset, fall back to wait.
+      echo "[start-legacy] ahead-check strategy=reset but gap<threshold or data_dir missing; falling back to wait"
+      ;;
+
+    hybrid)
+      echo "[start-legacy] ahead-check strategy=hybrid; stopping $svc and waiting up to ${AHEAD_WAIT_BEFORE_RESET_SECONDS}s for upstream to reach block $d"
+      compose_stop "$svc" || true
+
+      local start now elapsed
+      start=$(date +%s)
+      while true; do
+        u=$(rpc_block_number_dec "$upstream_url" || true)
+        if [ -n "$u" ] && [ "$u" -ge "$d" ]; then
+          echo "[start-legacy] ahead-check hybrid: upstream caught up (upstream=$u >= downstream_head=$d); restarting $svc without wipe"
+          compose_up "$svc"
+          wait_for_rpc "$downstream_label" "$downstream_url" "$svc" "$data_dir"
+          return 0
+        fi
+
+        now=$(date +%s)
+        elapsed=$((now - start))
+        if [ "$elapsed" -ge "${AHEAD_WAIT_BEFORE_RESET_SECONDS}" ]; then
+          break
+        fi
+        sleep "${AHEAD_WAIT_POLL_SECONDS}"
+      done
+
+      # If we didn't catch up in time, fall back to reset (if allowed).
+      if [ -n "$data_dir" ] && [ "$gap" -ge "${AHEAD_RESET_THRESHOLD}" ]; then
+        echo "[start-legacy] ahead-check hybrid: upstream did not catch up within ${AHEAD_WAIT_BEFORE_RESET_SECONDS}s; resetting downstream"
+        reset_service_datadir "$svc" "$downstream_label" "$downstream_url" "$data_dir"
+        return 0
+      fi
+
+      echo "[start-legacy] ahead-check hybrid: reset not allowed (gap<threshold or no data_dir); continuing with wait strategy"
+      ;;
+
+    wait|*)
+      # fallthrough to legacy wait behavior below
+      ;;
+  esac
 
   echo "[start-legacy] ahead-check strategy=wait; stopping $svc until $upstream_label can serve block $d, then restarting"
   compose_stop "$svc" || true
