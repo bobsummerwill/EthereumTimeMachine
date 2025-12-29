@@ -157,6 +157,41 @@ Endpoints (on the Ubuntu VM running the stack; `VM_IP` defaults come from [`chai
 - Exporter metrics: http://<VM_IP>:9100/metrics
 - Sync UI: http://<VM_IP>:8088
 
+## AWS remote VM setup (EC2)
+
+One working reference setup:
+
+- Instance type: **m6a.2xlarge**
+- AMI: **Ubuntu 24.04 LTS**
+- Disk: **1500 GB** (EBS)
+
+### Security Group inbound rules
+
+Minimum recommended inbound rules (lock these down to your IP/CIDR where possible):
+
+- SSH (for [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh))
+  - TCP 22
+
+Monitoring UIs (optional, but commonly used):
+
+- Grafana UI
+  - TCP 3000
+- Sync UI
+  - TCP 8088
+
+External P2P peering (required if you want a non-VM node, e.g. the Windows zip bundle, to dial the VM):
+
+- `geth-v1-3-6` P2P
+  - TCP 30311
+  - UDP 30311
+  - This corresponds to the host port publishing in [`geth-v1-3-6.ports`](chain-of-geths/docker-compose.yml:182)
+
+Notes:
+
+- The `172.20.0.x` addresses in generated `static-nodes.json` are **container-only** addresses on the VM’s Docker bridge network.
+  External machines must use the VM’s public IP/DNS, plus the published host ports.
+- On a default Ubuntu EC2, `ufw` is usually **inactive**. If you enabled it, you must also allow the same inbound ports at the VM firewall.
+
 ## Generated files directory
 
 All generated material is under `chain-of-geths/generated-files/`.

@@ -51,16 +51,69 @@ require_cmd unzip
 require_cmd zip
 require_cmd docker
 
+# Some environments (notably Windows-adjacent tooling) can accidentally propagate an *unexpanded*
+# template string instead of a literal IP/hostname, e.g.
+#   "${VM_IP:-52.0.234.84}"  (docker-compose style)
+# or (after mangling)
+#   "{VM-IP:-52.0.234.84}"
+#
+# Fix upstream here by normalizing the VM host/IP before writing static-nodes.json.
+read_vm_ip_from_env_file() {
+  local file="$1"
+  [[ -f "$file" ]] || return 0
+  # Simple KEY=VALUE parser; ignore comments/blank lines.
+  awk -F= '
+    $0 ~ /^VM_IP=/ {
+      val=substr($0, index($0,"=")+1)
+      gsub(/\r/,"",val)
+      print val
+      exit
+    }
+  ' "$file"
+}
+
+VM_IP_FALLBACK="$(read_vm_ip_from_env_file "$ENV_FILE")"
+if [[ -z "$VM_IP_FALLBACK" ]]; then
+  VM_IP_FALLBACK="$(read_vm_ip_from_env_file "$ENV_EXAMPLE")"
+fi
+
+normalize_vm_host() {
+  local host="${1:-}"
+
+  # Drop CR from CRLF files (common on Windows).
+  host="${host//$'\r'/}"
+
+  # Handle docker-compose style default expression literally passed through.
+  if [[ "$host" =~ ^\$\{VM_IP:-([^}]+)\}$ ]]; then
+    host="${BASH_REMATCH[1]}"
+  fi
+
+  # Handle a common mangled variant where `$` and `_` are lost/altered.
+  if [[ "$host" =~ ^\{VM[-_]IP:-([^}]+)\}$ ]]; then
+    host="${BASH_REMATCH[1]}"
+  fi
+
+  # Final safety: if it still looks templated, fall back to the configured VM_IP from .env/.env.example.
+  if [[ -z "$host" || "$host" == *"{"* || "$host" == *"}"* || "$host" == *"$"* ]]; then
+    if [[ -n "$VM_IP_FALLBACK" ]]; then
+      echo "WARN: VM_IP value looks unexpanded ('$1'); using VM_IP from .env/.env.example ($VM_IP_FALLBACK)" >&2
+      host="$VM_IP_FALLBACK"
+    fi
+  fi
+
+  echo "$host"
+}
+
 # Determine the VM's public IP for a Windows->VM enode.
 get_vm_ip() {
   # Priority:
   #   1) explicit environment variable
   #   2) read from local .env / .env.example (sourced above)
   if [[ -n "${VM_IP:-}" ]]; then
-    echo "${VM_IP}"
+    normalize_vm_host "${VM_IP}"
     return 0
   fi
-  echo ""
+  normalize_vm_host "${VM_IP_FALLBACK}"
 }
 
 VM_IP_FOR_WINDOWS="$(get_vm_ip)"
@@ -71,6 +124,13 @@ Could not determine VM public IP for the Windows bundle.
 Fix:
   VM_IP=<your-vm-public-ip> ./generate-windows-zip.sh
 EOF
+  exit 1
+fi
+
+# Guardrail: never write a templated/unexpanded VM host into the Windows bundle.
+if [[ "$VM_IP_FOR_WINDOWS" == *"{"* || "$VM_IP_FOR_WINDOWS" == *"}"* || "$VM_IP_FOR_WINDOWS" == *"$"* ]]; then
+  echo "ERROR: VM host/IP still looks unexpanded after normalization: '$VM_IP_FOR_WINDOWS'" >&2
+  echo "Fix your chain-of-geths/.env VM_IP (or pass VM_IP=... when running this script)." >&2
   exit 1
 fi
 
