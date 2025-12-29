@@ -54,7 +54,7 @@
               "type": "linear"
             },
             "showPoints": "never",
-            "spanNulls": false,
+            "spanNulls": true,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -638,6 +638,6 @@
   "timezone": "browser",
   "title": "Ethereum Time Machine – Sync Progress",
   "uid": "chain-of-geths-sync",
-  "version": 1000000,
+  "version": 1000001,
   "weekStart": ""
 }

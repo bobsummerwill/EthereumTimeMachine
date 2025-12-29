@@ -2,10 +2,11 @@
 
 # Self-watchdog wrapper for geth containers.
 #
-# Behavior (per user request):
-# - Every SAMPLE_INTERVAL_SECONDS, log Current and Target blocks.
-# - Unless Current + TARGET_MARGIN_BLOCKS > Target,
-#     if Current has not changed since the last sample interval, terminate the container.
+# Behavior:
+# - Every SAMPLE_INTERVAL_SECONDS, log current and target blocks.
+# - Unless current + TARGET_MARGIN_BLOCKS > target,
+#     if current has not changed since the last sample interval for STALL_REQUIRED_SAMPLES samples,
+#     terminate the container.
 # - With `restart: unless-stopped`, Docker will restart the container.
 
 # NOTE: use POSIX sh features only; many images use dash (/bin/sh) which lacks
@@ -20,11 +21,8 @@ STALL_REQUIRED_SAMPLES="${STALL_REQUIRED_SAMPLES:-2}"
 
 # Watchdog data source.
 #
-# This script used to rely on `geth attach ... --exec` (IPC/HTTP console) to read `eth.syncing`.
-# That breaks on very old geth versions (e.g. v1.3.x doesn't support `--exec`) and can be a
-# false-negative when `eth_syncing=false` but the node is actually stuck behind its upstream.
-#
-# JSON-RPC is more portable across versions (provided HTTP/RPC is enabled inside the container).
+# Prefer JSON-RPC (eth_blockNumber / eth_syncing / net_peerCount) which is portable across geth versions,
+# as long as HTTP/RPC is enabled inside the container.
 RPC_URL="${RPC_URL:-http://127.0.0.1:8545}"
 
 # Fallback for images that don't ship with wget/curl (notably some of our built-from-source images).
