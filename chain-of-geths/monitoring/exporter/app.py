@@ -750,14 +750,24 @@ class Poller:
             # Determine export progress for synthetic row.
             # IMPORTANT: `geth_up` for phase rows should reflect *active running*, not mere file presence.
             # (Grafana's "Geth status" panel intentionally ORs node health with phase-row health.)
-            export_current = 0
             export_running = export_marker_path.exists()
-            export_up = export_running
 
+            # Prefer the explicit progress file written by the seeder.
+            export_current = 0
+            if export_progress_path.exists():
+                data = _read_json_file(export_progress_path)
+                if isinstance(data, dict) and data.get("last_done") is not None:
+                    try:
+                        export_current = int(data.get("last_done"))
+                    except Exception:
+                        export_current = 0
+
+            # If DONE file exists, pin to full cutoff regardless of parsing.
             if export_done_path.exists():
                 export_current = cutoff_block
-            else:
-                # Best-effort: parse export progress from the seed log if present.
+
+            # Fallback: parse export progress from the seed log if present (older deployments).
+            if export_current == 0 and not export_done_path.exists():
                 # Newer geth logs during export contain:
                 #   "Exporting blocks ... exported=123,456"
                 try:
@@ -767,16 +777,10 @@ class Poller:
                         if m:
                             export_current = int(m[-1].replace(",", ""))
                 except Exception:
-                    export_current = 0
+                    export_current = export_current
 
-            # Backwards-compatible fallback if a .progress file exists.
-            if export_current == 0 and export_progress_path.exists():
-                data = _read_json_file(export_progress_path)
-                if isinstance(data, dict) and data.get("last_done") is not None:
-                    try:
-                        export_current = int(data.get("last_done"))
-                    except Exception:
-                        export_current = 0
+            # Keep the synthetic row visible at the end (DONE) for charts/panels that gate on geth_up.
+            export_up = export_running or export_done_path.exists()
             emit_phase_row(
                 "Geth v1.16.7 (export)",
                 1.50,

@@ -100,14 +100,14 @@
           "sort": "none"
         }
       },
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "((geth_effective_head_block{node=~\"^Geth .*\",node!=\"Geth v1.11.6\"} > 0) and on(node) (geth_up{node=~\"^Geth .*\",node!=\"Geth v1.11.6\"} == 1)) or label_replace((geth_effective_head_block{node=\"Geth v1.11.6 (import)\"} and on(node) (geth_up{node=\"Geth v1.11.6 (import)\"} == 1)), \"node\", \"Geth v1.11.6\", \"node\", \".*\")",
-          "legendFormat": "{{node}}",
-          "range": true,
-          "refId": "A"
-        },
+       "targets": [
+         {
+           "editorMode": "code",
+           "expr": "((geth_effective_head_block{node=~\"^Geth .*\",node!=\"Geth v1.11.6\",node!~\".*\\\\((export|import)\\\\).*\"} > 0) and on(node) (geth_up{node=~\"^Geth .*\",node!=\"Geth v1.11.6\",node!~\".*\\\\((export|import)\\\\).*\"} == 1)) or geth_effective_head_block{node=\"Geth v1.16.7 (export)\"} or label_replace(geth_effective_head_block{node=\"Geth v1.11.6 (import)\"}, \"node\", \"Geth v1.11.6\", \"node\", \".*\")",
+           "legendFormat": "{{node}}",
+           "range": true,
+           "refId": "A"
+         },
         {
           "editorMode": "code",
           "expr": "geth_block_number{node=~\"^Geth .*\"}",

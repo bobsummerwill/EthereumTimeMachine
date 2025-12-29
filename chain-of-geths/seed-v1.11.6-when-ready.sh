@@ -12,6 +12,7 @@ CUTOFF_BLOCK="${CUTOFF_BLOCK:-1919999}"
 
 EXPORT_DIR="$ROOT_DIR/generated-files/exports"
 EXPORT_FILE_NAME="${EXPORT_FILE_NAME:-mainnet-0-${CUTOFF_BLOCK}.rlp}"
+EXPORT_PROGRESS_FILE="$EXPORT_DIR/$EXPORT_FILE_NAME.progress"
 
 FLAG_FILE="$ROOT_DIR/generated-files/seed-v1.11.6-${CUTOFF_BLOCK}.done"
 LOCK_FILE="$ROOT_DIR/generated-files/seed-v1.11.6.lock"
@@ -221,20 +222,103 @@ sudo docker run --rm \
 wait_for_lock_release "$ROOT_DIR/generated-files/data/v1.16.7/geth/chaindata/LOCK" 120
 
 # Export from v1.16.7 datadir.
-rm -f "$EXPORT_DIR/$EXPORT_FILE_NAME" "$EXPORT_DIR/$EXPORT_FILE_NAME.progress" >> "$LOG_FILE" 2>&1 || true
+rm -f "$EXPORT_DIR/$EXPORT_FILE_NAME" "$EXPORT_PROGRESS_FILE" >> "$LOG_FILE" 2>&1 || true
 rm -f "$EXPORT_DONE_FILE" >> "$LOG_FILE" 2>&1 || true
 rm -f "$EXPORT_MARKER_FILE" >> "$LOG_FILE" 2>&1 || true
 touch "$EXPORT_MARKER_FILE" >> "$LOG_FILE" 2>&1 || true
+
+# Initialize a progress file immediately so dashboards can show 0..CUTOFF from the start.
+python3 - <<PY "$EXPORT_PROGRESS_FILE"
+import json, os, sys, time
+path = sys.argv[1]
+os.makedirs(os.path.dirname(path), exist_ok=True)
+tmp = path + ".tmp"
+with open(tmp, "w") as f:
+  json.dump({"last_done": 0, "phase": "export", "updated_at": time.time(), "note": "initialized"}, f)
+os.replace(tmp, path)
+PY
+
+# Run export, tee to seed log, and continuously update the progress file by parsing stdout/stderr.
+set +e
 sudo docker run --rm \
   --user "$DOCKER_RUN_USER" \
   --entrypoint geth \
   -v "$ROOT_DIR/generated-files/data/v1.16.7:/data" \
   -v "$EXPORT_DIR:/exports" \
   ethereum/client-go:v1.16.7 \
-  --datadir /data export "/exports/$EXPORT_FILE_NAME" 0 "$CUTOFF_BLOCK" >> "$LOG_FILE" 2>&1
+  --datadir /data export "/exports/$EXPORT_FILE_NAME" 0 "$CUTOFF_BLOCK" 2>&1 \
+  | tee -a "$LOG_FILE" \
+  | python3 -u - "$EXPORT_PROGRESS_FILE" <<'PY'
+import json
+import os
+import re
+import sys
+import time
+
+path = sys.argv[1]
+pat = re.compile(r"exported=([0-9,]+)")
+
+last = 0
+try:
+  with open(path, "r") as f:
+    data = json.load(f) or {}
+    last = int(data.get("last_done") or 0)
+except Exception:
+  last = 0
+
+def write(note: str = ""):
+  os.makedirs(os.path.dirname(path), exist_ok=True)
+  tmp = path + ".tmp"
+  payload = {
+    "last_done": int(last),
+    "phase": "export",
+    "updated_at": time.time(),
+  }
+  if note:
+    payload["note"] = note
+  with open(tmp, "w") as f:
+    json.dump(payload, f)
+  os.replace(tmp, path)
+
+# Emit at least one write so the file always exists.
+write("stream-start")
+
+for line in sys.stdin:
+  m = pat.search(line)
+  if not m:
+    continue
+  try:
+    n = int(m.group(1).replace(",", ""))
+  except Exception:
+    continue
+  if n > last:
+    last = n
+    write()
+
+write("stream-end")
+PY
+
+export_rc=${PIPESTATUS[0]}
+set -e
+if [ "$export_rc" -ne 0 ]; then
+  echo "[seed] ERROR: geth export failed (rc=$export_rc)" >> "$LOG_FILE"
+  exit "$export_rc"
+fi
 
 rm -f "$EXPORT_MARKER_FILE" >> "$LOG_FILE" 2>&1 || true
 touch "$EXPORT_DONE_FILE" >> "$LOG_FILE" 2>&1 || true
+
+# Finalize progress file to the full cutoff for dashboards.
+python3 - <<PY "$EXPORT_PROGRESS_FILE" "$CUTOFF_BLOCK"
+import json, os, sys, time
+path = sys.argv[1]
+cutoff = int(sys.argv[2])
+os.makedirs(os.path.dirname(path), exist_ok=True)
+tmp = path + ".tmp"
+with open(tmp, "w") as f:
+  json.dump({"last_done": cutoff, "phase": "export", "updated_at": time.time(), "note": "done"}, f)
+os.replace(tmp, path)
+PY
 
 
 
