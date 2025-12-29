@@ -117,7 +117,7 @@
           "refId": "B"
         }
       ],
-      "title": "Execution chain height",
+      "title": "Chain height",
       "type": "timeseries"
     },
     {
@@ -438,7 +438,7 @@
           "refId": "B"
         }
       ],
-      "title": "Prometheus status",
+      "title": "Helper status",
       "type": "stat"
     },
     {
@@ -509,48 +509,55 @@
       "targets": [
         {
           "editorMode": "code",
+          "expr": "geth_up{node=\"Lighthouse v8.0.1\"}",
+          "legendFormat": "Lighthouse v8.0.1",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
           "expr": "max(geth_up{node=\"Geth v1.16.7\"} or geth_up{node=\"Geth v1.16.7 (export)\"})",
           "legendFormat": "Geth v1.16.7",
           "range": true,
-          "refId": "A"
+          "refId": "B"
         },
         {
           "editorMode": "code",
           "expr": "max(geth_up{node=\"Geth v1.11.6\"} or geth_up{node=\"Geth v1.11.6 (import)\"})",
           "legendFormat": "Geth v1.11.6",
           "range": true,
-          "refId": "B"
+          "refId": "C"
         },
         {
           "editorMode": "code",
           "expr": "geth_up{node=\"Geth v1.10.8\"}",
           "legendFormat": "Geth v1.10.8",
           "range": true,
-          "refId": "C"
+          "refId": "D"
         },
         {
           "editorMode": "code",
           "expr": "geth_up{node=\"Geth v1.9.25\"}",
           "legendFormat": "Geth v1.9.25",
           "range": true,
-          "refId": "D"
+          "refId": "E"
         },
         {
           "editorMode": "code",
           "expr": "geth_up{node=\"Geth v1.3.6\"}",
           "legendFormat": "Geth v1.3.6",
           "range": true,
-          "refId": "E"
+          "refId": "F"
         },
         {
           "editorMode": "code",
           "expr": "geth_up{node=\"Geth v1.0.3\"}",
           "legendFormat": "Geth v1.0.3",
           "range": true,
-          "refId": "F"
+          "refId": "G"
         }
       ],
-      "title": "Geth status",
+      "title": "Node status",
       "type": "stat"
     },
     {
@@ -688,7 +695,7 @@
             "refId": "E"
           }
         ],
-        "title": "Stage progress",
+       "title": "Stages",
         "transformations": [
          {
            "id": "joinByField",
