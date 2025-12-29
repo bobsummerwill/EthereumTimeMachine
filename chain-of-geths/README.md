@@ -81,15 +81,15 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
              |   Frontier                                    |
              +-----------------------------------------------+
                                  |
-                                 | P2P eth/61-62 (protocol bridge)
-                                 v
-             +-----------------------------------------------+
-             | geth v1.0.3 (1st Sep 2015)                    |
-             | eth/61-62                                     |
-             | Forks supported:                              |
-             |   Homestead                                   |
-             |   Frontier                                    |
-             +-----------------------------------------------+
+                                  | P2P eth/61 (protocol bridge)
+                                  v
+              +-----------------------------------------------+
+              | geth v1.0.3 (1st Sep 2015)                    |
+              | eth/60-61                                     |
+              | Forks supported:                              |
+              |   Homestead                                   |
+              |   Frontier                                    |
+              +-----------------------------------------------+
 ```
 
 Services:

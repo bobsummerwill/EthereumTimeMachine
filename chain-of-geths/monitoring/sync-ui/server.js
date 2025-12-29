@@ -113,7 +113,7 @@ function nodeMeta(node) {
     },
     "Geth v1.0.3": {
       date: "1st Sep 2015",
-      proto: "eth/61-62",
+      proto: "eth/60-61",
       forks: ["Frontier"],
     },
   };
@@ -135,7 +135,7 @@ function edgeLabel(upstreamNode, downstreamNode) {
   const map = {
     "Geth v1.10.8 -> Geth v1.9.25": "eth/65",
     "Geth v1.9.25 -> Geth v1.3.6": "eth/63",
-    "Geth v1.3.6 -> Geth v1.0.3": "eth/61-62",
+    "Geth v1.3.6 -> Geth v1.0.3": "eth/61",
   };
   return map[key] || "";
 }
@@ -640,7 +640,7 @@ app.get("/", async (req, res) => {
             'Geth v1.10.8': { date: '21st Sep 2021', proto: 'eth/65-66', forks: ['London', 'Berlin'] },
             'Geth v1.9.25': { date: '11th Dec 2020', proto: 'eth/63-65', forks: ['Muir Glacier', 'Istanbul', 'Petersburg', 'Constantinople', 'Byzantium', 'Spurious Dragon', 'Tangerine Whistle', 'DAO'] },
             'Geth v1.3.6': { date: '1st Apr 2016', proto: 'eth/61-63', forks: ['Homestead'] },
-            'Geth v1.0.3': { date: '1st Sep 2015', proto: 'eth/61-62', forks: ['Frontier'] },
+            'Geth v1.0.3': { date: '1st Sep 2015', proto: 'eth/60-61', forks: ['Frontier'] },
           };
           const meta = metaMap[node];
           const releasedLine = meta ? '<div class="released">released ' + esc(meta.date) + '</div>' : '';
@@ -685,7 +685,7 @@ app.get("/", async (req, res) => {
               'Geth v1.11.6 (import) -> Geth v1.10.8': 'eth/66',
               'Geth v1.10.8 -> Geth v1.9.25': 'eth/65',
               'Geth v1.9.25 -> Geth v1.3.6': 'eth/63',
-              'Geth v1.3.6 -> Geth v1.0.3': 'eth/61-62',
+              'Geth v1.3.6 -> Geth v1.0.3': 'eth/61',
             };
             const key = String(node) + ' -> ' + String(next.node);
             const noLabelBecauseExport = String(node || '').includes('(export)') || String(next.node || '').includes('(export)');
