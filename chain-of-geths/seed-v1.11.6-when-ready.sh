@@ -248,7 +248,7 @@ sudo docker run --rm \
   ethereum/client-go:v1.16.7 \
   --datadir /data export "/exports/$EXPORT_FILE_NAME" 0 "$CUTOFF_BLOCK" 2>&1 \
   | tee -a "$LOG_FILE" \
-  | python3 -u - "$EXPORT_PROGRESS_FILE" <<'PY'
+  | python3 -u -c '
 import json
 import os
 import re
@@ -296,7 +296,7 @@ for line in sys.stdin:
     write()
 
 write("stream-end")
-PY
+' "$EXPORT_PROGRESS_FILE"
 
 export_rc=${PIPESTATUS[0]}
 set -e
