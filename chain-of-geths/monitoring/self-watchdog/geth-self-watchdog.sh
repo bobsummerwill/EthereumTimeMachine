@@ -17,7 +17,26 @@ TARGET_MARGIN_BLOCKS="${TARGET_MARGIN_BLOCKS:-10}"
 # How many consecutive "no progress" samples are required before restarting geth.
 # User request: require 2 intervals to reduce false positives during long DB maintenance (freezer/compaction).
 STALL_REQUIRED_SAMPLES="${STALL_REQUIRED_SAMPLES:-2}"
+
+# Watchdog data source.
+#
+# This script used to rely on `geth attach ... --exec` (IPC/HTTP console) to read `eth.syncing`.
+# That breaks on very old geth versions (e.g. v1.3.x doesn't support `--exec`) and can be a
+# false-negative when `eth_syncing=false` but the node is actually stuck behind its upstream.
+#
+# JSON-RPC is more portable across versions (provided HTTP/RPC is enabled inside the container).
+RPC_URL="${RPC_URL:-http://127.0.0.1:8545}"
+
+# Fallback for images that don't ship with wget/curl (notably some of our built-from-source images).
 IPC_PATH="${IPC_PATH:-/data/geth.ipc}"
+
+# Optional: fixed target height for “historical cutoff” stacks.
+# If set, we treat this as the target even when `eth_syncing` reports false.
+FIXED_TARGET_BLOCK="${FIXED_TARGET_BLOCK:-}"
+
+# If 1, only restart a stalled node when it has at least 1 peer. Helps avoid restart-loops
+# when upstream peers are intentionally down.
+REQUIRE_PEERS_FOR_RESTART="${REQUIRE_PEERS_FOR_RESTART:-1}"
 
 # Optional startup gate: wait for some HTTP endpoint to be reachable before starting geth.
 #
@@ -44,28 +63,35 @@ num_to_dec() {
   esac
 }
 
-extract_hex_field() {
-  # Extract either:
-  #   "field":"0x..."   OR   field: 0x...
-  field="$1"
-  input="$2"
-  # quoted-json form
-  v=$(printf "%s" "$input" | sed -n "s/.*\"$field\"[[:space:]]*:[[:space:]]*\"\(0x[0-9a-fA-F]\+\)\".*/\1/p" | head -n 1)
-  if [ -n "$v" ]; then
-    printf "%s" "$v"
+http_post_json() {
+  url="$1"
+  body="$2"
+
+  # Prefer wget (present in official geth images and installed in our legacy images).
+  if command -v wget >/dev/null 2>&1; then
+    wget -qO- --timeout=2 --tries=1 --header='Content-Type: application/json' --post-data="$body" "$url" 2>/dev/null || true
     return 0
   fi
-  # console-object form
-  v=$(printf "%s" "$input" | sed -n "s/.*$field[[:space:]]*:[[:space:]]*\(0x[0-9a-fA-F]\+\).*/\1/p" | head -n 1)
-  printf "%s" "$v"
+
+  # Fallback: curl.
+  if command -v curl >/dev/null 2>&1; then
+    curl -sS --max-time 2 -H 'Content-Type: application/json' -d "$body" "$url" 2>/dev/null || true
+    return 0
+  fi
+
+  echo ""
+}
+
+has_http_client() {
+  command -v wget >/dev/null 2>&1 && return 0
+  command -v curl >/dev/null 2>&1 && return 0
+  return 1
 }
 
 attach_exec() {
-  # Best-effort attach across versions.
-  # Try: plain IPC path, ipc: prefix, then HTTP.
+  # Best-effort attach for newer geth versions (requires `--exec` support).
   expr="$1"
 
-  # If IPC isn't ready yet, skip quickly.
   if [ -S "$IPC_PATH" ]; then
     out=$(geth attach "$IPC_PATH" --exec "$expr" 2>/dev/null || true)
     [ -n "$out" ] && { printf "%s" "$out"; return 0; }
@@ -73,7 +99,7 @@ attach_exec() {
     [ -n "$out" ] && { printf "%s" "$out"; return 0; }
   fi
 
-  # HTTP fallback (only if enabled in the container)
+  # HTTP console fallback (only if enabled in the container)
   out=$(geth attach "http://127.0.0.1:8545" --exec "$expr" 2>/dev/null || true)
   [ -n "$out" ] && { printf "%s" "$out"; return 0; }
   out=$(geth attach "http://localhost:8545" --exec "$expr" 2>/dev/null || true)
@@ -91,48 +117,103 @@ first_hex_or_dec() {
   printf "%s" "$v"
 }
 
-get_current_and_target() {
-  # Use a JS expression that returns a 2-element array.
-  # We parse the first two numeric literals.
-  #
-  # eth.syncing is either false or an object with currentBlock/highestBlock.
-  # For non-syncing nodes, we use blockNumber for both.
-  out=$(attach_exec "(function(){var s=eth.syncing; if(!s){return [eth.blockNumber, eth.blockNumber];} return [s.currentBlock, s.highestBlock];})()" || true)
+attach_current_target_peers() {
+  # Outputs: "<cur_dec> <tgt_dec> <peers_dec>" or "" if unavailable.
+  # NOTE: only works on geth versions that support `attach --exec`.
+  out=$(attach_exec '(function(){var peers=net.peerCount; var s=eth.syncing; if(!s){return [eth.blockNumber, eth.blockNumber, peers];} return [s.currentBlock, s.highestBlock, peers];})()' || true)
+  [ -z "$out" ] && { echo ""; return 0; }
 
-  if [ -z "$out" ]; then
-    echo ""; echo ""; return 0
+  a=$(first_hex_or_dec "$out")
+  [ -z "$a" ] && { echo ""; return 0; }
+  rest=$(printf "%s" "$out" | sed "0,/$a/s//X/")
+  b=$(first_hex_or_dec "$rest")
+  rest2=$(printf "%s" "$rest" | sed "0,/$b/s//X/")
+  c=$(first_hex_or_dec "$rest2")
+
+  cur=$(num_to_dec "$a" || true)
+  tgt=$(num_to_dec "${b:-$a}" || true)
+  peers=$(num_to_dec "${c:-0}" || true)
+  [ -z "$cur" ] && { echo ""; return 0; }
+  [ -z "$tgt" ] && tgt="$cur"
+  [ -z "$peers" ] && peers=0
+
+  # Apply fixed target override if configured.
+  if [ -n "$FIXED_TARGET_BLOCK" ]; then
+    echo "$cur $FIXED_TARGET_BLOCK $peers"
+    return 0
   fi
 
-  # Grab first two numbers.
-  first=$(first_hex_or_dec "$out")
-  # If output isn't parseable yet (e.g. "undefined"), treat as not-ready.
-  if [ -z "$first" ]; then
-    echo ""; echo ""; return 0
-  fi
-  # remove up to first occurrence so the next grep finds the second
-  rest=$(printf "%s" "$out" | sed "0,/$first/s//X/")
-  second=$(first_hex_or_dec "$rest")
-  [ -z "$second" ] && second="$first"
-
-  printf "%s\n%s\n" "$first" "$second"
+  echo "$cur $tgt $peers"
 }
 
-current_and_target() {
-  # Outputs: "<cur_dec> <tgt_dec>" or "" if unavailable.
-  set -- $(get_current_and_target)
-  cur_raw="$1"
-  tgt_raw="$2"
+rpc_call() {
+  # Usage: rpc_call <method>
+  method="$1"
+  http_post_json "$RPC_URL" "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$method\",\"params\":[]}" | tr -d '\n'
+}
 
-  [ -z "$cur_raw" ] && { echo ""; return 0; }
-  [ -z "$tgt_raw" ] && tgt_raw="$cur_raw"
+json_result() {
+  # Extract the JSON-RPC `result` value.
+  # - If result is a string: returns the raw string without quotes.
+  # - If result is an object: returns the raw object JSON.
+  # - If result is false/true: returns "false"/"true".
+  input="$1"
+  # object result (best-effort, no jq)
+  v=$(printf "%s" "$input" | sed -n 's/.*"result"[[:space:]]*:[[:space:]]*\({.*}\)[[:space:]]*}.*/\1/p' | head -n 1)
+  [ -n "$v" ] && { printf "%s" "$v"; return 0; }
+  # boolean result
+  v=$(printf "%s" "$input" | sed -n 's/.*"result"[[:space:]]*:[[:space:]]*\(false\|true\).*/\1/p' | head -n 1)
+  [ -n "$v" ] && { printf "%s" "$v"; return 0; }
+  # string result
+  v=$(printf "%s" "$input" | sed -n 's/.*"result"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+  printf "%s" "$v"
+}
 
-  cur=$(num_to_dec "$cur_raw" || true)
-  tgt=$(num_to_dec "$tgt_raw" || true)
+json_field_hex() {
+  # Extract a hex string field from a JSON object.
+  # Usage: json_field_hex <field> <json>
+  field="$1"
+  input="$2"
+  printf "%s" "$input" | sed -n "s/.*\"$field\"[[:space:]]*:[[:space:]]*\"\(0x[0-9a-fA-F]\+\)\".*/\1/p" | head -n 1
+}
 
-  # If conversion failed, fall back to equality-only mode: treat target=current.
-  [ -z "$cur" ] && cur=0
+current_target_peers() {
+  # Outputs: "<cur_dec> <tgt_dec> <peers_dec>" or "" if unavailable.
+  if ! has_http_client; then
+    # Fallback path for images without wget/curl.
+    attach_current_target_peers
+    return 0
+  fi
+
+  bn_json=$(rpc_call eth_blockNumber || true)
+  bn_hex=$(json_result "$bn_json")
+  [ -z "$bn_hex" ] && { echo ""; return 0; }
+  cur=$(num_to_dec "$bn_hex" || true)
+  [ -z "$cur" ] && { echo ""; return 0; }
+
+  peers_json=$(rpc_call net_peerCount || true)
+  peers_hex=$(json_result "$peers_json")
+  peers=$(num_to_dec "$peers_hex" || true)
+  [ -z "$peers" ] && peers=0
+
+  # Fixed target overrides everything (for cutoff stacks).
+  if [ -n "$FIXED_TARGET_BLOCK" ]; then
+    echo "$cur $FIXED_TARGET_BLOCK $peers"
+    return 0
+  fi
+
+  syncing_json=$(rpc_call eth_syncing || true)
+  syncing_res=$(json_result "$syncing_json")
+  if [ "$syncing_res" = "false" ] || [ -z "$syncing_res" ]; then
+    # Not syncing (or not parseable yet): treat target=current to avoid restarts.
+    echo "$cur $cur $peers"
+    return 0
+  fi
+
+  highest_hex=$(json_field_hex highestBlock "$syncing_res")
+  tgt=$(num_to_dec "$highest_hex" || true)
   [ -z "$tgt" ] && tgt="$cur"
-  echo "$cur $tgt"
+  echo "$cur $tgt $peers"
 }
 
 echo "[self-watchdog] starting geth (wrapper pid=$$)"
@@ -189,23 +270,33 @@ while true; do
     exit 1
   fi
 
-  ct=$(current_and_target || true)
-  if [ -z "$ct" ]; then
+  ctp=$(current_target_peers || true)
+  if [ -z "$ctp" ]; then
     # Not ready yet (IPC/HTTP not up); don't restart.
     sleep "$SAMPLE_INTERVAL_SECONDS"
     continue
   fi
-  # shell-split into two fields
-  set -- $ct
+  # shell-split into three fields
+  set -- $ctp
   cur=${1:-0}
   tgt=${2:-$cur}
+  peers=${3:-0}
 
-  echo "[self-watchdog] progress current=$cur target=$tgt"
+  echo "[self-watchdog] progress current=$cur target=$tgt peers=$peers rpc=$RPC_URL fixed_target=${FIXED_TARGET_BLOCK:-}"
 
   # If we are basically at target, don't reboot for lack of progress.
   if [ $((cur + TARGET_MARGIN_BLOCKS)) -gt "$tgt" ]; then
     last_cur="$cur"
     stall_count=0
+    sleep "$SAMPLE_INTERVAL_SECONDS"
+    continue
+  fi
+
+  # Optional: avoid restart loops when the node can't possibly make progress due to no peers.
+  if [ "$REQUIRE_PEERS_FOR_RESTART" = "1" ] && [ "$peers" -le 0 ]; then
+    echo "[self-watchdog] stalled-but-no-peers: not restarting (REQUIRE_PEERS_FOR_RESTART=1)"
+    stall_count=0
+    last_cur="$cur"
     sleep "$SAMPLE_INTERVAL_SECONDS"
     continue
   fi

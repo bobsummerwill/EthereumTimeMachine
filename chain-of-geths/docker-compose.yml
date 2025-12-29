@@ -6,6 +6,10 @@ services:
     container_name: geth-v1-16-7
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      # Head node: target is derived from `eth_syncing` (no fixed target).
+      # Keep a slower cadence by default; legacy nodes override this.
+      SAMPLE_INTERVAL_SECONDS: ${WATCHDOG_SAMPLE_INTERVAL_SECONDS:-600}
     command: |
       --config /data/config.toml
       --datadir /data
@@ -47,6 +51,10 @@ services:
     container_name: geth-v1-11-6
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      # This node is intentionally pinned to the historical cutoff; treat that as its target.
+      FIXED_TARGET_BLOCK: "1919999"
+      SAMPLE_INTERVAL_SECONDS: ${LEGACY_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-300}
     command: |
       --config /data/config.toml
       --datadir /data
@@ -78,6 +86,10 @@ services:
     container_name: geth-v1-10-8
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      # Downstream nodes should all converge to the same cutoff height.
+      FIXED_TARGET_BLOCK: "1919999"
+      SAMPLE_INTERVAL_SECONDS: ${LEGACY_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-300}
     # Troubleshooting: disable snapshots to prevent v1.10.8 from falling into fast/snapshot recovery,
     # which can cause it to drop the offline-seeded upstream peer as "unsynced".
     # Also bump verbosity temporarily to capture peer/drop reasons.
@@ -113,6 +125,9 @@ services:
     container_name: geth-v1-9-25
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      FIXED_TARGET_BLOCK: "1919999"
+      SAMPLE_INTERVAL_SECONDS: ${LEGACY_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-300}
     command: |
       --datadir /data
       --cache 2048
@@ -147,6 +162,9 @@ services:
     container_name: geth-v1-3-6
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      FIXED_TARGET_BLOCK: "1919999"
+      SAMPLE_INTERVAL_SECONDS: ${LEGACY_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-300}
     # v1.3.x uses `--fast` (bool) to enable fast sync; explicitly disable to force full sync.
     command: |
       --datadir /data
@@ -177,6 +195,9 @@ services:
     container_name: geth-v1-3-3
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      FIXED_TARGET_BLOCK: "1919999"
+      SAMPLE_INTERVAL_SECONDS: ${LEGACY_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-300}
     command: |
       --datadir /data
       --nodekey /data/nodekey

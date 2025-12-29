@@ -37,6 +37,11 @@ compose_up() {
   sudo docker compose up -d $@ 2>/dev/null || sudo docker-compose up -d $@
 }
 
+compose_stop() {
+  # shellcheck disable=SC2068
+  sudo docker compose stop $@ 2>/dev/null || sudo docker-compose stop $@
+}
+
 rpc_healthcheck() {
   # Minimal JSON-RPC health check: returns 0 when the endpoint responds with a result.
   # Use web3_clientVersion because it exists across very old geth releases.
@@ -75,6 +80,54 @@ rpc_block_hash() {
     --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"$num_hex\",false],\"id\":1}" \
     | sed -n 's/.*"hash":"\(0x[0-9a-fA-F]*\)".*/\1/p' \
     | head -n 1
+}
+
+rpc_block_number_dec() {
+  # Return current blockNumber as decimal, or empty.
+  local url="$1"
+  local out hex
+  out=$(curl -s --max-time 2 -X POST "$url" -H 'Content-Type: application/json' \
+    --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' || true)
+  hex=$(echo "$out" | sed -n 's/.*"result"[[:space:]]*:[[:space:]]*"\(0x[0-9a-fA-F]*\)".*/\1/p' | head -n 1)
+  [ -z "$hex" ] && return 0
+  hex="${hex#0x}"
+  [ -z "$hex" ] && return 0
+  echo $((16#$hex))
+}
+
+ensure_not_ahead_of_upstream() {
+  # If a downstream node is started while its upstream peer is behind its local chain head
+  # (common when reusing persisted datadirs), legacy geth can latch a low peer status at
+  # handshake and then *never* resume syncing even after the upstream catches up.
+  #
+  # Mitigation: if downstream_head > upstream_head at startup, stop downstream, wait for
+  # upstream to reach downstream_head, then start downstream again to force a fresh handshake.
+  local svc="$1"
+  local downstream_label="$2"
+  local downstream_url="$3"
+  local upstream_label="$4"
+  local upstream_url="$5"
+
+  local d u
+  d=$(rpc_block_number_dec "$downstream_url" || true)
+  u=$(rpc_block_number_dec "$upstream_url" || true)
+
+  if [ -z "$d" ] || [ -z "$u" ]; then
+    echo "[start-legacy] cannot read heads for ahead-check ($downstream_label/$upstream_label); skipping"
+    return 0
+  fi
+
+  if [ "$d" -le "$u" ]; then
+    echo "[start-legacy] ahead-check OK: $downstream_label head=$d upstream($upstream_label) head=$u"
+    return 0
+  fi
+
+  echo "[start-legacy] ahead-check TRIGGERED: $downstream_label head=$d is ahead of upstream($upstream_label) head=$u"
+  echo "[start-legacy] stopping $svc until $upstream_label can serve block $d, then restarting"
+  compose_stop "$svc" || true
+  wait_for_serving_block "$upstream_label" "$upstream_url" "$d"
+  compose_up "$svc"
+  wait_for_rpc "$downstream_label" "$downstream_url"
 }
 
 wait_for_serving_block() {
@@ -136,16 +189,25 @@ wait_for_serving_block "geth-v1-10-8" "http://localhost:8551" "$MIN_SERVE_BLOCK"
 echo "[start-legacy] starting geth-v1-9-25"
 compose_up geth-v1-9-25
 wait_for_rpc "geth-v1-9-25" "http://localhost:8552"
+ensure_not_ahead_of_upstream \
+  "geth-v1-9-25" "geth-v1-9-25" "http://localhost:8552" \
+  "geth-v1-10-8" "http://localhost:8551"
 wait_for_serving_block "geth-v1-9-25" "http://localhost:8552" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] starting geth-v1-3-6"
 compose_up geth-v1-3-6
 wait_for_rpc "geth-v1-3-6" "http://localhost:8553"
+ensure_not_ahead_of_upstream \
+  "geth-v1-3-6" "geth-v1-3-6" "http://localhost:8553" \
+  "geth-v1-9-25" "http://localhost:8552"
 wait_for_serving_block "geth-v1-3-6" "http://localhost:8553" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] starting geth-v1-3-3"
 compose_up geth-v1-3-3
 wait_for_rpc "geth-v1-3-3" "http://localhost:8549"
+ensure_not_ahead_of_upstream \
+  "geth-v1-3-3" "geth-v1-3-3" "http://localhost:8549" \
+  "geth-v1-3-6" "http://localhost:8553"
 wait_for_serving_block "geth-v1-3-3" "http://localhost:8549" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] done"
