@@ -84,8 +84,8 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
                                  | P2P eth/62 (protocol bridge)
                                  v
              +-----------------------------------------------+
-             | geth v1.3.3 (5th Jan 2016)                    |
-             | eth/61-63                                     |
+             | geth v1.0.3 (1st Sep 2015)                    |
+             | eth/60-62                                     |
              | Forks supported:                              |
              |   Homestead                                   |
              |   Frontier                                    |
@@ -99,7 +99,7 @@ Services:
 - `geth-v1-10-8`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:76)
 - `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:107)
 - `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:139)
-- `geth-v1-3-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:167)
+- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:167)
 - `geth-exporter`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:230)
 - `prometheus`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:261)
 - `sync-ui`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:278)

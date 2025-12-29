@@ -79,7 +79,7 @@ DOCKER_IMAGES_DIR="$SCRIPT_DIR/generated-files/docker-images"
 mkdir -p "$DOCKER_IMAGES_DIR"
 # Avoid carrying forward stale tarballs for versions that are no longer in the stack.
 rm -f "$DOCKER_IMAGES_DIR"/*.tar
-for version in v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.3.3; do
+for version in v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.0.3; do
     docker save ethereumtimemachine/geth:$version > "$DOCKER_IMAGES_DIR/geth-$version.tar"
 done
 
@@ -269,7 +269,7 @@ if [ "$POST_DEPLOY_HEALTHCHECK" = "1" ]; then
   wait_for_peers "Geth v1.10.8" 8551 1 120 || true
   wait_for_peers "Geth v1.9.25" 8552 1 120 || true
   wait_for_peers "Geth v1.3.6" 8553 1 120 || true
-  wait_for_peers "Geth v1.3.3" 8549 1 120 || true
+  wait_for_peers "Geth v1.0.3" 8549 1 120 || true
 fi
 
 # Create the bridge container but do not start it yet.

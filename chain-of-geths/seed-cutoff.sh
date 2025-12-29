@@ -69,8 +69,8 @@ echo "Re-starting geth-v1-16-7..."
 sudo docker compose start geth-v1-16-7 >/dev/null 2>&1 || sudo docker-compose start geth-v1-16-7 >/dev/null 2>&1 || true
 
 echo "Stopping legacy nodes to release DB locks..."
-sudo docker compose stop geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-3-3 >/dev/null 2>&1 || \
-  sudo docker-compose stop geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-3-3 >/dev/null 2>&1 || true
+sudo docker compose stop geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 >/dev/null 2>&1 || \
+  sudo docker-compose stop geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 >/dev/null 2>&1 || true
 
 import_one() {
   local version="$1"
@@ -87,14 +87,14 @@ import_one() {
 import_one v1.10.8 ethereumtimemachine/geth:v1.10.8
 import_one v1.9.25 ethereumtimemachine/geth:v1.9.25
 import_one v1.3.6 ethereumtimemachine/geth:v1.3.6
-import_one v1.3.3 ethereumtimemachine/geth:v1.3.3
+import_one v1.0.3 ethereumtimemachine/geth:v1.0.3
 
 echo "Starting legacy nodes again..."
-sudo docker compose up -d geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-3-3 >/dev/null 2>&1 || \
-  sudo docker-compose up -d geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-3-3 >/dev/null 2>&1
+sudo docker compose up -d geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 >/dev/null 2>&1 || \
+  sudo docker-compose up -d geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 >/dev/null 2>&1
 
 echo "Seed complete. Quick sanity check (eth_blockNumber):"
-for name_port in "v1.10.8:8551" "v1.9.25:8552" "v1.3.6:8553" "v1.3.3:8549"; do
+for name_port in "v1.10.8:8551" "v1.9.25:8552" "v1.3.6:8553" "v1.0.3:8549"; do
   ver=${name_port%%:*}; port=${name_port##*:}
   bn=$(curl -s -X POST localhost:$port -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" | sed -n "s/.*\"result\":\"\(0x[0-9a-fA-F]*\)\".*/\1/p")
   echo "  $ver => $bn"

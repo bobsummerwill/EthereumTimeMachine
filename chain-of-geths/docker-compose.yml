@@ -190,16 +190,16 @@ services:
       ethereum:
         ipv4_address: 172.20.0.13
 
-  geth-v1-3-3:
-    image: ethereumtimemachine/geth:v1.3.3
-    container_name: geth-v1-3-3
+  geth-v1-0-3:
+    image: ethereumtimemachine/geth:v1.0.3
+    container_name: geth-v1-0-3
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     environment:
       FIXED_TARGET_BLOCK: "1919999"
-      # v1.3.3 can temporarily report `eth_syncing=false` while far behind its upstream.
+      # v1.0.3 is extremely old; it can temporarily report `eth_syncing=false` while far behind its upstream.
       # Make the watchdog more aggressive so it self-heals by forcing a fresh peer handshake.
-      SAMPLE_INTERVAL_SECONDS: ${V1_3_3_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-120}
+      SAMPLE_INTERVAL_SECONDS: ${V1_0_3_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-120}
       STALL_REQUIRED_SAMPLES: "1"
       # Allow restart even when peerCount temporarily drops to 0 (common around restarts).
       REQUIRE_PEERS_FOR_RESTART: "0"
@@ -218,7 +218,7 @@ services:
       - "30307:30307/tcp"
       - "30307:30307/udp"
     volumes:
-      - ./generated-files/data/v1.3.3:/data
+      - ./generated-files/data/v1.0.3:/data
       - ./monitoring/self-watchdog:/watchdog:ro
     depends_on:
       - geth-v1-3-6
@@ -273,7 +273,7 @@ services:
         Geth v1.10.8=http://geth-v1-10-8:8545,
         Geth v1.9.25=http://geth-v1-9-25:8545,
         Geth v1.3.6=http://geth-v1-3-6:8545,
-        Geth v1.3.3=http://geth-v1-3-3:8545
+        Geth v1.0.3=http://geth-v1-0-3:8545
       # Used to add a Lighthouse row in the same “Sync progress” table.
       LIGHTHOUSE_API_URL: http://lighthouse-v8-0-1:5052
       # Stable label for the Lighthouse row (emit from startup even if the API is still booting).

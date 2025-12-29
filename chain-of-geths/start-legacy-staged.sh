@@ -7,7 +7,7 @@
 #   geth v1.10.8
 #   geth v1.9.25
 #   geth v1.3.6
-#   geth v1.3.3
+#   geth v1.0.3
 #
 # Only the v1.16.7 -> v1.11.6 hop uses offline export/import seeding.
 # All lower versions use normal P2P sync from their single upstream peer (static peering).
@@ -482,13 +482,13 @@ ensure_not_ahead_of_upstream \
   "$ROOT_DIR/generated-files/data/v1.3.6"
 wait_for_serving_block "geth-v1-3-6" "http://localhost:8553" "$MIN_SERVE_BLOCK"
 
-echo "[start-legacy] starting geth-v1-3-3"
-compose_up geth-v1-3-3
-wait_for_rpc "geth-v1-3-3" "http://localhost:8549" "geth-v1-3-3" "$ROOT_DIR/generated-files/data/v1.3.3"
+echo "[start-legacy] starting geth-v1-0-3"
+compose_up geth-v1-0-3
+wait_for_rpc "geth-v1-0-3" "http://localhost:8549" "geth-v1-0-3" "$ROOT_DIR/generated-files/data/v1.0.3"
 ensure_not_ahead_of_upstream \
-  "geth-v1-3-3" "geth-v1-3-3" "http://localhost:8549" \
+  "geth-v1-0-3" "geth-v1-0-3" "http://localhost:8549" \
   "geth-v1-3-6" "http://localhost:8553" \
-  "$ROOT_DIR/generated-files/data/v1.3.3"
-wait_for_serving_block "geth-v1-3-3" "http://localhost:8549" "$MIN_SERVE_BLOCK"
+  "$ROOT_DIR/generated-files/data/v1.0.3"
+wait_for_serving_block "geth-v1-0-3" "http://localhost:8549" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] done"

@@ -42,15 +42,15 @@ mkdir -p "$DATA_ROOT"
 # - v1.11.6: eth/66–68 (bridges v1.16.7 <-> v1.10.8)
 # - v1.10.8: eth/65–66 (bridges v1.11.6 <-> v1.9.25)
 # - v1.9.25:  eth/63–65 (bridges v1.10.8 <-> v1.3.6)
-# - v1.3.6:   eth/62–63 (bridges v1.9.25 <-> v1.3.3)
-versions=(v1.16.7 v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.3.3)
+# - v1.3.6:   eth/62–63 (bridges v1.9.25 <-> v1.0.3)
+versions=(v1.16.7 v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.0.3)
 declare -A ip_by_version=(
     ["v1.16.7"]="172.20.0.18"
     ["v1.11.6"]="172.20.0.15"
     ["v1.10.8"]="172.20.0.16"
     ["v1.9.25"]="172.20.0.17"
     ["v1.3.6"]="172.20.0.13"
-    ["v1.3.3"]="172.20.0.14"
+    ["v1.0.3"]="172.20.0.14"
 )
 declare -A port_by_version=(
     ["v1.16.7"]="30306"
@@ -58,7 +58,7 @@ declare -A port_by_version=(
     ["v1.10.8"]="30309"
     ["v1.9.25"]="30310"
     ["v1.3.6"]="30311"
-    ["v1.3.3"]="30307"
+    ["v1.0.3"]="30307"
 )
 
 
@@ -121,10 +121,10 @@ generate_enode() {
         echo "Failed to extract pubkey from enode output for $version. Raw: '$raw'" >&2
         exit 1
     fi
-    # NOTE: Extremely old Geth versions (e.g. v1.3.3 / Frontier-era) may not parse the
+    # NOTE: Extremely old Geth versions (e.g. v1.0.3 / Frontier-era) may not parse the
     # modern enode URL query string (`?discport=0`). If they can't parse it, they won't
     # dial static peers at all.
-    if [[ "$version" == "v1.3.3" ]]; then
+    if [[ "$version" == "v1.0.3" ]]; then
         echo "enode://$pubkey@$ip:$port"
     else
         # Keep discport=0 for maximum cross-version compatibility.
@@ -132,7 +132,7 @@ generate_enode() {
     fi
 }
 
-# Very old Geth releases (e.g. v1.3.3) may not parse enode URLs that include
+# Very old Geth releases (e.g. v1.0.3) may not parse enode URLs that include
 # a query string like `?discport=0`. When writing static-nodes.json for those
 # clients, strip any query component.
 strip_enode_query() {
@@ -212,7 +212,7 @@ rm -f "$v1_11_6_dir/geth/static-nodes.json" "$v1_11_6_dir/static-nodes.json" 2>/
 echo "Created config.toml for v1.11.6 with discovery disabled and no outbound peering"
 
 # Create static-nodes.json for each non-top version (except v1.11.6, which is offline-seeded and has no outbound peers).
-for version in v1.10.8 v1.9.25 v1.3.6 v1.3.3; do
+for version in v1.10.8 v1.9.25 v1.3.6 v1.0.3; do
     datadir="$DATA_ROOT/$version"
 
     # Starting around the 1.4+ era, Geth expects peer config under <datadir>/geth/.
@@ -237,9 +237,9 @@ for version in v1.10.8 v1.9.25 v1.3.6 v1.3.3; do
             ensure_geth_static_nodes "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;
-        v1.3.3)
+        v1.0.3)
             next="v1.3.6"
-            # v1.3.3 may not parse `?discport=0` in enode URLs.
+            # v1.0.3 may not parse `?discport=0` in enode URLs.
             printf '["%s"]\n' "$(strip_enode_query "${enodes[$next]}")" > "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;

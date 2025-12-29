@@ -213,7 +213,7 @@ versions=(
 	"v1.10.8"
 	"v1.9.25"
 	"v1.3.6"
-	"v1.3.3"
+	"v1.0.3"
 )
 
 # Optional: build only a single version (faster iteration).
