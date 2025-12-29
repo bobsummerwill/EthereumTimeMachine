@@ -310,6 +310,9 @@ class Poller:
 
         # Stage checklist config.
         cutoff_block = _env_int("CUTOFF_BLOCK", 1919999)
+        # Geth v1.0.3 is Frontier-era; it cannot serve Homestead-era blocks.
+        # Track its progress against the last Frontier block instead of the global cutoff.
+        v1_0_3_target_block = _env_int("V1_0_3_TARGET_BLOCK", 1149999)
         host_output_dir = Path(os.environ.get("HOST_OUTPUT_DIR", "/host_output")).resolve()
         lighthouse_metrics_url = (os.environ.get("LIGHTHOUSE_METRICS_URL", "") or "").strip().rstrip("/")
 
@@ -451,7 +454,9 @@ class Poller:
                 # Some nodes should display progress vs a fixed historical target rather than the
                 # node-reported `eth_syncing.highestBlock` (which may be missing/0 on older clients).
                 fixed_target: int | None
-                if name.strip() in {"Geth v1.11.6", "Geth v1.10.8", "Geth v1.9.25", "Geth v1.3.6", "Geth v1.0.3"}:
+                if name.strip() == "Geth v1.0.3":
+                    fixed_target = v1_0_3_target_block
+                elif name.strip() in {"Geth v1.11.6", "Geth v1.10.8", "Geth v1.9.25", "Geth v1.3.6"}:
                     # These nodes are expected to sync up to the fixed historical cutoff.
                     fixed_target = cutoff_block
                 else:
@@ -700,23 +705,23 @@ class Poller:
                     1 if (import_marker_path.exists() or importing) else 0,
                 )
 
-            # 5-7) Legacy bridge nodes syncing to the cutoff (normal P2P sync via static peering).
-            def cutoff_sync_stage(node: str, stage_label: str) -> None:
+            # 5-8) Legacy bridge nodes syncing to their historical targets (normal P2P sync via static peering).
+            def fixed_sync_stage(node: str, stage_label: str, target: int) -> None:
                 if not node_up.get(node, False):
                     set_stage(stage_label, 0)
                     return
                 eff = node_effective_head.get(node, 0)
-                if eff >= cutoff_block:
+                if eff >= target:
                     set_stage(stage_label, 2)
                 elif eff > 0:
                     set_stage(stage_label, 1)
                 else:
                     set_stage(stage_label, 0)
 
-            cutoff_sync_stage("Geth v1.10.8", "5. Geth v1.10.8 syncing")
-            cutoff_sync_stage("Geth v1.9.25", "6. Geth v1.9.25 syncing")
-            cutoff_sync_stage("Geth v1.3.6", "7. Geth v1.3.6 syncing")
-            cutoff_sync_stage("Geth v1.0.3", "8. Geth v1.0.3 syncing")
+            fixed_sync_stage("Geth v1.10.8", "5. Geth v1.10.8 syncing", cutoff_block)
+            fixed_sync_stage("Geth v1.9.25", "6. Geth v1.9.25 syncing", cutoff_block)
+            fixed_sync_stage("Geth v1.3.6", "7. Geth v1.3.6 syncing", cutoff_block)
+            fixed_sync_stage("Geth v1.0.3", "8. Geth v1.0.3 syncing", v1_0_3_target_block)
 
             # --- Synthetic rows for export/import phases in the Sync progress table ---
             # These are displayed as extra rows (between v1.16.7 and v1.11.6) by

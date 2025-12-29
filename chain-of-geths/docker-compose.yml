@@ -198,7 +198,7 @@ services:
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     environment:
-      FIXED_TARGET_BLOCK: "1919999"
+      FIXED_TARGET_BLOCK: "1149999"
       # v1.0.3 is extremely old; it can temporarily report `eth_syncing=false` while far behind its upstream.
       # Make the watchdog more aggressive so it self-heals by forcing a fresh peer handshake.
       SAMPLE_INTERVAL_SECONDS: ${V1_0_3_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-120}
@@ -285,6 +285,7 @@ services:
       # Used for stage checklist (export/import phases) by reading files under the host ./generated-files bind.
       HOST_OUTPUT_DIR: /host_output
       CUTOFF_BLOCK: "1919999"
+      V1_0_3_TARGET_BLOCK: "1149999"
       POLL_INTERVAL_SECONDS: "10"
       # Optional: hide specific node labels from the progress table (Grafana “Stage progress” / Sync-UI).
       # Remote deploy uses this to hide the offline-seeded bridge node row (it is represented by the Import phase row).
@@ -321,6 +322,7 @@ services:
     environment:
       PROMETHEUS_URL: http://prometheus:9090
       PORT: "8088"
+      V1_0_3_TARGET_BLOCK: "1149999"
     ports:
       - "8088:8088"
     depends_on:
