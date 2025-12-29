@@ -197,7 +197,12 @@ services:
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     environment:
       FIXED_TARGET_BLOCK: "1919999"
-      SAMPLE_INTERVAL_SECONDS: ${LEGACY_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-300}
+      # v1.3.3 can temporarily report `eth_syncing=false` while far behind its upstream.
+      # Make the watchdog more aggressive so it self-heals by forcing a fresh peer handshake.
+      SAMPLE_INTERVAL_SECONDS: ${V1_3_3_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-120}
+      STALL_REQUIRED_SAMPLES: "1"
+      # Allow restart even when peerCount temporarily drops to 0 (common around restarts).
+      REQUIRE_PEERS_FOR_RESTART: "0"
     command: |
       --datadir /data
       --nodekey /data/nodekey
