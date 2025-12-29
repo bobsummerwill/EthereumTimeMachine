@@ -157,8 +157,8 @@ services:
         ipv4_address: 172.20.0.17
 
   # Bridge node: eth/63<->Frontier-era compatibility.
-  # Geth v1.3.6 supports eth/62-63-ish and can still talk to v1.9.25.
-  # This exists because v1.3.3 is too old to speak directly to v1.9.25.
+  # Geth v1.3.6 supports eth/61-63 and can still talk to v1.9.25.
+  # This exists because v1.0.3 is too old to speak directly to v1.9.25.
   geth-v1-3-6:
     image: ethereumtimemachine/geth:v1.3.6
     container_name: geth-v1-3-6

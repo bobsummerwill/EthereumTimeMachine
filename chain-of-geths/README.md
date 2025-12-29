@@ -75,17 +75,17 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
                                  v
              +-----------------------------------------------+
              | geth v1.3.6 (1st Apr 2016)                    |
-             | eth/62-63                                     |
+             | eth/61-63                                     |
              | Forks supported:                              |
              |   Homestead                                   |
              |   Frontier                                    |
              +-----------------------------------------------+
                                  |
-                                 | P2P eth/62 (protocol bridge)
+                                 | P2P eth/61-62 (protocol bridge)
                                  v
              +-----------------------------------------------+
              | geth v1.0.3 (1st Sep 2015)                    |
-             | eth/60-62                                     |
+             | eth/61-62                                     |
              | Forks supported:                              |
              |   Homestead                                   |
              |   Frontier                                    |

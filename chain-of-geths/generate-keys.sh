@@ -42,7 +42,7 @@ mkdir -p "$DATA_ROOT"
 # - v1.11.6: eth/66–68 (bridges v1.16.7 <-> v1.10.8)
 # - v1.10.8: eth/65–66 (bridges v1.11.6 <-> v1.9.25)
 # - v1.9.25:  eth/63–65 (bridges v1.10.8 <-> v1.3.6)
-# - v1.3.6:   eth/62–63 (bridges v1.9.25 <-> v1.0.3)
+# - v1.3.6:   eth/61–63 (bridges v1.9.25 <-> v1.0.3)
 versions=(v1.16.7 v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.0.3)
 declare -A ip_by_version=(
     ["v1.16.7"]="172.20.0.18"
