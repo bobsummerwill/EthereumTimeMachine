@@ -95,6 +95,98 @@ rpc_block_number_dec() {
   echo $((16#$hex))
 }
 
+rpc_peer_count_dec() {
+  # Return current net_peerCount as decimal, or empty.
+  local url="$1"
+  local out hex
+  out=$(curl -s --max-time 2 -X POST "$url" -H 'Content-Type: application/json' \
+    --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":1}' || true)
+  hex=$(echo "$out" | sed -n 's/.*"result"[[:space:]]*:[[:space:]]*"\(0x[0-9a-fA-F]*\)".*/\1/p' | head -n 1)
+  [ -z "$hex" ] && return 0
+  hex="${hex#0x}"
+  [ -z "$hex" ] && return 0
+  echo $((16#$hex))
+}
+
+maybe_reset_if_stuck_at_genesis() {
+  # Some legacy geth versions can get stuck forever if the datadir contains partial/fast-sync artifacts.
+  # Symptom: eth_blockNumber stays at 0 while the node repeatedly drops its static upstream peer.
+  #
+  # This helper is intentionally conservative:
+  # - only triggers when blockNumber==0 for a sustained period
+  # - and when the upstream is clearly serving blocks
+  # - and when the node has no peers
+  #
+  # Env toggles:
+  #   RESET_IF_STUCK_AT_GENESIS=1 (default)
+  #   RESET_STUCK_GENESIS_TIMEOUT_SECONDS=1200
+  #   RESET_STUCK_GENESIS_POLL_SECONDS=30
+  local svc="$1"
+  local label="$2"
+  local url="$3"
+  local data_dir="$4"
+  local upstream_label="$5"
+  local upstream_url="$6"
+
+  local enabled timeout poll
+  enabled="${RESET_IF_STUCK_AT_GENESIS:-1}"
+  timeout="${RESET_STUCK_GENESIS_TIMEOUT_SECONDS:-1200}"
+  poll="${RESET_STUCK_GENESIS_POLL_SECONDS:-30}"
+
+  if [ "$enabled" != "1" ]; then
+    return 0
+  fi
+
+  echo "[start-legacy] genesis-stuck check enabled for $label (timeout=${timeout}s)"
+
+  local start now elapsed bn peers ubn
+  start=$(date +%s)
+  while true; do
+    bn=$(rpc_block_number_dec "$url" || true)
+    peers=$(rpc_peer_count_dec "$url" || true)
+    ubn=$(rpc_block_number_dec "$upstream_url" || true)
+
+    # If we're already making progress, bail immediately.
+    if [ -n "$bn" ] && [ "$bn" -gt 0 ]; then
+      echo "[start-legacy] genesis-stuck check OK: $label blockNumber=$bn peers=${peers:-?}"
+      return 0
+    fi
+
+    now=$(date +%s)
+    elapsed=$((now - start))
+
+    # Only consider reset once upstream is serving blocks (avoid wiping during a full-stack cold start).
+    if [ -n "$bn" ] && [ "$bn" -eq 0 ] && [ -n "$ubn" ] && [ "$ubn" -ge "$MIN_SERVE_BLOCK" ] && [ -n "$peers" ] && [ "$peers" -le 0 ]; then
+      echo "[start-legacy] $label still at genesis (blockNumber=0) with 0 peers while upstream($upstream_label) is at $ubn (elapsed=${elapsed}s)"
+      if [ "$elapsed" -ge "$timeout" ]; then
+        echo "[start-legacy] genesis-stuck triggered: wiping $label chain DB under $data_dir/geth and restarting container"
+        compose_stop "$svc" || true
+        sudo rm -rf \
+          "$data_dir/geth/chaindata" \
+          "$data_dir/geth/chaindata.bak" \
+          "$data_dir/geth/nodes" \
+          "$data_dir/geth/triecache" \
+          "$data_dir/geth/snapshot" \
+          "$data_dir/geth/LOCK" \
+          "$data_dir/geth/LOG" \
+          2>/dev/null || true
+        compose_up "$svc"
+        wait_for_rpc "$label" "$url"
+        # After reset, give it time to connect and begin syncing.
+        start=$(date +%s)
+      fi
+    fi
+
+    # Safety: don't loop forever if RPC can't provide a stable answer.
+    if [ "$elapsed" -ge $((timeout * 2)) ]; then
+      echo "[start-legacy] genesis-stuck check giving up after ${elapsed}s (no reset condition met)"
+      return 0
+    fi
+
+    sleep "$poll"
+  done
+}
+
 ensure_not_ahead_of_upstream() {
   # If a downstream node is started while its upstream peer is behind its local chain head
   # (common when reusing persisted datadirs), legacy geth can latch a low peer status at
@@ -189,6 +281,10 @@ wait_for_serving_block "geth-v1-10-8" "http://localhost:8551" "$MIN_SERVE_BLOCK"
 echo "[start-legacy] starting geth-v1-9-25"
 compose_up geth-v1-9-25
 wait_for_rpc "geth-v1-9-25" "http://localhost:8552"
+maybe_reset_if_stuck_at_genesis \
+  "geth-v1-9-25" "geth-v1-9-25" "http://localhost:8552" \
+  "$ROOT_DIR/generated-files/data/v1.9.25" \
+  "geth-v1-10-8" "http://localhost:8551"
 ensure_not_ahead_of_upstream \
   "geth-v1-9-25" "geth-v1-9-25" "http://localhost:8552" \
   "geth-v1-10-8" "http://localhost:8551"
