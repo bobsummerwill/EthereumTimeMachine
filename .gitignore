@@ -3,5 +3,10 @@
 chain-of-geths/generated-files/
 chain-of-geths/generated-files/**
 
+# Local environment overrides (keep secrets/IPs out of git)
+chain-of-geths/.env
+chain-of-geths/.env.*
+!chain-of-geths/.env.example
+
 # Compiled python output
 *.pyc

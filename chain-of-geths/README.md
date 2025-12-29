@@ -151,8 +151,7 @@ The stack includes Prometheus + Grafana + a JSON-RPC exporter so metrics work ac
 - Minimal “Sync UI”: [`chain-of-geths/monitoring/sync-ui/server.js`](chain-of-geths/monitoring/sync-ui/server.js)
 
 
-Endpoints (on the deployed host; see [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)):
-Endpoints (on the Ubuntu VM running the stack; default `VM_IP` is in [`chain-of-geths/deploy.sh`](chain-of-geths/deploy.sh:39) (line 39)):
+Endpoints (on the Ubuntu VM running the stack; `VM_IP` defaults come from [`chain-of-geths/.env.example`](chain-of-geths/.env.example:1) and can be overridden in `chain-of-geths/.env` (gitignored)):
 - Grafana: http://<VM_IP>:3000 (default `admin` / `admin`)
 - Prometheus: http://<VM_IP>:9090
 - Exporter metrics: http://<VM_IP>:9100/metrics

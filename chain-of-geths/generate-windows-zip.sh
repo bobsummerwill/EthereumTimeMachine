@@ -15,6 +15,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Load local env overrides (VM_IP, etc.).
+ENV_FILE="$SCRIPT_DIR/.env"
+ENV_EXAMPLE="$SCRIPT_DIR/.env.example"
+if [ ! -f "$ENV_FILE" ] && [ -f "$ENV_EXAMPLE" ]; then
+  cp "$ENV_EXAMPLE" "$ENV_FILE"
+  echo "Created $ENV_FILE from $ENV_EXAMPLE (edit as needed)" >&2
+fi
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$ENV_FILE"
+  set +a
+fi
+
 OUTPUT_DIR="$SCRIPT_DIR/generated-files"
 mkdir -p "$OUTPUT_DIR"
 
@@ -41,19 +55,10 @@ require_cmd docker
 get_vm_ip() {
   # Priority:
   #   1) explicit environment variable
-  #   2) parse the default VM_IP from deploy.sh
+  #   2) read from local .env / .env.example (sourced above)
   if [[ -n "${VM_IP:-}" ]]; then
     echo "${VM_IP}"
     return 0
-  fi
-  local deploy_sh="$SCRIPT_DIR/deploy.sh"
-  if [[ -f "$deploy_sh" ]]; then
-    local ip
-    ip=$(grep -E '^VM_IP=' "$deploy_sh" | head -n 1 | sed -E 's/^VM_IP="?([^" ]+)"?.*$/\1/')
-    if [[ -n "$ip" ]]; then
-      echo "$ip"
-      return 0
-    fi
   fi
   echo ""
 }

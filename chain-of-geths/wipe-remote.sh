@@ -8,9 +8,11 @@
 #   WIPE_REMOTE=YES ./wipe-remote.sh
 #
 # Optional env vars:
-#   VM_IP=52.0.234.84
+#   VM_IP=<your-vm-public-ip>
 #   VM_USER=ubuntu
 #   SSH_KEY_PATH=$HOME/Downloads/chain-of-geths-keys.pem
+#
+# Recommended: create chain-of-geths/.env (gitignored) from chain-of-geths/.env.example.
 #
 # Nuclear option:
 #   NUKE_DOCKER_DIR=YES   # stops Docker/containerd and deletes /var/lib/docker + /var/lib/containerd
@@ -21,6 +23,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 mkdir -p "$SCRIPT_DIR/generated-files"
+
+# Load local env overrides (VM_IP, VM_USER, SSH_KEY_PATH, etc.).
+ENV_FILE="$SCRIPT_DIR/.env"
+ENV_EXAMPLE="$SCRIPT_DIR/.env.example"
+if [ ! -f "$ENV_FILE" ] && [ -f "$ENV_EXAMPLE" ]; then
+  cp "$ENV_EXAMPLE" "$ENV_FILE"
+  echo "Created $ENV_FILE from $ENV_EXAMPLE (edit as needed)" >&2
+fi
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$ENV_FILE"
+  set +a
+fi
 
 # Non-interactive SSH defaults for first-time connections (no host-key prompt).
 # We store known_hosts under generated-files/ so it doesn't pollute the user's global ~/.ssh/known_hosts.

@@ -10,6 +10,21 @@ cd "$SCRIPT_DIR"
 
 mkdir -p "$SCRIPT_DIR/generated-files"
 
+# Load local env overrides (VM_IP, VM_USER, SSH_KEY_PATH, etc.).
+# If missing, seed from .env.example so there is a canonical place to edit.
+ENV_FILE="$SCRIPT_DIR/.env"
+ENV_EXAMPLE="$SCRIPT_DIR/.env.example"
+if [ ! -f "$ENV_FILE" ] && [ -f "$ENV_EXAMPLE" ]; then
+  cp "$ENV_EXAMPLE" "$ENV_FILE"
+  echo "Created $ENV_FILE from $ENV_EXAMPLE (edit as needed)" >&2
+fi
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$ENV_FILE"
+  set +a
+fi
+
 # Non-interactive SSH defaults for first-time connections (no host-key prompt).
 # We store known_hosts under generated-files/ so it doesn't pollute the user's global ~/.ssh/known_hosts.
 SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$SCRIPT_DIR/generated-files/known_hosts"
