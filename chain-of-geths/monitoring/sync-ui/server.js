@@ -431,6 +431,39 @@ app.get("/", async (req, res) => {
         overflow: hidden;
         background: rgba(255,255,255,0.04);
       }
+
+      /* Status icon overlays inside the tank (Visual stage progress). */
+      .tank::after {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 56px;
+        font-weight: 900;
+        line-height: 1;
+        pointer-events: none;
+        /* Keep the icon crisp above the fill + animated overlay. */
+        z-index: 3;
+        opacity: 0.95;
+        text-shadow: 0 1px 0 rgba(0,0,0,0.35);
+        content: "";
+      }
+
+      /* DONE: large black tick. */
+      .status-2 .tank::after {
+        content: "✔";
+        color: rgba(0,0,0,0.92);
+        text-shadow: none;
+      }
+
+      /* TODO: large red cross (same red as the card via currentColor). */
+      .status-0 .tank::after {
+        content: "✖";
+        color: currentColor;
+        text-shadow: 0 1px 0 rgba(0,0,0,0.35);
+      }
+
       .fill {
         position: absolute;
         left: 0;
@@ -448,22 +481,31 @@ app.get("/", async (req, res) => {
         content: "";
         position: absolute;
         inset: 0;
-        /* Overlay subtle stripes (darker, not bright) to avoid blocky artifacts. */
+        /*
+          Smooth chevron/stripe motion.
+          - No tiled squares: avoid background-size (it creates visible seams in some renderers).
+          - Seamless loop: animation distance matches the gradient period.
+        */
         background-image: repeating-linear-gradient(
           45deg,
-          rgba(0,0,0,0.35) 0,
-          rgba(0,0,0,0.35) 6px,
-          rgba(255,255,255,0.10) 6px,
-          rgba(255,255,255,0.10) 12px
+          rgba(0,0,0,0.38) 0,
+          rgba(0,0,0,0.38) 8px,
+          rgba(255,255,255,0.10) 8px,
+          rgba(255,255,255,0.10) 16px
         );
-        background-size: 24px 24px;
-        animation: stripes 1.2s linear infinite;
-        opacity: 0.9;
+        animation: stripes 650ms linear infinite;
+        opacity: 0.92;
         pointer-events: none;
+        will-change: background-position;
+        z-index: 2;
       }
       @keyframes stripes {
         from { background-position: 0 0; }
-        to { background-position: 24px 0; }
+        to { background-position: 16px 16px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .status-1 .fill::after { animation: none; }
       }
 
       .arrow {
