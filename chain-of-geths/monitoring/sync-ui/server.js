@@ -480,7 +480,17 @@ app.get("/", async (req, res) => {
       .status-1 .fill::after {
         content: "";
         position: absolute;
-        inset: 0;
+        /*
+          Use transform-based animation (composited) instead of background-position.
+          This avoids:
+            - visible tile seams (no background-size)
+            - jerky repaints on slower/VM browsers
+            - loop jumps (translate distance matches gradient period)
+        */
+        left: -60%;
+        top: -60%;
+        width: 220%;
+        height: 220%;
         /*
           Smooth chevron/stripe motion.
           - No tiled squares: avoid background-size (it creates visible seams in some renderers).
@@ -493,15 +503,16 @@ app.get("/", async (req, res) => {
           rgba(255,255,255,0.10) 8px,
           rgba(255,255,255,0.10) 16px
         );
-        animation: stripes 650ms linear infinite;
+        transform: translate3d(0, 0, 0);
+        animation: stripes-pan 650ms linear infinite;
         opacity: 0.92;
         pointer-events: none;
-        will-change: background-position;
+        will-change: transform;
         z-index: 2;
       }
-      @keyframes stripes {
-        from { background-position: 0 0; }
-        to { background-position: 16px 16px; }
+      @keyframes stripes-pan {
+        from { transform: translate3d(0, 0, 0); }
+        to { transform: translate3d(-16px, -16px, 0); }
       }
 
       @media (prefers-reduced-motion: reduce) {
