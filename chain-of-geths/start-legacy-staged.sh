@@ -32,6 +32,34 @@ CUTOFF_BLOCK="${CUTOFF_BLOCK:-1919999}"
 # the next node down.
 MIN_SERVE_BLOCK="${MIN_SERVE_BLOCK:-1000}"
 
+# --- Self-healing knobs (systemic guardrails) ---
+#
+# We regularly see two “bad persistence” failure modes on legacy nodes:
+#
+# 1) RPC never comes up because geth is stuck doing a long/failed repair
+#    (e.g. "Head state missing, repairing").
+#
+# 2) A downstream node has a persisted head *ahead* of its upstream peer.
+#    Legacy geth can latch an initial peer status and then never sync.
+#    The script already defends by stopping downstream until upstream catches up,
+#    but that can stall the whole chain for hours.
+#
+# Defaults below make the runner prefer wiping the *downstream* DB (preserving nodekey/static-nodes)
+# over waiting for upstream to catch up.
+
+# If 1, and RPC stays unhealthy long enough AND logs look like a DB repair trap,
+# wipe that node's chain DB and restart it.
+RESET_IF_RPC_STUCK="${RESET_IF_RPC_STUCK:-1}"
+# How long to wait for RPC before attempting an auto-reset (per node start).
+RPC_STUCK_TIMEOUT_SECONDS="${RPC_STUCK_TIMEOUT_SECONDS:-900}"
+
+# Strategy when downstream_head > upstream_head:
+# - "reset": wipe downstream DB and restart immediately (recommended for unattended runs)
+# - "wait":  stop downstream and wait for upstream to reach downstream head (legacy behavior)
+AHEAD_STRATEGY="${AHEAD_STRATEGY:-reset}"
+# Only reset on ahead-condition when the gap is at least this many blocks.
+AHEAD_RESET_THRESHOLD="${AHEAD_RESET_THRESHOLD:-10000}"
+
 compose_up() {
   # shellcheck disable=SC2068
   sudo docker compose up -d $@ 2>/dev/null || sudo docker-compose up -d $@
@@ -57,16 +85,107 @@ rpc_healthcheck() {
   echo "$out" | grep -q '"result"[[:space:]]*:[[:space:]]*"'
 }
 
+docker_logs_tail() {
+  local svc="$1"
+  sudo docker logs --tail 200 "$svc" 2>/dev/null || true
+}
+
+looks_like_db_repair_trap() {
+  # Heuristics: when present during startup, legacy nodes can stay busy for a very long time
+  # and never expose RPC, effectively blocking the staged runner.
+  local logs="$1"
+  echo "$logs" | grep -Eqi 'Head state missing, repairing|missing trie node|state trie|repairing state|database (corruption|inconsistent)|fatal.*pebble|freezer.*truncate'
+}
+
+wipe_chain_db_preserve_identity() {
+  # Wipe chain DB while preserving node identity and static peering config.
+  # This is intentionally conservative: it removes only known DB/artifact directories.
+  local data_dir="$1"
+
+  if [ -z "$data_dir" ] || [ ! -d "$data_dir" ]; then
+    echo "[start-legacy] WARN: wipe requested but data_dir missing: '$data_dir'"
+    return 0
+  fi
+
+  # Newer-ish datadir layout (v1.9+): <datadir>/geth/chaindata
+  if [ -d "$data_dir/geth" ]; then
+    sudo rm -rf \
+      "$data_dir/geth/chaindata" \
+      "$data_dir/geth/chaindata.bak" \
+      "$data_dir/geth/nodes" \
+      "$data_dir/geth/triecache" \
+      "$data_dir/geth/snapshot" \
+      "$data_dir/geth/lightchaindata" \
+      "$data_dir/geth/LOCK" \
+      "$data_dir/geth/LOG" \
+      2>/dev/null || true
+  fi
+
+  # Very old layout (v1.3.x): <datadir>/chaindata
+  if [ -d "$data_dir/chaindata" ] || [ -d "$data_dir/dapp" ]; then
+    sudo rm -rf \
+      "$data_dir/chaindata" \
+      "$data_dir/dapp" \
+      "$data_dir/geth.ipc" \
+      "$data_dir/LOCK" \
+      "$data_dir/LOG" \
+      2>/dev/null || true
+  fi
+
+  # Always remove IPC socket if it exists.
+  sudo rm -f "$data_dir/geth.ipc" 2>/dev/null || true
+}
+
+reset_service_datadir() {
+  local svc="$1"
+  local label="$2"
+  local url="$3"
+  local data_dir="$4"
+
+  echo "[start-legacy] auto-reset: stopping $label ($svc), wiping DB under $data_dir, restarting"
+  compose_stop "$svc" || true
+  wipe_chain_db_preserve_identity "$data_dir"
+  compose_up "$svc"
+  # Wait for RPC again; don't recurse into auto-reset infinitely.
+  RESET_IF_RPC_STUCK=0 wait_for_rpc "$label" "$url" "$svc" "$data_dir"
+}
+
 wait_for_rpc() {
   local label="$1"
   local url="$2"
+  # Optional remediation params.
+  local svc="${3:-}"
+  local data_dir="${4:-}"
+
   echo "[start-legacy] waiting for $label RPC health (@ $url)"
+  local start
+  start=$(date +%s)
+
   while true; do
     if rpc_healthcheck "$url"; then
       echo "[start-legacy] $label RPC healthy"
       return 0
     fi
+
     echo "[start-legacy] $label RPC not ready yet"
+
+    if [ "${RESET_IF_RPC_STUCK:-0}" = "1" ] && [ -n "$svc" ] && [ -n "$data_dir" ] && [ -n "${RPC_STUCK_TIMEOUT_SECONDS:-}" ]; then
+      local now elapsed
+      now=$(date +%s)
+      elapsed=$((now - start))
+      if [ "$elapsed" -ge "${RPC_STUCK_TIMEOUT_SECONDS}" ]; then
+        logs=$(docker_logs_tail "$svc")
+        if looks_like_db_repair_trap "$logs"; then
+          echo "[start-legacy] WARN: $label RPC unhealthy for ${elapsed}s and logs suggest DB repair trap; attempting auto-reset"
+          reset_service_datadir "$svc" "$label" "$url" "$data_dir"
+          # After reset_service_datadir returns, RPC is healthy.
+          return 0
+        fi
+        # Not a known trap; extend the window to avoid spamming.
+        start=$now
+      fi
+    fi
+
     sleep 5
   done
 }
@@ -199,6 +318,8 @@ ensure_not_ahead_of_upstream() {
   local downstream_url="$3"
   local upstream_label="$4"
   local upstream_url="$5"
+  # Optional: downstream datadir, used for auto-reset strategy.
+  local data_dir="${6:-}"
 
   local d u
   d=$(rpc_block_number_dec "$downstream_url" || true)
@@ -215,11 +336,21 @@ ensure_not_ahead_of_upstream() {
   fi
 
   echo "[start-legacy] ahead-check TRIGGERED: $downstream_label head=$d is ahead of upstream($upstream_label) head=$u"
-  echo "[start-legacy] stopping $svc until $upstream_label can serve block $d, then restarting"
+
+  local gap
+  gap=$((d - u))
+
+  if [ "${AHEAD_STRATEGY:-wait}" = "reset" ] && [ -n "$data_dir" ] && [ "$gap" -ge "${AHEAD_RESET_THRESHOLD}" ]; then
+    echo "[start-legacy] ahead-check strategy=reset (gap=$gap >= ${AHEAD_RESET_THRESHOLD}); wiping downstream DB and restarting"
+    reset_service_datadir "$svc" "$downstream_label" "$downstream_url" "$data_dir"
+    return 0
+  fi
+
+  echo "[start-legacy] ahead-check strategy=wait; stopping $svc until $upstream_label can serve block $d, then restarting"
   compose_stop "$svc" || true
   wait_for_serving_block "$upstream_label" "$upstream_url" "$d"
   compose_up "$svc"
-  wait_for_rpc "$downstream_label" "$downstream_url"
+  wait_for_rpc "$downstream_label" "$downstream_url" "$svc" "$data_dir"
 }
 
 wait_for_serving_block() {
@@ -270,40 +401,43 @@ compose_up geth-v1-11-6
 # geth-v1-11-6 is expected to be offline-seeded (0..CUTOFF_BLOCK) by seed-v1.11.6-when-ready.sh.
 SEED_V1_11_6_FLAG="$ROOT_DIR/generated-files/seed-v1.11.6-${CUTOFF_BLOCK}.done"
 wait_for_file "$SEED_V1_11_6_FLAG"
-wait_for_rpc "geth-v1-11-6" "http://localhost:8546"
+wait_for_rpc "geth-v1-11-6" "http://localhost:8546" "geth-v1-11-6" "$ROOT_DIR/generated-files/data/v1.11.6"
 wait_for_serving_block "geth-v1-11-6" "http://localhost:8546" "$CUTOFF_BLOCK"
 
 echo "[start-legacy] starting geth-v1-10-8"
 compose_up geth-v1-10-8
-wait_for_rpc "geth-v1-10-8" "http://localhost:8551"
+wait_for_rpc "geth-v1-10-8" "http://localhost:8551" "geth-v1-10-8" "$ROOT_DIR/generated-files/data/v1.10.8"
 wait_for_serving_block "geth-v1-10-8" "http://localhost:8551" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] starting geth-v1-9-25"
 compose_up geth-v1-9-25
-wait_for_rpc "geth-v1-9-25" "http://localhost:8552"
+wait_for_rpc "geth-v1-9-25" "http://localhost:8552" "geth-v1-9-25" "$ROOT_DIR/generated-files/data/v1.9.25"
 maybe_reset_if_stuck_at_genesis \
   "geth-v1-9-25" "geth-v1-9-25" "http://localhost:8552" \
   "$ROOT_DIR/generated-files/data/v1.9.25" \
   "geth-v1-10-8" "http://localhost:8551"
 ensure_not_ahead_of_upstream \
   "geth-v1-9-25" "geth-v1-9-25" "http://localhost:8552" \
-  "geth-v1-10-8" "http://localhost:8551"
+  "geth-v1-10-8" "http://localhost:8551" \
+  "$ROOT_DIR/generated-files/data/v1.9.25"
 wait_for_serving_block "geth-v1-9-25" "http://localhost:8552" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] starting geth-v1-3-6"
 compose_up geth-v1-3-6
-wait_for_rpc "geth-v1-3-6" "http://localhost:8553"
+wait_for_rpc "geth-v1-3-6" "http://localhost:8553" "geth-v1-3-6" "$ROOT_DIR/generated-files/data/v1.3.6"
 ensure_not_ahead_of_upstream \
   "geth-v1-3-6" "geth-v1-3-6" "http://localhost:8553" \
-  "geth-v1-9-25" "http://localhost:8552"
+  "geth-v1-9-25" "http://localhost:8552" \
+  "$ROOT_DIR/generated-files/data/v1.3.6"
 wait_for_serving_block "geth-v1-3-6" "http://localhost:8553" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] starting geth-v1-3-3"
 compose_up geth-v1-3-3
-wait_for_rpc "geth-v1-3-3" "http://localhost:8549"
+wait_for_rpc "geth-v1-3-3" "http://localhost:8549" "geth-v1-3-3" "$ROOT_DIR/generated-files/data/v1.3.3"
 ensure_not_ahead_of_upstream \
   "geth-v1-3-3" "geth-v1-3-3" "http://localhost:8549" \
-  "geth-v1-3-6" "http://localhost:8553"
+  "geth-v1-3-6" "http://localhost:8553" \
+  "$ROOT_DIR/generated-files/data/v1.3.3"
 wait_for_serving_block "geth-v1-3-3" "http://localhost:8549" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] done"
