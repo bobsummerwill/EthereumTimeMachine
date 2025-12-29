@@ -801,6 +801,6 @@
   "timezone": "browser",
   "title": "Ethereum Time Machine – Sync Progress",
   "uid": "chain-of-geths-sync",
-  "version": 17,
+  "version": 1000,
   "weekStart": ""
 }
