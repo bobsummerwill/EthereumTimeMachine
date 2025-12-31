@@ -724,10 +724,7 @@ class Poller:
             fixed_sync_stage("Geth v1.10.8", "5. Geth v1.10.8 syncing", cutoff_block)
             fixed_sync_stage("Geth v1.9.25", "6. Geth v1.9.25 syncing", cutoff_block)
             fixed_sync_stage("Geth v1.3.6", "7. Geth v1.3.6 syncing", cutoff_block)
-            fixed_sync_stage("Geth v1.0.3", "8. Geth v1.0.3 syncing", v1_0_target_block)
-            fixed_sync_stage("Geth v1.0.2", "9. Geth v1.0.2 syncing", v1_0_target_block)
-            fixed_sync_stage("Geth v1.0.1", "10. Geth v1.0.1 syncing", v1_0_target_block)
-            fixed_sync_stage("Geth v1.0.0", "11. Geth v1.0.0 syncing", v1_0_target_block)
+            fixed_sync_stage("Geth v1.0.2", "8. Geth v1.0.2 syncing", v1_0_target_block)
 
             # --- Synthetic rows for export/import phases in the Sync progress table ---
             # These are displayed as extra rows (between v1.16.7 and v1.11.6) by

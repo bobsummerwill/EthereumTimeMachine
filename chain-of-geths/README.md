@@ -80,43 +80,16 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
              |   Homestead                                   |
              |   Frontier                                    |
              +-----------------------------------------------+
-                                 |
-                                  | P2P eth/61 (protocol bridge)
-                                  v
-               +-----------------------------------------------+
-               | geth v1.0.3 (1st Sep 2015)                    |
-               | eth/60-61                                     |
-               | Forks supported:                              |
-               |   Frontier                                    |
-               +-----------------------------------------------+
                                   |
-                                  | P2P eth/61 (protocol bridge)
-                                  v
-               +-----------------------------------------------+
-               | geth v1.0.2 (22nd Aug 2015)                   |
-               | eth/60-61                                     |
-               | Forks supported:                              |
-               |   Frontier                                    |
-               +-----------------------------------------------+
-                                  |
-                                  | P2P eth/61 (protocol bridge)
-                                  v
-               +-----------------------------------------------+
-               | geth v1.0.1 (5th Aug 2015)                    |
-               | eth/60-61                                     |
-               | Forks supported:                              |
-               |   Frontier                                    |
-               +-----------------------------------------------+
-                                  |
-                                  | P2P eth/61 (protocol bridge)
-                                  v
-               +-----------------------------------------------+
-               | geth v1.0.0 (29th Jul 2015)                   |
-               | eth/60-61                                     |
-               | Forks supported:                              |
-               |   Frontier                                    |
-               +-----------------------------------------------+
-```
+                                   | P2P eth/61 (protocol bridge)
+                                   v
+                  +-----------------------------------------------+
+                  | geth v1.0.2 (22nd Aug 2015)                   |
+                  | eth/60-61                                     |
+                  | Forks supported:                              |
+                  |   Frontier                                    |
+                  +-----------------------------------------------+
+  ```
 
 Services:
 - `geth-v1-16-7`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
@@ -125,10 +98,7 @@ Services:
 - `geth-v1-10-8`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
 - `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
 - `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
-- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
 - `geth-v1-0-2`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
-- `geth-v1-0-1`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
-- `geth-v1-0-0`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
 - `geth-exporter`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
 - `prometheus`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
 - `sync-ui`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
@@ -163,7 +133,6 @@ Offline-seeded node:
 - `nodekey`
 - `static-nodes.json`
 - `config.toml` (newer nodes)
-- (no genesis.json needed for this chain)
 
 See: [`chain-of-geths/generate-keys.sh`](chain-of-geths/generate-keys.sh)
 
@@ -217,8 +186,9 @@ External P2P peering (required if you want a non-VM node, e.g. the Windows zip b
 
 Notes:
 
-- The `172.20.0.x` addresses in generated `static-nodes.json` are **container-only** addresses on the VM’s Docker bridge network.
-  External machines must use the VM’s public IP/DNS, plus the published host ports.
+- Generated `static-nodes.json` uses **docker-compose service names** (e.g. `geth-v1-3-6`) rather than fixed container IPs.
+  This keeps static peering stable even when docker assigns different IPs on restart.
+- External machines must use the VM’s public IP/DNS, plus the published host ports (container DNS names are not resolvable outside Docker).
 - On a default Ubuntu EC2, `ufw` is usually **inactive**. If you enabled it, you must also allow the same inbound ports at the VM firewall.
 
 ## Generated files directory

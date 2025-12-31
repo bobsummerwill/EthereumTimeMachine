@@ -21,7 +21,7 @@ RUN apt-get update \
 # Download and install geth binary
 EOF
 	case $version in
-		v1.0.0|v1.0.1|v1.0.2|v1.0.3)
+		v1.0.2)
 	            # Build from source: no maintained prebuilt Linux binaries for these very early releases.
 	            # We compile using a downloaded Go 1.4.x toolchain (DockerHub no longer serves schema1 images like golang:1.4).
 	            cat > "$out_file" << 'EOF'
@@ -197,14 +197,11 @@ versions=(
 	"v1.10.8"
 	"v1.9.25"
 	"v1.3.6"
-	"v1.0.0"
-	"v1.0.1"
 	"v1.0.2"
-	"v1.0.3"
 )
 
 # Optional: build only a single version (faster iteration).
-# Example: ONLY_VERSION=v1.0.3 ./build-images.sh
+# Example: ONLY_VERSION=v1.0.2 ./build-images.sh
 if [[ -n "${ONLY_VERSION:-}" ]]; then
     versions=("$ONLY_VERSION")
 fi

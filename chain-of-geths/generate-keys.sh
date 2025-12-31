@@ -36,38 +36,30 @@ OUTPUT_DIR="$SCRIPT_DIR/generated-files"
 DATA_ROOT="$OUTPUT_DIR/data"
 mkdir -p "$DATA_ROOT"
 
-# Versions and their (docker-network) IPs/ports. Must match docker-compose.yml.
+# Versions and their (docker-network) P2P ports. Must match docker-compose.yml.
 # NOTE: Some adjacent releases don't overlap in `eth/*` protocol versions.
 # These bridge nodes are required for stable peering:
 # - v1.11.6: eth/66–68 (bridges v1.16.7 <-> v1.10.8)
 # - v1.10.8: eth/65–66 (bridges v1.11.6 <-> v1.9.25)
 # - v1.9.25:  eth/63–65 (bridges v1.10.8 <-> v1.3.6)
-# - v1.3.6:   eth/61–63 (bridges v1.9.25 <-> v1.0.3)
-# - v1.0.3:   eth/60–61 (bridges v1.3.6 <-> v1.0.2)
-# - v1.0.2+:  eth/60 (Frontier-era tail)
-versions=(v1.16.7 v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.0.3 v1.0.2 v1.0.1 v1.0.0)
-declare -A ip_by_version=(
-    ["v1.16.7"]="172.20.0.18"
-    ["v1.11.6"]="172.20.0.15"
-    ["v1.10.8"]="172.20.0.16"
-    ["v1.9.25"]="172.20.0.17"
-    ["v1.3.6"]="172.20.0.13"
-    ["v1.0.3"]="172.20.0.14"
-    ["v1.0.2"]="172.20.0.12"
-    ["v1.0.1"]="172.20.0.11"
-    ["v1.0.0"]="172.20.0.10"
-)
+# - v1.3.6:   eth/61–63 (bridges v1.9.25 <-> v1.0.2)
+# - v1.0.2:   eth/60–61 (Frontier-era tail)
+versions=(v1.16.7 v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.0.2)
 declare -A port_by_version=(
     ["v1.16.7"]="30306"
     ["v1.11.6"]="30308"
     ["v1.10.8"]="30309"
     ["v1.9.25"]="30310"
     ["v1.3.6"]="30311"
-    ["v1.0.3"]="30307"
     ["v1.0.2"]="30312"
-    ["v1.0.1"]="30313"
-    ["v1.0.0"]="30314"
 )
+
+# Compose service name for a given version.
+# Example: v1.16.7 -> geth-v1-16-7
+service_name_for_version() {
+    local version="$1"
+    echo "geth-${version//./-}"
+}
 
 
 
@@ -75,7 +67,8 @@ declare -A port_by_version=(
 generate_enode() {
     local version=$1
     local datadir="$DATA_ROOT/$version"
-    local ip="${ip_by_version[$version]}"
+    local host
+    host=$(service_name_for_version "$version")
     local port="${port_by_version[$version]}"
     mkdir -p "$datadir"
 
@@ -123,6 +116,9 @@ generate_enode() {
 
     # raw is expected to look like: enode://<pubkey>@[::]:30303?discport=0
     # Normalize to a usable address in our docker-compose network.
+    #
+    # IMPORTANT: We intentionally use the docker-compose *service name* here (not a fixed container IP).
+    # This keeps static peering working even when docker assigns different IPs across restarts.
     local pubkey
     pubkey=$(echo "$raw" | sed -E 's#^enode://([^@]+)@.*#\1#')
     if [[ -z "$pubkey" || "$pubkey" == "enode://" ]]; then
@@ -133,14 +129,14 @@ generate_enode() {
     # modern enode URL query string (`?discport=0`). If they can't parse it, they won't
     # dial static peers at all.
     if [[ "$version" == v1.0.* ]]; then
-        echo "enode://$pubkey@$ip:$port"
+        echo "enode://$pubkey@$host:$port"
     else
         # Keep discport=0 for maximum cross-version compatibility.
-        echo "enode://$pubkey@$ip:$port?discport=0"
+        echo "enode://$pubkey@$host:$port?discport=0"
     fi
 }
 
-# Very old Geth releases (e.g. v1.0.3) may not parse enode URLs that include
+# Very old Geth releases (e.g. v1.0.2) may not parse enode URLs that include
 # a query string like `?discport=0`. When writing static-nodes.json for those
 # clients, strip any query component.
 strip_enode_query() {
@@ -161,7 +157,8 @@ done
 echo ""
 echo "--- Chain-of-geths identity summary (version -> ip:port -> enode) ---"
 for version in "${versions[@]}"; do
-  echo "  $version -> ${ip_by_version[$version]}:${port_by_version[$version]} -> ${enodes[$version]}"
+  host=$(service_name_for_version "$version")
+  echo "  $version -> ${host}:${port_by_version[$version]} -> ${enodes[$version]}"
 done
 echo "--- end summary ---"
 
@@ -184,15 +181,6 @@ ensure_jwtsecret() {
 }
 
 ensure_jwtsecret v1.16.7
-
-# v1.0.0 needs a canonical mainnet genesis JSON available at runtime.
-# We generate it from a modern geth preset (no datadir needed) and store it under the v1.0.0 datadir
-# so it gets copied alongside other generated-files during deploy.
-v1_0_0_genesis="$DATA_ROOT/v1.0.0/genesis.json"
-echo "Generating mainnet genesis.json for v1.0.0..."
-docker run --rm ethereum/client-go:v1.16.7 dumpgenesis --mainnet > "$v1_0_0_genesis"
-chmod 644 "$v1_0_0_genesis" 2>/dev/null || true
-echo "Wrote: $v1_0_0_genesis ($(wc -c < "$v1_0_0_genesis") bytes)"
 
 # v1.16.7 is the top node; it peers with mainnet via discovery.
 v1_16_7_dir="$DATA_ROOT/v1.16.7"
@@ -236,7 +224,7 @@ rm -f "$v1_11_6_dir/geth/static-nodes.json" "$v1_11_6_dir/static-nodes.json" 2>/
 echo "Created config.toml for v1.11.6 with discovery disabled and no outbound peering"
 
 # Create static-nodes.json for each non-top version (except v1.11.6, which is offline-seeded and has no outbound peers).
-for version in v1.10.8 v1.9.25 v1.3.6 v1.0.3 v1.0.2 v1.0.1 v1.0.0; do
+for version in v1.10.8 v1.9.25 v1.3.6 v1.0.2; do
     datadir="$DATA_ROOT/$version"
 
     # Starting around the 1.4+ era, Geth expects peer config under <datadir>/geth/.
@@ -261,29 +249,14 @@ for version in v1.10.8 v1.9.25 v1.3.6 v1.0.3 v1.0.2 v1.0.1 v1.0.0; do
             ensure_geth_static_nodes "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;
-        v1.0.3)
-            next="v1.3.6"
-            # v1.0.x may not parse `?discport=0` in enode URLs.
-            printf '["%s"]\n' "$(strip_enode_query "${enodes[$next]}")" > "$datadir/static-nodes.json"
-            echo "Created static-nodes.json for $version pointing to $next"
-            ;;
         v1.3.6)
             next="v1.9.25"
             printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;
         v1.0.2)
-            next="v1.0.3"
-            printf '["%s"]\n' "$(strip_enode_query "${enodes[$next]}")" > "$datadir/static-nodes.json"
-            echo "Created static-nodes.json for $version pointing to $next"
-            ;;
-        v1.0.1)
-            next="v1.0.2"
-            printf '["%s"]\n' "$(strip_enode_query "${enodes[$next]}")" > "$datadir/static-nodes.json"
-            echo "Created static-nodes.json for $version pointing to $next"
-            ;;
-        v1.0.0)
-            next="v1.0.1"
+            next="v1.3.6"
+            # v1.0.x may not parse `?discport=0` in enode URLs.
             printf '["%s"]\n' "$(strip_enode_query "${enodes[$next]}")" > "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;

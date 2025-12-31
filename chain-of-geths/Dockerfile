@@ -27,12 +27,12 @@ ENV GOPATH=/go
 
 WORKDIR /go/src/github.com/ethereum/go-ethereum
 RUN git clone https://github.com/ethereum/go-ethereum.git . \
-    && git checkout v1.0.3
+    && git checkout v1.0.2
 
 # Build logs for debugging/reproducibility
 RUN echo "[build] go version: $(go version)" \
     && echo "[build] git rev:   $(git rev-parse --short HEAD)" \
-    && echo "[build] git tag:   v1.0.3"
+    && echo "[build] git tag:   v1.0.2"
 
 # IMPORTANT: Go 1.4's cgo DWARF parser is brittle with modern GCC output.
 # Use an older distro toolchain (jessie, GCC 4.9) and keep DWARFv2.
