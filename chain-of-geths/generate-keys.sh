@@ -54,6 +54,17 @@ declare -A port_by_version=(
     ["v1.0.2"]="30312"
 )
 
+# Static Docker network IPs for deterministic peering.
+# Must match [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:1).
+declare -A ip_by_version=(
+    ["v1.16.7"]="172.20.0.18"
+    ["v1.11.6"]="172.20.0.15"
+    ["v1.10.8"]="172.20.0.16"
+    ["v1.9.25"]="172.20.0.17"
+    ["v1.3.6"]="172.20.0.13"
+    ["v1.0.2"]="172.20.0.12"
+)
+
 # Compose service name for a given version.
 # Example: v1.16.7 -> geth-v1-16-7
 service_name_for_version() {
@@ -68,7 +79,13 @@ generate_enode() {
     local version=$1
     local datadir="$DATA_ROOT/$version"
     local host
-    host=$(service_name_for_version "$version")
+    # Use fixed container IPs because older geth versions (notably v1.3.x and earlier)
+    # do not reliably resolve DNS hostnames in enode URLs.
+    host="${ip_by_version[$version]}"
+    if [[ -z "$host" ]]; then
+        echo "Missing ip_by_version mapping for $version" >&2
+        exit 1
+    fi
     local port="${port_by_version[$version]}"
     mkdir -p "$datadir"
 

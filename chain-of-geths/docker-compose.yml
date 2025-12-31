@@ -34,7 +34,8 @@ services:
       - ./generated-files/data/v1.16.7:/data
       - ./monitoring/self-watchdog:/watchdog:ro
     networks:
-      - ethereum
+      ethereum:
+        ipv4_address: 172.20.0.18
 
   # Protocol bridge node (eth/66-68 compatibility).
   #
@@ -75,7 +76,8 @@ services:
       - ./generated-files/data/v1.11.6:/data
       - ./monitoring/self-watchdog:/watchdog:ro
     networks:
-      - ethereum
+      ethereum:
+        ipv4_address: 172.20.0.15
 
   # Bridge node: eth/66<->eth/65 compatibility.
   # Geth v1.10.8 supports eth/65, eth/66.
@@ -114,7 +116,8 @@ services:
     depends_on:
       - geth-v1-11-6
     networks:
-      - ethereum
+      ethereum:
+        ipv4_address: 172.20.0.16
 
   # Bridge node: eth/65<->eth/63 compatibility.
   # Geth v1.9.25 supports eth/63, eth/64, eth/65.
@@ -150,7 +153,8 @@ services:
     depends_on:
       - geth-v1-10-8
     networks:
-      - ethereum
+      ethereum:
+        ipv4_address: 172.20.0.17
 
   # Bridge node: eth/63<->Frontier-era compatibility.
   # Geth v1.3.6 supports eth/61-63 and can still talk to v1.9.25.
@@ -185,7 +189,8 @@ services:
     depends_on:
       - geth-v1-9-25
     networks:
-      - ethereum
+      ethereum:
+        ipv4_address: 172.20.0.13
 
   # Frontier-era tail nodes (eth/60 compatibility).
   # These sync from the next node up (v1.3.6) via static peering.
@@ -219,7 +224,8 @@ services:
     depends_on:
       - geth-v1-3-6
     networks:
-      - ethereum
+      ethereum:
+        ipv4_address: 172.20.0.12
 
   # Consensus client (beacon node) for the *modern feeder* execution node.
   # We keep this single CL instance so the modern EL can progress on post-Merge mainnet
