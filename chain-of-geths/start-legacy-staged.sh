@@ -143,6 +143,24 @@ wipe_chain_db_preserve_identity() {
       2>/dev/null || true
   fi
 
+  # Frontier-era tail layout (v1.0.x): geth uses multiple top-level LevelDBs.
+  # Observed directories: blockchain/, state/, extra/, (optional) nodes/ and geth.ipc.
+  # Preserve:
+  # - nodekey
+  # - static-nodes.json
+  # - genesis.json (v1.0.0)
+  if [ -d "$data_dir/blockchain" ] || [ -d "$data_dir/state" ] || [ -d "$data_dir/extra" ]; then
+    sudo rm -rf \
+      "$data_dir/blockchain" \
+      "$data_dir/state" \
+      "$data_dir/extra" \
+      "$data_dir/nodes" \
+      "$data_dir/geth.ipc" \
+      "$data_dir/LOCK" \
+      "$data_dir/LOG" \
+      2>/dev/null || true
+  fi
+
   # Always remove IPC socket if it exists.
   sudo rm -f "$data_dir/geth.ipc" 2>/dev/null || true
 }
@@ -310,6 +328,68 @@ maybe_reset_if_stuck_at_genesis() {
     # Safety: don't loop forever if RPC can't provide a stable answer.
     if [ "$elapsed" -ge $((timeout * 2)) ]; then
       echo "[start-legacy] genesis-stuck check giving up after ${elapsed}s (no reset condition met)"
+      return 0
+    fi
+
+    sleep "$poll"
+  done
+}
+
+maybe_restart_if_stuck_at_genesis_with_peers() {
+  # Some very old geth versions can get "latched" at block 0 even though they have a peer.
+  # In practice, a single container restart after the upstream is serving blocks fixes it.
+  #
+  # Env toggles:
+  #   RESTART_IF_STUCK_AT_GENESIS_WITH_PEERS=1 (default)
+  #   RESTART_STUCK_GENESIS_WITH_PEERS_TIMEOUT_SECONDS=600
+  #   RESTART_STUCK_GENESIS_WITH_PEERS_POLL_SECONDS=30
+  local svc="$1"
+  local label="$2"
+  local url="$3"
+  local data_dir="$4"
+  local upstream_label="$5"
+  local upstream_url="$6"
+
+  local enabled timeout poll
+  enabled="${RESTART_IF_STUCK_AT_GENESIS_WITH_PEERS:-1}"
+  timeout="${RESTART_STUCK_GENESIS_WITH_PEERS_TIMEOUT_SECONDS:-600}"
+  poll="${RESTART_STUCK_GENESIS_WITH_PEERS_POLL_SECONDS:-30}"
+
+  if [ "$enabled" != "1" ]; then
+    return 0
+  fi
+
+  echo "[start-legacy] genesis-stuck-with-peers check enabled for $label (timeout=${timeout}s)"
+
+  local start now elapsed bn peers ubn
+  start=$(date +%s)
+  while true; do
+    bn=$(rpc_block_number_dec "$url" || true)
+    peers=$(rpc_peer_count_dec "$url" || true)
+    ubn=$(rpc_block_number_dec "$upstream_url" || true)
+
+    if [ -n "$bn" ] && [ "$bn" -gt 0 ]; then
+      echo "[start-legacy] genesis-stuck-with-peers OK: $label blockNumber=$bn peers=${peers:-?}"
+      return 0
+    fi
+
+    now=$(date +%s)
+    elapsed=$((now - start))
+
+    # Only consider restart once upstream is clearly serving blocks.
+    if [ -n "$bn" ] && [ "$bn" -eq 0 ] && [ -n "$ubn" ] && [ "$ubn" -ge "$MIN_SERVE_BLOCK" ]; then
+      echo "[start-legacy] $label still at genesis (blockNumber=0) peers=${peers:-?} while upstream($upstream_label) is at $ubn (elapsed=${elapsed}s)"
+      if [ "$elapsed" -ge "$timeout" ]; then
+        echo "[start-legacy] genesis-stuck-with-peers triggered: restarting $svc (preserving datadir $data_dir)"
+        compose_stop "$svc" || true
+        compose_up "$svc"
+        wait_for_rpc "$label" "$url" "$svc" "$data_dir"
+        return 0
+      fi
+    fi
+
+    if [ "$elapsed" -ge $((timeout * 2)) ]; then
+      echo "[start-legacy] genesis-stuck-with-peers check giving up after ${elapsed}s"
       return 0
     fi
 
@@ -519,6 +599,10 @@ ensure_not_ahead_of_upstream \
   "geth-v1-0-0" "geth-v1-0-0" "http://localhost:8556" \
   "geth-v1-0-1" "http://localhost:8555" \
   "$ROOT_DIR/generated-files/data/v1.0.0"
+maybe_restart_if_stuck_at_genesis_with_peers \
+  "geth-v1-0-0" "geth-v1-0-0" "http://localhost:8556" \
+  "$ROOT_DIR/generated-files/data/v1.0.0" \
+  "geth-v1-0-1" "http://localhost:8555"
 wait_for_serving_block "geth-v1-0-0" "http://localhost:8556" "$MIN_SERVE_BLOCK"
 
 echo "[start-legacy] done"

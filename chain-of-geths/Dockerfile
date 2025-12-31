@@ -46,7 +46,8 @@ RUN env \
 FROM debian:bullseye-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates libgmp10 \
+    # Include curl so the self-watchdog can query JSON-RPC even on very old geth builds.
+    && apt-get install -y --no-install-recommends ca-certificates libgmp10 curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /out/geth /usr/local/bin/geth
