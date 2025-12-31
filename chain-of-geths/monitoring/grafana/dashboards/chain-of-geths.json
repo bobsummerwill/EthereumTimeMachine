@@ -85,7 +85,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 10
+        "y": 13
       },
       "id": 1,
       "options": {
@@ -103,14 +103,14 @@
        "targets": [
          {
            "editorMode": "code",
-           "expr": "((geth_effective_head_block{node=~\"^Geth .*\",node!=\"Geth v1.11.6\",node!~\".*\\\\((export|import)\\\\).*\"} > 0) and on(node) (geth_up{node=~\"^Geth .*\",node!=\"Geth v1.11.6\",node!~\".*\\\\((export|import)\\\\).*\"} == 1)) or geth_effective_head_block{node=\"Geth v1.16.7 (export)\"} or label_replace(geth_effective_head_block{node=\"Geth v1.11.6 (import)\"}, \"node\", \"Geth v1.11.6\", \"node\", \".*\")",
+           "expr": "((geth_effective_head_block{node=~\"^Geth .*\",node!=\"Geth v1.11.6\",node!=\"Geth v1.3.3\",node!~\".*\\\\((export|import)\\\\).*\"} > 0) and on(node) (geth_up{node=~\"^Geth .*\",node!=\"Geth v1.11.6\",node!=\"Geth v1.3.3\",node!~\".*\\\\((export|import)\\\\).*\"} == 1)) or geth_effective_head_block{node=\"Geth v1.16.7 (export)\"} or label_replace(geth_effective_head_block{node=\"Geth v1.11.6 (import)\"}, \"node\", \"Geth v1.11.6\", \"node\", \".*\")",
            "legendFormat": "{{node}}",
            "range": true,
            "refId": "A"
          },
         {
           "editorMode": "code",
-          "expr": "geth_block_number{node=~\"^Geth .*\"}",
+           "expr": "geth_block_number{node=~\"^Geth .*\",node!=\"Geth v1.3.3\"}",
           "hide": true,
           "legendFormat": "{{node}} (canonical)",
           "range": true,
@@ -167,7 +167,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 10
+        "y": 13
       },
       "id": 4,
       "options": {
@@ -184,7 +184,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "geth_peer_count",
+           "expr": "geth_peer_count{node!=\"Geth v1.3.3\"}",
           "legendFormat": "{{node}}",
           "range": true,
           "refId": "A"
@@ -240,7 +240,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 19
+        "y": 22
       },
       "id": 5,
       "options": {
@@ -324,7 +324,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 19
+        "y": 22
       },
       "id": 6,
       "options": {
@@ -389,9 +389,30 @@
         {
           "editorMode": "code",
           "expr": "geth_up{node=\"Geth v1.0.3\"}",
-          "legendFormat": "Geth v1.0.3 (eth/60-61)",
+          "legendFormat": "Geth v1.0.3",
           "range": true,
           "refId": "G"
+        },
+        {
+          "editorMode": "code",
+          "expr": "geth_up{node=\"Geth v1.0.2\"}",
+          "legendFormat": "Geth v1.0.2",
+          "range": true,
+          "refId": "H"
+        },
+        {
+          "editorMode": "code",
+          "expr": "geth_up{node=\"Geth v1.0.1\"}",
+          "legendFormat": "Geth v1.0.1",
+          "range": true,
+          "refId": "I"
+        },
+        {
+          "editorMode": "code",
+          "expr": "geth_up{node=\"Geth v1.0.0\"}",
+          "legendFormat": "Geth v1.0.0",
+          "range": true,
+          "refId": "J"
         }
       ],
       "title": "Node status",
@@ -480,7 +501,7 @@
         ]
       },
        "gridPos": {
-         "h": 10,
+         "h": 13,
          "w": 24,
          "x": 0,
          "y": 0
@@ -638,6 +659,6 @@
   "timezone": "browser",
   "title": "Ethereum Time Machine – Sync Progress",
   "uid": "chain-of-geths-sync",
-  "version": 1000003,
+  "version": 1000006,
   "weekStart": ""
 }

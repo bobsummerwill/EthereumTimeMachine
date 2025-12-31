@@ -310,9 +310,12 @@ class Poller:
 
         # Stage checklist config.
         cutoff_block = _env_int("CUTOFF_BLOCK", 1919999)
-        # Geth v1.0.3 is Frontier-era; it cannot serve Homestead-era blocks.
+        # Geth v1.0.x is Frontier-era; it cannot serve Homestead-era blocks.
         # Track its progress against the last Frontier block instead of the global cutoff.
-        v1_0_3_target_block = _env_int("V1_0_3_TARGET_BLOCK", 1149999)
+        # Backwards-compatible env:
+        # - V1_0_3_TARGET_BLOCK (old)
+        # - V1_0_X_TARGET_BLOCK (new; applies to all v1.0.* nodes)
+        v1_0_target_block = _env_int("V1_0_X_TARGET_BLOCK", _env_int("V1_0_3_TARGET_BLOCK", 1149999))
         host_output_dir = Path(os.environ.get("HOST_OUTPUT_DIR", "/host_output")).resolve()
         lighthouse_metrics_url = (os.environ.get("LIGHTHOUSE_METRICS_URL", "") or "").strip().rstrip("/")
 
@@ -454,8 +457,8 @@ class Poller:
                 # Some nodes should display progress vs a fixed historical target rather than the
                 # node-reported `eth_syncing.highestBlock` (which may be missing/0 on older clients).
                 fixed_target: int | None
-                if name.strip() == "Geth v1.0.3":
-                    fixed_target = v1_0_3_target_block
+                if name.strip().startswith("Geth v1.0."):
+                    fixed_target = v1_0_target_block
                 elif name.strip() in {"Geth v1.11.6", "Geth v1.10.8", "Geth v1.9.25", "Geth v1.3.6"}:
                     # These nodes are expected to sync up to the fixed historical cutoff.
                     fixed_target = cutoff_block
@@ -721,7 +724,10 @@ class Poller:
             fixed_sync_stage("Geth v1.10.8", "5. Geth v1.10.8 syncing", cutoff_block)
             fixed_sync_stage("Geth v1.9.25", "6. Geth v1.9.25 syncing", cutoff_block)
             fixed_sync_stage("Geth v1.3.6", "7. Geth v1.3.6 syncing", cutoff_block)
-            fixed_sync_stage("Geth v1.0.3", "8. Geth v1.0.3 syncing", v1_0_3_target_block)
+            fixed_sync_stage("Geth v1.0.3", "8. Geth v1.0.3 syncing", v1_0_target_block)
+            fixed_sync_stage("Geth v1.0.2", "9. Geth v1.0.2 syncing", v1_0_target_block)
+            fixed_sync_stage("Geth v1.0.1", "10. Geth v1.0.1 syncing", v1_0_target_block)
+            fixed_sync_stage("Geth v1.0.0", "11. Geth v1.0.0 syncing", v1_0_target_block)
 
             # --- Synthetic rows for export/import phases in the Sync progress table ---
             # These are displayed as extra rows (between v1.16.7 and v1.11.6) by

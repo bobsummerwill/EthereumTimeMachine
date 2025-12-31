@@ -43,7 +43,9 @@ mkdir -p "$DATA_ROOT"
 # - v1.10.8: eth/65–66 (bridges v1.11.6 <-> v1.9.25)
 # - v1.9.25:  eth/63–65 (bridges v1.10.8 <-> v1.3.6)
 # - v1.3.6:   eth/61–63 (bridges v1.9.25 <-> v1.0.3)
-versions=(v1.16.7 v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.0.3)
+# - v1.0.3:   eth/60–61 (bridges v1.3.6 <-> v1.0.2)
+# - v1.0.2+:  eth/60 (Frontier-era tail)
+versions=(v1.16.7 v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.0.3 v1.0.2 v1.0.1 v1.0.0)
 declare -A ip_by_version=(
     ["v1.16.7"]="172.20.0.18"
     ["v1.11.6"]="172.20.0.15"
@@ -51,6 +53,9 @@ declare -A ip_by_version=(
     ["v1.9.25"]="172.20.0.17"
     ["v1.3.6"]="172.20.0.13"
     ["v1.0.3"]="172.20.0.14"
+    ["v1.0.2"]="172.20.0.12"
+    ["v1.0.1"]="172.20.0.11"
+    ["v1.0.0"]="172.20.0.10"
 )
 declare -A port_by_version=(
     ["v1.16.7"]="30306"
@@ -59,6 +64,9 @@ declare -A port_by_version=(
     ["v1.9.25"]="30310"
     ["v1.3.6"]="30311"
     ["v1.0.3"]="30307"
+    ["v1.0.2"]="30312"
+    ["v1.0.1"]="30313"
+    ["v1.0.0"]="30314"
 )
 
 
@@ -121,10 +129,10 @@ generate_enode() {
         echo "Failed to extract pubkey from enode output for $version. Raw: '$raw'" >&2
         exit 1
     fi
-    # NOTE: Extremely old Geth versions (e.g. v1.0.3 / Frontier-era) may not parse the
+    # NOTE: Extremely old Geth versions (v1.0.* / Frontier-era) may not parse the
     # modern enode URL query string (`?discport=0`). If they can't parse it, they won't
     # dial static peers at all.
-    if [[ "$version" == "v1.0.3" ]]; then
+    if [[ "$version" == v1.0.* ]]; then
         echo "enode://$pubkey@$ip:$port"
     else
         # Keep discport=0 for maximum cross-version compatibility.
@@ -150,6 +158,13 @@ for version in "${versions[@]}"; do
     echo "Enode for $version: $enode"
 done
 
+echo ""
+echo "--- Chain-of-geths identity summary (version -> ip:port -> enode) ---"
+for version in "${versions[@]}"; do
+  echo "  $version -> ${ip_by_version[$version]}:${port_by_version[$version]} -> ${enodes[$version]}"
+done
+echo "--- end summary ---"
+
 # Ensure Engine API JWT secrets exist for post-Merge-capable nodes.
 # Lighthouse connects to the execution client's authenticated RPC endpoint (authrpc) using this shared secret.
 ensure_jwtsecret() {
@@ -169,6 +184,15 @@ ensure_jwtsecret() {
 }
 
 ensure_jwtsecret v1.16.7
+
+# v1.0.0 needs a canonical mainnet genesis JSON available at runtime.
+# We generate it from a modern geth preset (no datadir needed) and store it under the v1.0.0 datadir
+# so it gets copied alongside other generated-files during deploy.
+v1_0_0_genesis="$DATA_ROOT/v1.0.0/genesis.json"
+echo "Generating mainnet genesis.json for v1.0.0..."
+docker run --rm ethereum/client-go:v1.16.7 dumpgenesis --mainnet > "$v1_0_0_genesis"
+chmod 644 "$v1_0_0_genesis" 2>/dev/null || true
+echo "Wrote: $v1_0_0_genesis ($(wc -c < "$v1_0_0_genesis") bytes)"
 
 # v1.16.7 is the top node; it peers with mainnet via discovery.
 v1_16_7_dir="$DATA_ROOT/v1.16.7"
@@ -212,7 +236,7 @@ rm -f "$v1_11_6_dir/geth/static-nodes.json" "$v1_11_6_dir/static-nodes.json" 2>/
 echo "Created config.toml for v1.11.6 with discovery disabled and no outbound peering"
 
 # Create static-nodes.json for each non-top version (except v1.11.6, which is offline-seeded and has no outbound peers).
-for version in v1.10.8 v1.9.25 v1.3.6 v1.0.3; do
+for version in v1.10.8 v1.9.25 v1.3.6 v1.0.3 v1.0.2 v1.0.1 v1.0.0; do
     datadir="$DATA_ROOT/$version"
 
     # Starting around the 1.4+ era, Geth expects peer config under <datadir>/geth/.
@@ -239,13 +263,28 @@ for version in v1.10.8 v1.9.25 v1.3.6 v1.0.3; do
             ;;
         v1.0.3)
             next="v1.3.6"
-            # v1.0.3 may not parse `?discport=0` in enode URLs.
+            # v1.0.x may not parse `?discport=0` in enode URLs.
             printf '["%s"]\n' "$(strip_enode_query "${enodes[$next]}")" > "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;
         v1.3.6)
             next="v1.9.25"
             printf '["%s"]\n' "${enodes[$next]}" > "$datadir/static-nodes.json"
+            echo "Created static-nodes.json for $version pointing to $next"
+            ;;
+        v1.0.2)
+            next="v1.0.3"
+            printf '["%s"]\n' "$(strip_enode_query "${enodes[$next]}")" > "$datadir/static-nodes.json"
+            echo "Created static-nodes.json for $version pointing to $next"
+            ;;
+        v1.0.1)
+            next="v1.0.2"
+            printf '["%s"]\n' "$(strip_enode_query "${enodes[$next]}")" > "$datadir/static-nodes.json"
+            echo "Created static-nodes.json for $version pointing to $next"
+            ;;
+        v1.0.0)
+            next="v1.0.1"
+            printf '["%s"]\n' "$(strip_enode_query "${enodes[$next]}")" > "$datadir/static-nodes.json"
             echo "Created static-nodes.json for $version pointing to $next"
             ;;
     esac

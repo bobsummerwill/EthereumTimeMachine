@@ -5,7 +5,13 @@ const app = express();
 const PORT = Number.parseInt(process.env.PORT || "8088", 10);
 const PROMETHEUS_URL = (process.env.PROMETHEUS_URL || "http://prometheus:9090").replace(/\/+$/, "");
 const CUTOFF_BLOCK = Number.parseInt(process.env.CUTOFF_BLOCK || "1919999", 10);
-const V1_0_3_TARGET_BLOCK = Number.parseInt(process.env.V1_0_3_TARGET_BLOCK || "1149999", 10);
+// Backwards-compatible env:
+// - V1_0_3_TARGET_BLOCK (legacy)
+// - V1_0_X_TARGET_BLOCK (applies to all v1.0.* nodes)
+const V1_0_X_TARGET_BLOCK = Number.parseInt(
+  process.env.V1_0_X_TARGET_BLOCK || process.env.V1_0_3_TARGET_BLOCK || "1149999",
+  10,
+);
 
 async function promQuery(query) {
   const url = new URL("/api/v1/query", PROMETHEUS_URL);
@@ -116,6 +122,21 @@ function nodeMeta(node) {
       proto: "eth/60-61",
       forks: ["Frontier"],
     },
+    "Geth v1.0.2": {
+      date: "22nd Aug 2015",
+      proto: "eth/60-61",
+      forks: ["Frontier"],
+    },
+    "Geth v1.0.1": {
+      date: "5th Aug 2015",
+      proto: "eth/60-61",
+      forks: ["Frontier"],
+    },
+    "Geth v1.0.0": {
+      date: "29th Jul 2015",
+      proto: "eth/60-61",
+      forks: ["Frontier"],
+    },
   };
   return map[node] || null;
 }
@@ -136,6 +157,10 @@ function edgeLabel(upstreamNode, downstreamNode) {
     "Geth v1.10.8 -> Geth v1.9.25": "eth/65",
     "Geth v1.9.25 -> Geth v1.3.6": "eth/63",
     "Geth v1.3.6 -> Geth v1.0.3": "eth/61",
+    // v1.0.0-v1.0.3 all support eth/60-61, but we label the tail edges as eth/61.
+    "Geth v1.0.3 -> Geth v1.0.2": "eth/61",
+    "Geth v1.0.2 -> Geth v1.0.1": "eth/61",
+    "Geth v1.0.1 -> Geth v1.0.0": "eth/61",
   };
   return map[key] || "";
 }
@@ -205,9 +230,9 @@ function normalizeForDisplay(row) {
     tgt = CUTOFF_BLOCK;
     pct = Math.min(100, (cur * 100.0) / CUTOFF_BLOCK);
   }
-  if (node === "Geth v1.0.3" && Number.isFinite(V1_0_3_TARGET_BLOCK) && V1_0_3_TARGET_BLOCK > 0) {
-    tgt = V1_0_3_TARGET_BLOCK;
-    pct = Math.min(100, (cur * 100.0) / V1_0_3_TARGET_BLOCK);
+  if (node.startsWith("Geth v1.0.") && Number.isFinite(V1_0_X_TARGET_BLOCK) && V1_0_X_TARGET_BLOCK > 0) {
+    tgt = V1_0_X_TARGET_BLOCK;
+    pct = Math.min(100, (cur * 100.0) / V1_0_X_TARGET_BLOCK);
   }
   if (!Number.isFinite(pct)) {
     pct = tgt > 0 ? (cur * 100.0) / tgt : 0;
@@ -641,6 +666,9 @@ app.get("/", async (req, res) => {
             'Geth v1.9.25': { date: '11th Dec 2020', proto: 'eth/63-65', forks: ['Muir Glacier', 'Istanbul', 'Petersburg', 'Constantinople', 'Byzantium', 'Spurious Dragon', 'Tangerine Whistle', 'DAO'] },
             'Geth v1.3.6': { date: '1st Apr 2016', proto: 'eth/61-63', forks: ['Homestead'] },
             'Geth v1.0.3': { date: '1st Sep 2015', proto: 'eth/60-61', forks: ['Frontier'] },
+            'Geth v1.0.2': { date: '22nd Aug 2015', proto: 'eth/60-61', forks: ['Frontier'] },
+            'Geth v1.0.1': { date: '5th Aug 2015', proto: 'eth/60-61', forks: ['Frontier'] },
+            'Geth v1.0.0': { date: '29th Jul 2015', proto: 'eth/60-61', forks: ['Frontier'] },
           };
           const meta = metaMap[node];
           const releasedLine = meta ? '<div class="released">released ' + esc(meta.date) + '</div>' : '';
@@ -686,6 +714,10 @@ app.get("/", async (req, res) => {
               'Geth v1.10.8 -> Geth v1.9.25': 'eth/65',
               'Geth v1.9.25 -> Geth v1.3.6': 'eth/63',
               'Geth v1.3.6 -> Geth v1.0.3': 'eth/61',
+              // v1.0.0-v1.0.3 all support eth/60-61, but we label the tail edges as eth/61.
+              'Geth v1.0.3 -> Geth v1.0.2': 'eth/61',
+              'Geth v1.0.2 -> Geth v1.0.1': 'eth/61',
+              'Geth v1.0.1 -> Geth v1.0.0': 'eth/61',
             };
             const key = String(node) + ' -> ' + String(next.node);
             const noLabelBecauseExport = String(node || '').includes('(export)') || String(next.node || '').includes('(export)');

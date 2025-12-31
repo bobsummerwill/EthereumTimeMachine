@@ -21,10 +21,10 @@ RUN apt-get update \
 # Download and install geth binary
 EOF
 	case $version in
-		v1.0.3)
-            # Build from source: no maintained prebuilt Linux binaries for these very early releases.
-            # We compile using a downloaded Go 1.4.x toolchain (DockerHub no longer serves schema1 images like golang:1.4).
-            cat > "$out_file" << 'EOF'
+		v1.0.0|v1.0.1|v1.0.2|v1.0.3)
+	            # Build from source: no maintained prebuilt Linux binaries for these very early releases.
+	            # We compile using a downloaded Go 1.4.x toolchain (DockerHub no longer serves schema1 images like golang:1.4).
+	            cat > "$out_file" << 'EOF'
 # Use an older Debian toolchain for compatibility with the Go 1.4 CGO toolchain.
 # Newer GCC/binutils combinations can emit DWARF that Go 1.4 fails to parse.
 FROM debian:jessie-slim AS build
@@ -54,12 +54,12 @@ ENV GOPATH=/go
 
 WORKDIR /go/src/github.com/ethereum/go-ethereum
 RUN git clone https://github.com/ethereum/go-ethereum.git . \
-    && git checkout v1.0.3
+    && git checkout __GETH_TAG__
 
 # Build logs for debugging/reproducibility
 RUN echo "[build] go version: $(go version)" \
     && echo "[build] git rev:   $(git rev-parse --short HEAD)" \
-    && echo "[build] git tag:   v1.0.3"
+    && echo "[build] git tag:   __GETH_TAG__"
 
 # IMPORTANT: Go 1.4's cgo DWARF parser is brittle with modern GCC output.
 # Use an older distro toolchain (jessie, GCC 4.9) and keep DWARFv2.
@@ -85,6 +85,8 @@ EXPOSE 8545 30303
 
 ENTRYPOINT ["geth"]
 EOF
+	            # Substitute the requested tag into the Dockerfile template.
+	            sed -i "s/__GETH_TAG__/${version}/g" "$out_file"
 			;;
 		v1.11.6)
             cat >> "$out_file" << 'EOF'
@@ -147,25 +149,6 @@ RUN wget -O /tmp/geth.tar.gz https://gethstore.blob.core.windows.net/builds/geth
     rm -rf /tmp/*
 EOF
 			;;
-		v1.3.3)
-			cat >> "$out_file" << 'EOF'
-RUN wget -O /tmp/geth.tar https://github.com/ethereum/go-ethereum/releases/download/v1.3.3/geth-Linux64-20160105143200-1.3.3-c541b38.tar.bz2 && \
-	# GitHub release assets for very old tags can sometimes be served with an unexpected
-	# content-encoding (or the file may not actually be bzip2-compressed). Detect and extract
-	# using a small set of fallbacks instead of hardcoding `tar -xjf`.
-	if bzip2 -t /tmp/geth.tar >/dev/null 2>&1; then \
-	    tar -xjf /tmp/geth.tar -C /tmp; \
-	elif tar -xzf /tmp/geth.tar -C /tmp >/dev/null 2>&1; then \
-	    true; \
-	else \
-	    tar -xf /tmp/geth.tar -C /tmp; \
-	fi && \
-	GETH_BIN=$(find /tmp -maxdepth 2 -type f -name geth | head -n 1) && \
-	test -n "$GETH_BIN" && \
-	mv "$GETH_BIN" /usr/local/bin/geth && \
-	rm -rf /tmp/*
-EOF
-			;;
 		v1.3.6)
 			cat >> "$out_file" << 'EOF'
 RUN wget -O /tmp/geth.tar https://github.com/ethereum/go-ethereum/releases/download/v1.3.6/geth-Linux64-20160402135800-1.3.6-9e323d6.tar.bz2 && \
@@ -187,8 +170,8 @@ EOF
 			;;
 	esac
 
-    # v1.0.3 has a fully-defined multi-stage Dockerfile already.
-    if [[ "$version" == "v1.0.3" ]]; then
+    # v1.0.x has a fully-defined multi-stage Dockerfile already.
+    if [[ "$version" == v1.0.* ]]; then
         return 0
     fi
 
@@ -213,6 +196,9 @@ versions=(
 	"v1.10.8"
 	"v1.9.25"
 	"v1.3.6"
+	"v1.0.0"
+	"v1.0.1"
+	"v1.0.2"
 	"v1.0.3"
 )
 

@@ -16,7 +16,7 @@ Entrypoints:
   - Services: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
   - `geth-v1-16-7` exposes HTTP JSON-RPC on host port `8545`.
 
-### Protocol bridge chain (down to Homestead)
+### Protocol bridge chain (down to Frontier)
 
 The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
   
@@ -83,27 +83,56 @@ The chain is wired so adjacent nodes share at least one `eth/*` subprotocol:
                                  |
                                   | P2P eth/61 (protocol bridge)
                                   v
-              +-----------------------------------------------+
-              | geth v1.0.3 (1st Sep 2015)                    |
-              | eth/60-61                                     |
-              | Forks supported:                              |
-              |   Homestead                                   |
-              |   Frontier                                    |
-              +-----------------------------------------------+
+               +-----------------------------------------------+
+               | geth v1.0.3 (1st Sep 2015)                    |
+               | eth/60-61                                     |
+               | Forks supported:                              |
+               |   Frontier                                    |
+               +-----------------------------------------------+
+                                  |
+                                  | P2P eth/61 (protocol bridge)
+                                  v
+               +-----------------------------------------------+
+               | geth v1.0.2 (22nd Aug 2015)                   |
+               | eth/60-61                                     |
+               | Forks supported:                              |
+               |   Frontier                                    |
+               +-----------------------------------------------+
+                                  |
+                                  | P2P eth/61 (protocol bridge)
+                                  v
+               +-----------------------------------------------+
+               | geth v1.0.1 (5th Aug 2015)                    |
+               | eth/60-61                                     |
+               | Forks supported:                              |
+               |   Frontier                                    |
+               +-----------------------------------------------+
+                                  |
+                                  | P2P eth/61 (protocol bridge)
+                                  v
+               +-----------------------------------------------+
+               | geth v1.0.0 (29th Jul 2015)                   |
+               | eth/60-61                                     |
+               | Forks supported:                              |
+               |   Frontier                                    |
+               +-----------------------------------------------+
 ```
 
 Services:
-- `geth-v1-16-7`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:4)
-- `lighthouse-v8-0-1`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:198)
-- `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:45)
-- `geth-v1-10-8`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:76)
-- `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:107)
-- `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:139)
-- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:167)
-- `geth-exporter`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:230)
-- `prometheus`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:261)
-- `sync-ui`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:278)
-- `grafana`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:292)
+- `geth-v1-16-7`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `lighthouse-v8-0-1`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `geth-v1-11-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `geth-v1-10-8`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `geth-v1-9-25`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `geth-v1-3-6`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `geth-v1-0-3`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `geth-v1-0-2`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `geth-v1-0-1`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `geth-v1-0-0`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `geth-exporter`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `prometheus`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `sync-ui`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
+- `grafana`: [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml)
 
 ## Offline export/import seeding (bridge workflow)
 

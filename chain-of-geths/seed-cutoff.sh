@@ -41,6 +41,10 @@ SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/Downloads/chain-of-geths-keys.pem}"
 # Cutoff: last Homestead-era block (right before the DAO fork activates at 1,920,000).
 CUTOFF_BLOCK="${CUTOFF_BLOCK:-1919999}"
 
+# Frontier-era tail nodes (geth v1.0.x) cannot serve Homestead blocks.
+# If you set CUTOFF_BLOCK above this, we will skip importing into v1.0.x nodes.
+V1_0_X_TARGET_BLOCK="${V1_0_X_TARGET_BLOCK:-1149999}"
+
 EXPORT_DIR_REMOTE="/home/$VM_USER/chain-of-geths/generated-files/exports"
 EXPORT_FILE_NAME="${EXPORT_FILE_NAME:-mainnet-0-${CUTOFF_BLOCK}.rlp}"
 
@@ -48,7 +52,7 @@ echo "Seeding cutoff blocks 0..$CUTOFF_BLOCK on $VM_USER@$VM_IP"
 echo "Export file: $EXPORT_DIR_REMOTE/$EXPORT_FILE_NAME"
 
 ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
-  "CUTOFF_BLOCK=$CUTOFF_BLOCK EXPORT_FILE_NAME=$EXPORT_FILE_NAME bash -s" <<'EOF'
+  "CUTOFF_BLOCK=$CUTOFF_BLOCK V1_0_X_TARGET_BLOCK=$V1_0_X_TARGET_BLOCK EXPORT_FILE_NAME=$EXPORT_FILE_NAME bash -s" <<'EOF'
 set -euo pipefail
 cd /home/ubuntu/chain-of-geths
 
@@ -69,8 +73,8 @@ echo "Re-starting geth-v1-16-7..."
 sudo docker compose start geth-v1-16-7 >/dev/null 2>&1 || sudo docker-compose start geth-v1-16-7 >/dev/null 2>&1 || true
 
 echo "Stopping legacy nodes to release DB locks..."
-sudo docker compose stop geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 >/dev/null 2>&1 || \
-  sudo docker-compose stop geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 >/dev/null 2>&1 || true
+sudo docker compose stop geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 geth-v1-0-2 geth-v1-0-1 geth-v1-0-0 >/dev/null 2>&1 || \
+  sudo docker-compose stop geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 geth-v1-0-2 geth-v1-0-1 geth-v1-0-0 >/dev/null 2>&1 || true
 
 import_one() {
   local version="$1"
@@ -87,14 +91,23 @@ import_one() {
 import_one v1.10.8 ethereumtimemachine/geth:v1.10.8
 import_one v1.9.25 ethereumtimemachine/geth:v1.9.25
 import_one v1.3.6 ethereumtimemachine/geth:v1.3.6
-import_one v1.0.3 ethereumtimemachine/geth:v1.0.3
+
+# v1.0.x nodes are Frontier-era; do not attempt to import past their supported range.
+if [ "$CUTOFF_BLOCK" -le "${V1_0_X_TARGET_BLOCK:-1149999}" ]; then
+  import_one v1.0.3 ethereumtimemachine/geth:v1.0.3
+  import_one v1.0.2 ethereumtimemachine/geth:v1.0.2
+  import_one v1.0.1 ethereumtimemachine/geth:v1.0.1
+  import_one v1.0.0 ethereumtimemachine/geth:v1.0.0
+else
+  echo "Skipping v1.0.x import: CUTOFF_BLOCK=$CUTOFF_BLOCK exceeds V1_0_X_TARGET_BLOCK=${V1_0_X_TARGET_BLOCK:-1149999}"
+fi
 
 echo "Starting legacy nodes again..."
-sudo docker compose up -d geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 >/dev/null 2>&1 || \
-  sudo docker-compose up -d geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 >/dev/null 2>&1
+sudo docker compose up -d geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 geth-v1-0-2 geth-v1-0-1 geth-v1-0-0 >/dev/null 2>&1 || \
+  sudo docker-compose up -d geth-v1-10-8 geth-v1-9-25 geth-v1-3-6 geth-v1-0-3 geth-v1-0-2 geth-v1-0-1 geth-v1-0-0 >/dev/null 2>&1
 
 echo "Seed complete. Quick sanity check (eth_blockNumber):"
-for name_port in "v1.10.8:8551" "v1.9.25:8552" "v1.3.6:8553" "v1.0.3:8549"; do
+for name_port in "v1.10.8:8551" "v1.9.25:8552" "v1.3.6:8553" "v1.0.3:8549" "v1.0.2:8554" "v1.0.1:8555" "v1.0.0:8556"; do
   ver=${name_port%%:*}; port=${name_port##*:}
   bn=$(curl -s -X POST localhost:$port -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" | sed -n "s/.*\"result\":\"\(0x[0-9a-fA-F]*\)\".*/\1/p")
   echo "  $ver => $bn"

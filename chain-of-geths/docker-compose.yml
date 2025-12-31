@@ -13,7 +13,7 @@ services:
     command: |
       --config /data/config.toml
       --datadir /data
-      --cache 4096
+      --cache 2048
       --nodekey /data/geth/nodekey
       --http
       --http.addr 0.0.0.0
@@ -171,7 +171,7 @@ services:
     command: |
       --datadir /data
       --nodekey /data/nodekey
-      --cache 4096
+      --cache 2048
       --fast=false
       --rpc
       --rpcaddr 0.0.0.0
@@ -208,7 +208,7 @@ services:
     command: |
       --datadir /data
       --nodekey /data/nodekey
-      --cache 4096
+      --cache 2048
       --rpc
       --rpcaddr 0.0.0.0
       --rpcapi eth,net,web3
@@ -227,6 +227,107 @@ services:
     networks:
       ethereum:
         ipv4_address: 172.20.0.14
+
+  # Frontier-era tail nodes (eth/60 compatibility).
+  # These sync from the next node up (v1.0.3) via static peering.
+  geth-v1-0-2:
+    image: ethereumtimemachine/geth:v1.0.2
+    container_name: geth-v1-0-2
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      FIXED_TARGET_BLOCK: "1149999"
+      SAMPLE_INTERVAL_SECONDS: ${V1_0_3_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-120}
+      STALL_REQUIRED_SAMPLES: "1"
+      REQUIRE_PEERS_FOR_RESTART: "0"
+    command: |
+      --datadir /data
+      --nodekey /data/nodekey
+      --cache 2048
+      --rpc
+      --rpcaddr 0.0.0.0
+      --rpcapi eth,net,web3
+      --networkid 1
+      --port 30312
+      --nodiscover
+    ports:
+      - "8554:8545"
+      - "30312:30312/tcp"
+      - "30312:30312/udp"
+    volumes:
+      - ./generated-files/data/v1.0.2:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
+    depends_on:
+      - geth-v1-0-3
+    networks:
+      ethereum:
+        ipv4_address: 172.20.0.12
+
+  geth-v1-0-1:
+    image: ethereumtimemachine/geth:v1.0.1
+    container_name: geth-v1-0-1
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      FIXED_TARGET_BLOCK: "1149999"
+      SAMPLE_INTERVAL_SECONDS: ${V1_0_3_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-120}
+      STALL_REQUIRED_SAMPLES: "1"
+      REQUIRE_PEERS_FOR_RESTART: "0"
+    command: |
+      --datadir /data
+      --nodekey /data/nodekey
+      --cache 2048
+      --rpc
+      --rpcaddr 0.0.0.0
+      --rpcapi eth,net,web3
+      --networkid 1
+      --port 30313
+      --nodiscover
+    ports:
+      - "8555:8545"
+      - "30313:30313/tcp"
+      - "30313:30313/udp"
+    volumes:
+      - ./generated-files/data/v1.0.1:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
+    depends_on:
+      - geth-v1-0-2
+    networks:
+      ethereum:
+        ipv4_address: 172.20.0.11
+
+  geth-v1-0-0:
+    image: ethereumtimemachine/geth:v1.0.0
+    container_name: geth-v1-0-0
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      FIXED_TARGET_BLOCK: "1149999"
+      SAMPLE_INTERVAL_SECONDS: ${V1_0_3_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-120}
+      STALL_REQUIRED_SAMPLES: "1"
+      REQUIRE_PEERS_FOR_RESTART: "0"
+    command: |
+      --datadir /data
+      --genesis /data/genesis.json
+      --nodekey /data/nodekey
+      --rpc
+      --rpcaddr 0.0.0.0
+      --rpcapi eth,net,web3
+      --networkid 1
+      --port 30314
+      --nodiscover
+    ports:
+      - "8556:8545"
+      - "30314:30314/tcp"
+      - "30314:30314/udp"
+    volumes:
+      - ./generated-files/data/v1.0.0:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
+    depends_on:
+      - geth-v1-0-1
+    networks:
+      ethereum:
+        ipv4_address: 172.20.0.10
 
   # Consensus client (beacon node) for the *modern feeder* execution node.
   # We keep this single CL instance so the modern EL can progress on post-Merge mainnet
@@ -275,7 +376,10 @@ services:
         Geth v1.10.8=http://geth-v1-10-8:8545,
         Geth v1.9.25=http://geth-v1-9-25:8545,
         Geth v1.3.6=http://geth-v1-3-6:8545,
-        Geth v1.0.3=http://geth-v1-0-3:8545
+        Geth v1.0.3=http://geth-v1-0-3:8545,
+        Geth v1.0.2=http://geth-v1-0-2:8545,
+        Geth v1.0.1=http://geth-v1-0-1:8545,
+        Geth v1.0.0=http://geth-v1-0-0:8545
       # Used to add a Lighthouse row in the same “Sync progress” table.
       LIGHTHOUSE_API_URL: http://lighthouse-v8-0-1:5052
       # Stable label for the Lighthouse row (emit from startup even if the API is still booting).
@@ -286,6 +390,8 @@ services:
       HOST_OUTPUT_DIR: /host_output
       CUTOFF_BLOCK: "1919999"
       V1_0_3_TARGET_BLOCK: "1149999"
+      # Applies to all Geth v1.0.x nodes (v1.0.0-v1.0.3). Kept separate from the global cutoff.
+      V1_0_X_TARGET_BLOCK: "1149999"
       POLL_INTERVAL_SECONDS: "10"
       # Optional: hide specific node labels from the progress table (Grafana “Stage progress” / Sync-UI).
       # Remote deploy uses this to hide the offline-seeded bridge node row (it is represented by the Import phase row).
@@ -323,6 +429,7 @@ services:
       PROMETHEUS_URL: http://prometheus:9090
       PORT: "8088"
       V1_0_3_TARGET_BLOCK: "1149999"
+      V1_0_X_TARGET_BLOCK: "1149999"
     ports:
       - "8088:8088"
     depends_on:

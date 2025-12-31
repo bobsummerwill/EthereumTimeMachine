@@ -79,7 +79,11 @@ DOCKER_IMAGES_DIR="$SCRIPT_DIR/generated-files/docker-images"
 mkdir -p "$DOCKER_IMAGES_DIR"
 # Avoid carrying forward stale tarballs for versions that are no longer in the stack.
 rm -f "$DOCKER_IMAGES_DIR"/*.tar
-for version in v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.0.3; do
+
+# Remove any leftover generated data for versions that were removed from the chain.
+# (This prevents scp from re-uploading stale directories to the VM.)
+rm -rf "$SCRIPT_DIR/generated-files/data/v1.3.3" 2>/dev/null || true
+for version in v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.0.3 v1.0.2 v1.0.1 v1.0.0; do
     docker save ethereumtimemachine/geth:$version > "$DOCKER_IMAGES_DIR/geth-$version.tar"
 done
 
@@ -110,6 +114,15 @@ cd /home/ubuntu/chain-of-geths
 
 # Fail fast on VM-side setup issues. Without this, compose failures can be masked by later steps.
 set -euo pipefail
+
+# Cleanup: v1.3.3 was removed from the chain (replaced by v1.0.3 as the bridge to Frontier).
+# Ensure we don't carry any stale containers/images/data from older deployments.
+sudo docker rm -f geth-v1-3-3 2>/dev/null || true
+# NOTE: scp does not delete remote files that no longer exist locally, so an old
+# generated-files/docker-images/geth-v1.3.3.tar can linger and get re-loaded.
+rm -f /home/ubuntu/chain-of-geths/generated-files/docker-images/geth-v1.3.3.tar 2>/dev/null || true
+sudo docker image rm -f ethereumtimemachine/geth:v1.3.3 2>/dev/null || true
+rm -rf /home/ubuntu/chain-of-geths/generated-files/data/v1.3.3 2>/dev/null || true
 
 # Remote deployment behavior tweaks:
 # - Hide the offline-seeded bridge node row from progress tables (it is represented by the Import phase row).
@@ -169,8 +182,16 @@ echo "Stopping any prior docker compose stack..."
 # Avoid duplicated background processes across repeated deploys.
 # Old `nohup` runners keep writing to the same log file even after we redeploy (they hold an open fd),
 # which makes the status logs misleading and can cause multiple concurrent staged startups.
-sudo pkill -f seed-v1\.11\.6-when-ready\.sh 2>/dev/null || true
-sudo pkill -f start-legacy-staged\.sh 2>/dev/null || true
+  sudo pkill -f seed-v1\.11\.6-when-ready\.sh 2>/dev/null || true
+  sudo pkill -f start-legacy-staged\.sh 2>/dev/null || true
+
+  # Defensive: if any stray geth process is holding a lock on the v1.16.7 datadir
+  # (e.g., from a prior interrupted docker exec / manual run), kill it so the head node can start.
+  # We only target paths under this deployment directory.
+  sudo pkill -9 -f '/home/ubuntu/chain-of-geths/generated-files/data/v1\.16\.7' 2>/dev/null || true
+  rm -f /home/ubuntu/chain-of-geths/generated-files/data/v1.16.7/geth/LOCK 2>/dev/null || true
+  rm -f /home/ubuntu/chain-of-geths/generated-files/data/v1.16.7/geth/chaindata/LOCK 2>/dev/null || true
+  rm -f /home/ubuntu/chain-of-geths/generated-files/data/v1.16.7/geth/nodes/LOCK 2>/dev/null || true
 
 echo "Deleting Grafana data volume (grafana-data)..."
 # docker-compose names volumes as <project>_<volume>. Match both raw and project-prefixed names.
@@ -188,6 +209,9 @@ fi
 for img in generated-files/docker-images/*.tar; do
     sudo docker load < "$img"
 done
+
+# Defensive: ensure removed-version images are not present even if an old tarball slipped through.
+sudo docker image rm -f ethereumtimemachine/geth:v1.3.3 2>/dev/null || true
 
 
 # Start base services only (avoid starting the v1.11.6 bridge until seeding is complete).
@@ -270,6 +294,9 @@ if [ "$POST_DEPLOY_HEALTHCHECK" = "1" ]; then
   wait_for_peers "Geth v1.9.25" 8552 1 120 || true
   wait_for_peers "Geth v1.3.6" 8553 1 120 || true
   wait_for_peers "Geth v1.0.3" 8549 1 120 || true
+  wait_for_peers "Geth v1.0.2" 8554 1 120 || true
+  wait_for_peers "Geth v1.0.1" 8555 1 120 || true
+  wait_for_peers "Geth v1.0.0" 8556 1 120 || true
 fi
 
 # Create the bridge container but do not start it yet.
