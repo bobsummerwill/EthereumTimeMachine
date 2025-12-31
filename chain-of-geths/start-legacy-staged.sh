@@ -66,7 +66,11 @@ AHEAD_STRATEGY="${AHEAD_STRATEGY:-hybrid}"
 AHEAD_RESET_THRESHOLD="${AHEAD_RESET_THRESHOLD:-10000}"
 
 # Hybrid strategy knobs.
-# If upstream has not reached downstream head within this window, fall back to reset.
+#
+# IMPORTANT: In hybrid mode, we prefer to *preserve downstream progress* when upstream is
+# demonstrably making progress. So this window is treated as the maximum allowed time with
+# *no upstream progress* (not total wait time).
+# If upstream makes any progress, the timer is reset.
 AHEAD_WAIT_BEFORE_RESET_SECONDS="${AHEAD_WAIT_BEFORE_RESET_SECONDS:-1200}"
 # Poll cadence while waiting.
 AHEAD_WAIT_POLL_SECONDS="${AHEAD_WAIT_POLL_SECONDS:-30}"
@@ -443,11 +447,15 @@ ensure_not_ahead_of_upstream() {
       ;;
 
     hybrid)
-      echo "[start-legacy] ahead-check strategy=hybrid; stopping $svc and waiting up to ${AHEAD_WAIT_BEFORE_RESET_SECONDS}s for upstream to reach block $d"
+      echo "[start-legacy] ahead-check strategy=hybrid; stopping $svc and waiting for upstream to reach block $d (will only reset after ${AHEAD_WAIT_BEFORE_RESET_SECONDS}s of *no upstream progress*)"
       compose_stop "$svc" || true
 
       local start now elapsed
+      # Track upstream progress: only consider a reset if upstream is not advancing.
+      local last_u last_progress
       start=$(date +%s)
+      last_progress=$start
+      last_u="$u"
       while true; do
         u=$(rpc_block_number_dec "$upstream_url" || true)
         if [ -n "$u" ] && [ "$u" -ge "$d" ]; then
@@ -457,17 +465,24 @@ ensure_not_ahead_of_upstream() {
           return 0
         fi
 
+        # If upstream is making any progress, reset the no-progress timer.
+        if [ -n "$u" ] && [ -n "$last_u" ] && [ "$u" -gt "$last_u" ]; then
+          last_progress=$(date +%s)
+          echo "[start-legacy] ahead-check hybrid: upstream progress detected (upstream=$u, last_upstream=$last_u); extending wait"
+        fi
+        [ -n "$u" ] && last_u="$u"
+
         now=$(date +%s)
-        elapsed=$((now - start))
+        elapsed=$((now - last_progress))
         if [ "$elapsed" -ge "${AHEAD_WAIT_BEFORE_RESET_SECONDS}" ]; then
           break
         fi
         sleep "${AHEAD_WAIT_POLL_SECONDS}"
       done
 
-      # If we didn't catch up in time, fall back to reset (if allowed).
+      # If we didn't see upstream progress in time, fall back to reset (if allowed).
       if [ -n "$data_dir" ] && [ "$gap" -ge "${AHEAD_RESET_THRESHOLD}" ]; then
-        echo "[start-legacy] ahead-check hybrid: upstream did not catch up within ${AHEAD_WAIT_BEFORE_RESET_SECONDS}s; resetting downstream"
+        echo "[start-legacy] ahead-check hybrid: upstream did not make progress for ${AHEAD_WAIT_BEFORE_RESET_SECONDS}s; resetting downstream"
         reset_service_datadir "$svc" "$downstream_label" "$downstream_url" "$data_dir"
         return 0
       fi
