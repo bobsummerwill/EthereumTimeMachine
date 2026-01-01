@@ -11,8 +11,16 @@ Mist (and Ethereum Wallet) connects to Geth via IPC. The IPC protocol evolved ov
 | Geth Version | Mist/Wallet Version | Status |
 |--------------|---------------------|--------|
 | **1.1.0** (Aug 2015) | **0.2.6** (Sep 2015) | Confirmed working |
+| **1.3.6** (Apr 2016) | **0.7.4** (May 2016) | Confirmed working |
 | 1.3.x (Early 2016) | 0.3.7 - 0.3.8 | Expected to work |
 | 1.4.x (Mid 2016) | 0.7.x - 0.8.0 | Expected to work |
+
+## Database Migration
+
+Geth supports upgrading chaindata between versions:
+
+- **1.1.0 → 1.3.6**: Works. Shows "found old database" and performs lengthy upgrade.
+- Copy the data directory to a new folder before running newer Geth to preserve original.
 
 ## Version Timeline
 
@@ -171,7 +179,8 @@ eth.syncing
 ## Tested Hardware
 
 - **2010 ThinkPads** with Win64, 4GB RAM
-- Geth 1.1.0 + Mist 0.2.6: **Working**
+- Geth 1.1.0 + Mist 0.2.6: **Working** (Frontier)
+- Geth 1.3.6 + Mist 0.7.4: **Working** (Homestead)
 
 ## References
 
