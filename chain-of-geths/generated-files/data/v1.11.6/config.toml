@@ -1,0 +1,9 @@
+[Node]
+DataDir = "/data"
+
+[Node.P2P]
+NoDiscovery = true
+ListenAddr = ":30308"
+# This node is offline-seeded via export/import and is not intended to dial upstream peers.
+# It should accept inbound peers from the next node down (v1.10.8), with discovery disabled.
+StaticNodes = []

@@ -1,7 +1,9 @@
 # Generated artifacts
 # Ignore the entire generated-files tree (keys, exports, data dirs, tarballs, logs).
-chain-of-geths/generated-files/
 chain-of-geths/generated-files/**
+# But track the data directory
+!chain-of-geths/generated-files/data/
+!chain-of-geths/generated-files/data/**
 
 # Local environment overrides (keep secrets/IPs out of git)
 chain-of-geths/.env
