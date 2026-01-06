@@ -1,0 +1,62 @@
+services:
+  geth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vast-homestead-geth
+    restart: unless-stopped
+    # Requires NVIDIA Container Toolkit; on Vast.ai this is typically available.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    ports:
+      # JSON-RPC (for monitoring/debug only; do NOT expose publicly without a tunnel)
+      - "8545:8545"
+    volumes:
+      # Deterministic identity + persisted chain DB.
+      - ./generated-files/data/v1.3.6:/data
+      # Drop your tarball here (see generate-identity.sh).
+      - ./generated-files/input:/input:ro
+      # Password file for account unlock.
+      - ./generated-files/miner-password.txt:/run/miner-password.txt:ro
+    environment:
+      # For a forked continuation of mainnet pre-DAO, keep networkid=1 but disable peering.
+      GETH_NETWORK_ID: "1"
+      GETH_RPC_ADDR: "0.0.0.0"
+      GETH_RPC_PORT: "8545"
+      GETH_P2P_PORT: "30303"
+      GETH_CACHE: "2048"
+      CHAIN_DATA_TAR: "/input/chaindata.tar"
+      ACCOUNT_PASSWORD_FILE: "/run/miner-password.txt"
+      # Default behavior: lie about time so geth proposes large block timestamps without real waiting.
+      USE_FAKETIME: "1"
+      FAKETIME_MODE: "step"
+      FAKETIME_STEP_SECONDS: "1200"
+      FAKETIME_NO_CACHE: "1"
+      # Set an explicit address if you already have one.
+      # ETHERBASE: "0x..."
+      # Miner is optional here (you can run a separate miner container).
+      MINER_CMD: ""
+
+  genoil-ethminer:
+    build:
+      context: .
+      dockerfile: miner-genoil/Dockerfile
+    container_name: vast-homestead-genoil-ethminer
+    restart: unless-stopped
+    depends_on:
+      - geth
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment:
+      GETH_RPC_URL: "http://geth:8545"
+      # Default: OpenCL getwork mining (works with the Ubuntu-2015-era build stage).
+      # If your build includes CUDA support, switch to: "-U -F http://geth:8545".
+      ETHMINER_ARGS: "-G -F http://geth:8545"
+      # Timestamp strategy is handled by geth faketime, so don't pause the miner by default.
+      PAUSE_BETWEEN_BLOCKS_SECONDS: "0"

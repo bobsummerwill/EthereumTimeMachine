@@ -12,3 +12,11 @@ chain-of-geths/.env.*
 
 # Compiled python output
 *.pyc
+
+# Vast Homestead miner local artifacts
+resurrection/vast-homestead/generated-files/**
+
+# Local env overrides for Vast Homestead
+resurrection/vast-homestead/.env
+resurrection/vast-homestead/.env.*
+!resurrection/vast-homestead/.env.example
