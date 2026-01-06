@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ethereum Time Machine Infographic</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #e8e8e8;
+            min-height: 100vh;
+            padding: 40px;
+            line-height: 1.4;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid #00d4ff;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+            margin-bottom: 10px;
+        }
+        .header .subtitle {
+            font-size: 1.2em;
+            color: #888;
+        }
+        .header .tagline {
+            font-size: 1em;
+            color: #ffcc00;
+            margin-top: 15px;
+            font-style: italic;
+        }
+        .columns {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .column {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid #444;
+            border-radius: 10px;
+            padding: 25px;
+        }
+        .column.left {
+            border-color: #00ff88;
+        }
+        .column.right {
+            border-color: #ff6b35;
+        }
+        .column h2 {
+            font-size: 1.4em;
+            margin-bottom: 5px;
+        }
+        .column.left h2 {
+            color: #00ff88;
+        }
+        .column.right h2 {
+            color: #ff6b35;
+        }
+        .column h3 {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 20px;
+            font-weight: normal;
+        }
+        .section-title {
+            color: #ffcc00;
+            font-size: 1em;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        .diagram {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 0.85em;
+            margin: 10px 0;
+        }
+        .diagram pre {
+            margin: 0;
+            white-space: pre;
+        }
+        .column.left .diagram {
+            border-left: 3px solid #00ff88;
+        }
+        .column.right .diagram {
+            border-left: 3px solid #ff6b35;
+        }
+        p {
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 0.85em;
+        }
+        th, td {
+            padding: 8px 10px;
+            text-align: left;
+            border: 1px solid #444;
+        }
+        th {
+            background: rgba(255, 204, 0, 0.2);
+            color: #ffcc00;
+        }
+        td {
+            background: rgba(0, 0, 0, 0.2);
+        }
+        .checklist {
+            list-style: none;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .checklist li {
+            padding: 5px 0;
+        }
+        .checklist li::before {
+            content: "[x] ";
+            color: #00ff88;
+        }
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid #9d4edd;
+            border-radius: 10px;
+        }
+        .footer h2 {
+            color: #9d4edd;
+            font-size: 1.3em;
+            margin-bottom: 20px;
+        }
+        .footer .diagram {
+            border-left: 3px solid #9d4edd;
+            display: inline-block;
+            text-align: left;
+        }
+        .highlight-green { color: #00ff88; }
+        .highlight-orange { color: #ff6b35; }
+        .highlight-blue { color: #00d4ff; }
+        .highlight-yellow { color: #ffcc00; }
+        .highlight-purple { color: #9d4edd; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>ETHEREUM TIME MACHINE</h1>
+            <div class="subtitle">Bridging Ethereum's Past, Present, and Future</div>
+            <div class="tagline">"Travel back in time to experience authentic Ethereum history"</div>
+        </div>
+
+        <!-- TWO COLUMNS -->
+        <div class="columns">
+            <!-- LEFT COLUMN: CHAIN OF GETHS -->
+            <div class="column left">
+                <h2>PART 1: CHAIN OF GETHS</h2>
+                <h3>A Protocol Bridge Spanning Ethereum's Entire History</h3>
+
+                <div class="section-title">THE PROBLEM</div>
+                <p>Different Ethereum eras speak different "languages" (eth/* protocols). Modern clients can't talk to ancient ones directly.</p>
+
+                <div class="diagram"><pre>  eth/68-69 (2024)  <span class="highlight-orange">&lt;--X--&gt;</span>  eth/60-61 (2015)
+        |                          |
+    Modern Geth              Frontier Geth
+        |                          |
+        +<span class="highlight-orange">----- INCOMPATIBLE! ------</span>+</pre></div>
+
+                <div class="section-title">THE SOLUTION: Protocol Bridge Chain</div>
+                <p>Chain adjacent versions that share at least ONE common protocol. Each node translates between eras like a relay chain.</p>
+
+                <div class="diagram"><pre><span class="highlight-yellow">         THE CHAIN OF GETHS</span>
+========================================
+
+<span class="highlight-blue">+------------------+  +------------------+</span>
+<span class="highlight-blue">|  LIGHTHOUSE      |  |  GETH v1.16.7    |</span>
+<span class="highlight-blue">|  v8.0.1          |&lt;&gt;|  (Modern Head)   |</span>
+<span class="highlight-blue">|  Consensus       |  |  eth/68-69       |</span>
+<span class="highlight-blue">|  Client          |  |  Port: 8545      |</span>
+<span class="highlight-blue">+------------------+  +--------+---------+</span>
+                               |
+              <span class="highlight-yellow">RLP Export/Import (offline)</span>
+              <span class="highlight-yellow">Blocks 0 -&gt; 1,919,999</span>
+                               |
+                      +--------v---------+
+                      |  GETH v1.11.6    |
+                      |  (Bridge Node)   |
+                      |  eth/66-68       |
+                      +--------+---------+
+                               |
+                        <span class="highlight-green">P2P eth/66</span>
+                               |
+                      +--------v---------+
+                      |  GETH v1.10.8    |
+                      |  (Bridge Node)   |
+                      |  eth/65-66       |
+                      +--------+---------+
+                               |
+                        <span class="highlight-green">P2P eth/65</span>
+                               |
+                      +--------v---------+
+                      |  GETH v1.9.25    |
+                      |  (Bridge Node)   |
+                      |  eth/63-65       |
+                      +--------+---------+
+                               |
+                        <span class="highlight-green">P2P eth/63</span>
+                               |
+  <span class="highlight-orange">+---------------+</span>   +--------v---------+
+  <span class="highlight-orange">| RESURRECTION  |</span>&lt;--|  GETH v1.3.6     |
+  <span class="highlight-orange">| TARGET        |</span>   |  (Homestead Era) |
+  <span class="highlight-orange">| Block 1.15M+  |</span>   |  eth/61-63       |
+  <span class="highlight-orange">+---------------+</span>   +--------+---------+
+                               |
+                        <span class="highlight-green">P2P eth/61</span>
+                               |
+  <span class="highlight-orange">+---------------+</span>   +--------v---------+
+  <span class="highlight-orange">| RESURRECTION  |</span>&lt;--|  GETH v1.0.2     |
+  <span class="highlight-orange">| TARGET        |</span>   |  (Frontier Tail) |
+  <span class="highlight-orange">| Block 200K+   |</span>   |  eth/60-61       |
+  <span class="highlight-orange">+---------------+</span>   +------------------+</pre></div>
+            </div>
+
+            <!-- RIGHT COLUMN: RESURRECTION PROJECT -->
+            <div class="column right">
+                <h2>PART 2: RESURRECTION PROJECT</h2>
+                <h3>Mining Historical Chains Back to Life</h3>
+
+                <div class="section-title">THE GOAL</div>
+                <p>Extend historical Ethereum chains BEYOND their original blocks. Reduce difficulty to CPU-mineable levels for educational testnets.</p>
+
+                <div class="section-title">TWO RESURRECTION OPTIONS</div>
+                <table>
+                    <tr>
+                        <th></th>
+                        <th>HOMESTEAD</th>
+                        <th>FRONTIER</th>
+                    </tr>
+                    <tr>
+                        <td>Geth</td>
+                        <td>v1.3.6</td>
+                        <td>v1.0.3</td>
+                    </tr>
+                    <tr>
+                        <td>Block</td>
+                        <td>1,150,000+</td>
+                        <td>200,000+</td>
+                    </tr>
+                    <tr>
+                        <td>Start Diff</td>
+                        <td>~25 trillion</td>
+                        <td>~1.7 billion</td>
+                    </tr>
+                    <tr>
+                        <td>Target</td>
+                        <td>&lt; 1 trillion</td>
+                        <td>&lt; 1 trillion</td>
+                    </tr>
+                    <tr>
+                        <td>Timeline</td>
+                        <td>2-4 weeks</td>
+                        <td>4-6 weeks</td>
+                    </tr>
+                </table>
+
+                <div class="section-title">DIFFICULTY ALGORITHMS</div>
+                <div class="diagram"><pre><span class="highlight-blue">FRONTIER (Binary)</span>        <span class="highlight-orange">HOMESTEAD (Proportional)</span>
+=================        =======================
+
+if time &lt; 13s:           adj = max(1 - delta/10, <span class="highlight-orange">-99</span>)
+  diff += 0.05%          diff += (diff/2048) * adj
+else:
+  diff -= 0.05%          <span class="highlight-yellow">Can reduce up to -99x base!</span>
+
+Difficulty               Difficulty
+    ^                        ^
+    |   /----____            |   |
+    |  /         \__         |   |\
+    | /             \        |   | \_____
+    +---------------&gt;        +------------&gt;
+       <span class="highlight-blue">Time (slow)</span>              <span class="highlight-orange">Time (fast)</span></pre></div>
+
+                <div class="section-title">MINING STRATEGY: HOMESTEAD</div>
+                <table>
+                    <tr>
+                        <th>Phase</th>
+                        <th>Duration</th>
+                        <th>Action</th>
+                    </tr>
+                    <tr>
+                        <td>1. Crash</td>
+                        <td>1-2 days</td>
+                        <td>4-8 GPUs, max timestamp delta</td>
+                    </tr>
+                    <tr>
+                        <td>2. CPU</td>
+                        <td>1-2 weeks</td>
+                        <td>Transition to CPU mining</td>
+                    </tr>
+                    <tr>
+                        <td>3. Stable</td>
+                        <td>1 week</td>
+                        <td>Verify EIPs, set up peers</td>
+                    </tr>
+                </table>
+
+                <div class="section-title">MINING STRATEGY: FRONTIER</div>
+                <table>
+                    <tr>
+                        <th>Phase</th>
+                        <th>Duration</th>
+                        <th>Action</th>
+                    </tr>
+                    <tr>
+                        <td>1. GPU Grind</td>
+                        <td>4-6 weeks</td>
+                        <td>Sustained GPU mining (~0.05%/block)</td>
+                    </tr>
+                    <tr>
+                        <td>2. Transition</td>
+                        <td>1-2 weeks</td>
+                        <td>Mixed GPU/CPU as diff drops</td>
+                    </tr>
+                    <tr>
+                        <td>3. CPU Era</td>
+                        <td>Ongoing</td>
+                        <td>Pure CPU mining achieved</td>
+                    </tr>
+                </table>
+
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <h2>HOW IT ALL FITS TOGETHER</h2>
+            <div class="diagram"><pre>   <span class="highlight-green">CHAIN OF GETHS</span>              <span class="highlight-orange">RESURRECTION</span>               <span class="highlight-blue">RUNNING MIST</span>
+   ==============              ============               ============
+
+  +----------------+          +----------------+         +----------------+
+  |  Synced Geth   |  Mining  |  Extended      |   IPC   |  Mist Wallet   |
+  |  v1.3.6        | <span class="highlight-yellow">-------&gt;</span> |  Homestead     | <span class="highlight-yellow">&lt;-----&gt;</span> |  v0.7.4        |
+  |  Block 1.15M   |          |  Block 1.15M+  |         |  Authentic UX  |
+  +----------------+          +----------------+         +----------------+
+
+       <span class="highlight-green">Infrastructure</span>    +    <span class="highlight-orange">Chain Extension</span>    +    <span class="highlight-blue">User Experience</span>
+                         =
+                              <span class="highlight-purple">COMPLETE TIME MACHINE</span></pre></div>
+        </div>
+    </div>
+</body>
+</html>
