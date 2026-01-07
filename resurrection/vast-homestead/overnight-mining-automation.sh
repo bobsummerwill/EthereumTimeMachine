@@ -3,7 +3,7 @@
 # Overnight automation script for Vast.ai Homestead mining.
 #
 # This script automates the Ethereum Homestead resurrection process:
-# 1. Gets chaindata via P2P sync from chain-of-geths OR from uploaded tarball
+# 1. Syncs chaindata via P2P from chain-of-geths AWS node
 # 2. Downloads pre-built ethminer binary (CUDA 11.x for RTX 30xx/40xx)
 # 3. Starts geth with faketime stepping (20-min gaps to crash difficulty)
 # 4. Starts ethminer against geth RPC
@@ -12,21 +12,11 @@
 # PREREQUISITES:
 # - Vast.ai instance with 8x RTX 3090/4090 GPUs
 # - Ubuntu 22.04 LTS (required for geth v1.3.6 compatibility)
-#
-# TWO CHAINDATA OPTIONS:
-# 1. P2P Sync (recommended): Sync directly from chain-of-geths AWS node
-#    - Faster than uploading tarball (~1 hour vs 3+ hours)
-#    - Requires chain-of-geths running on AWS with public port 30311
-#    - Use: SYNC_MODE=p2p ./overnight-mining-automation.sh
-#
-# 2. Tarball Upload: Upload pre-synced chaindata tarball via rsync
-#    - Good if you have chaindata locally
-#    - Use: SYNC_MODE=tarball ./overnight-mining-automation.sh
+# - chain-of-geths running on AWS with public port 30311
 #
 # Usage: ./overnight-mining-automation.sh
 #
 # Environment variables:
-#   SYNC_MODE       - "p2p" (default) or "tarball"
 #   P2P_ENODE       - enode URL for P2P sync (default: chain-of-geths v1.3.6)
 #   TARGET_BLOCK    - block to sync to before mining (default: 1919999)
 #   VAST_INSTANCE_ID, VAST_SSH_HOST, VAST_SSH_PORT - instance details
@@ -34,9 +24,9 @@
 # Run in background with: nohup ./overnight-mining-automation.sh &
 #
 # The script will automatically:
-# - Sync chaindata to target block
-# - Disconnect peer before mining (important for P2P mode!)
-# - Install dependencies (libfaketime, CUDA drivers)
+# - Sync chaindata to target block (~1 hour)
+# - Disconnect peer before mining (prevents chain-of-geths from following)
+# - Install dependencies (libfaketime)
 # - Download ethminer binary
 # - Start mining with automatic difficulty crashing
 
@@ -56,9 +46,6 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCo
 MINER_ADDRESS="0x3ca943ef871bea7d0dfa34bff047b0e82be441ef"
 MINER_PRIVATE_KEY="1ef4d35813260e866883e70025a91a81d9c0f4b476868a5adcd80868a39363f5"
 
-# Sync mode: "p2p" (sync from chain-of-geths) or "tarball" (upload pre-synced data)
-SYNC_MODE="${SYNC_MODE:-p2p}"
-
 # P2P sync configuration
 # The enode URL for chain-of-geths v1.3.6 node on AWS
 # Format: enode://<node_id>@<ip>:<port>
@@ -68,11 +55,6 @@ P2P_ENODE="${P2P_ENODE:-enode://a45ce9d6d92327f093d05602b30966ab1e0bf8dd4ae63f4b
 # Target block to sync to before starting mining
 # 1919999 = last Homestead block before DAO fork
 TARGET_BLOCK="${TARGET_BLOCK:-1919999}"
-
-# Chaindata tarball location on remote (for tarball mode)
-REMOTE_CHAINDATA="/root/chaindata.tar.gz"
-# Expected size ~27GB
-EXPECTED_SIZE=27000000000
 
 log() {
   local timestamp
@@ -85,124 +67,7 @@ ssh_cmd() {
 }
 
 # ============================================================================
-# Tarball Mode Functions
-# ============================================================================
-
-check_upload_complete() {
-  # Check if rsync is still running locally (uploading chaindata)
-  if pgrep -f "rsync.*vast.ai" > /dev/null 2>&1; then
-    return 1  # Still uploading
-  fi
-
-  # Verify file exists and has reasonable size on remote
-  local remote_size
-  remote_size=$(ssh_cmd "stat -c%s $REMOTE_CHAINDATA 2>/dev/null || echo 0")
-
-  if [ "$remote_size" -gt "$EXPECTED_SIZE" ]; then
-    return 0  # Upload complete
-  fi
-
-  return 1  # Not complete yet
-}
-
-wait_for_upload() {
-  log "[Tarball Mode] Monitoring upload progress..."
-  log "Looking for rsync process uploading to vast.ai"
-  log "Expected final size: ~27GB"
-  log "Remote path: $REMOTE_CHAINDATA"
-
-  local check_count=0
-  while true; do
-    # Get remote file size - check both final and temp file (rsync uses hidden temp file)
-    local remote_dir
-    remote_dir=$(dirname "$REMOTE_CHAINDATA")
-    local remote_size
-    # Check final file first, then temp file
-    remote_size=$(ssh_cmd "stat -c%s $REMOTE_CHAINDATA 2>/dev/null || stat -c%s ${remote_dir}/.chaindata.tar.gz.* 2>/dev/null | head -1 || echo 0")
-    local remote_size_gb
-    remote_size_gb=$(echo "scale=2; $remote_size / 1073741824" | bc 2>/dev/null || echo "0")
-
-    # Check if rsync is running
-    local rsync_running="no"
-    if pgrep -f "rsync.*vast.ai" > /dev/null 2>&1; then
-      rsync_running="yes"
-    fi
-
-    log "Upload status: ${remote_size_gb}GB uploaded | rsync running: $rsync_running"
-
-    # Check if complete - final file exists and is large enough
-    local final_size
-    final_size=$(ssh_cmd "stat -c%s $REMOTE_CHAINDATA 2>/dev/null || echo 0")
-    if [ "$rsync_running" = "no" ] && [ "$final_size" -gt "$EXPECTED_SIZE" ]; then
-      log "Upload complete! Final size: $(echo "scale=2; $final_size / 1073741824" | bc)GB"
-      return 0
-    fi
-
-    # If rsync stopped, check if final file exists (any size)
-    if [ "$rsync_running" = "no" ] && [ "$final_size" -gt 0 ]; then
-      check_count=$((check_count + 1))
-      if [ "$check_count" -gt 3 ]; then
-        if [ "$final_size" -lt "$EXPECTED_SIZE" ]; then
-          log "WARNING: rsync stopped but file size ($(echo "scale=2; $final_size / 1073741824" | bc)GB) is less than expected"
-          log "Proceeding anyway - file may be smaller than expected or there was an issue"
-        fi
-        return 0
-      fi
-    else
-      check_count=0
-    fi
-
-    sleep 300  # Check every 5 minutes
-  done
-}
-
-extract_chaindata() {
-  log "Extracting chaindata tarball on remote..."
-
-  ssh_cmd bash -lc '
-    set -e
-
-    # Create data directory
-    mkdir -p /root/geth-data
-
-    echo "Chaindata tarball location:"
-    ls -lh /root/chaindata.tar.gz 2>/dev/null || echo "No tar.gz files found"
-
-    # Extract chaindata
-    echo "Extracting chaindata.tar.gz..."
-    cd /root/geth-data
-    tar -xzf /root/chaindata.tar.gz
-
-    # Check what we got
-    echo "Extracted contents:"
-    ls -la /root/geth-data/
-
-    # Handle nested directory if present (e.g., v1.3.6/chaindata)
-    if [ -d "/root/geth-data/v1.3.6" ]; then
-      echo "Moving nested v1.3.6 contents up..."
-      mv /root/geth-data/v1.3.6/* /root/geth-data/ 2>/dev/null || true
-      rmdir /root/geth-data/v1.3.6 2>/dev/null || true
-    fi
-
-    # Verify chaindata exists
-    if [ -d "/root/geth-data/chaindata" ]; then
-      echo "chaindata directory found!"
-      du -sh /root/geth-data/chaindata
-    else
-      echo "ERROR: chaindata directory not found after extraction!"
-      echo "Contents:"
-      find /root/geth-data -type d -maxdepth 3
-      exit 1
-    fi
-
-    echo "Extraction complete!"
-  '
-
-  log "Chaindata extraction complete."
-}
-
-# ============================================================================
-# Common Installation Functions
+# Installation Functions
 # ============================================================================
 
 install_geth() {
@@ -787,52 +652,39 @@ main() {
   log "Instance ID: $INSTANCE_ID"
   log "SSH: ${SSH_USER}@${SSH_HOST}:${SSH_PORT}"
   log "Miner Address: $MINER_ADDRESS"
-  log "Sync Mode: $SYNC_MODE"
   log "Target Block: $TARGET_BLOCK"
+  log "P2P Enode: $P2P_ENODE"
   log "============================================"
 
   # Step 1: Install geth v1.3.6
   install_geth
 
-  # Step 2: Get chaindata (either via P2P sync or tarball)
-  if [ "$SYNC_MODE" = "p2p" ]; then
-    log "Using P2P sync mode - syncing from chain-of-geths..."
+  # Step 2: Start P2P sync from chain-of-geths
+  start_geth_for_p2p_sync
 
-    # Start geth for P2P sync
-    start_geth_for_p2p_sync
+  # Step 3: Wait for sync to complete
+  wait_for_p2p_sync
 
-    # Wait for sync to complete
-    wait_for_p2p_sync
+  # Step 4: CRITICAL - Disconnect peer before mining
+  # This prevents chain-of-geths from following our resurrection blocks
+  disconnect_p2p_peer
 
-    # CRITICAL: Disconnect peer before mining
-    disconnect_p2p_peer
-
-  else
-    log "Using tarball mode - waiting for chaindata upload..."
-
-    # Wait for upload to complete
-    wait_for_upload
-
-    # Extract chaindata
-    extract_chaindata
-  fi
-
-  # Step 3: Setup miner key
+  # Step 5: Setup miner key
   setup_miner_key
 
-  # Step 4: Install libfaketime
+  # Step 6: Install libfaketime
   install_libfaketime
 
-  # Step 5: Install ethminer
+  # Step 7: Install ethminer
   install_ethminer
 
-  # Step 6: Start geth with faketime (restarts geth in mining mode)
+  # Step 8: Start geth with faketime (restarts geth in mining mode)
   start_geth_initial
 
-  # Step 7: Start ethminer
+  # Step 9: Start ethminer
   start_ethminer
 
-  # Step 8: Monitor and maintain mining
+  # Step 10: Monitor and maintain mining
   monitor_mining
 }
 
