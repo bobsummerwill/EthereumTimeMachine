@@ -2,25 +2,53 @@
 #
 # Overnight automation script for Vast.ai Homestead mining.
 #
-# This script:
-# 1. Monitors the chaindata upload progress (checks for rsync process)
-# 2. When upload completes, extracts chaindata on remote
-# 3. Builds ethminer (Genoil) on remote
-# 4. Starts geth with faketime stepping
-# 5. Starts ethminer against geth RPC
-# 6. Logs all progress to a file
+# This script automates the Ethereum Homestead resurrection process:
+# 1. Gets chaindata via P2P sync from chain-of-geths OR from uploaded tarball
+# 2. Downloads pre-built ethminer binary (CUDA 11.x for RTX 30xx/40xx)
+# 3. Starts geth with faketime stepping (20-min gaps to crash difficulty)
+# 4. Starts ethminer against geth RPC
+# 5. Logs all progress to a file
+#
+# PREREQUISITES:
+# - Vast.ai instance with 8x RTX 3090/4090 GPUs
+# - Ubuntu 22.04 LTS (required for geth v1.3.6 compatibility)
+#
+# TWO CHAINDATA OPTIONS:
+# 1. P2P Sync (recommended): Sync directly from chain-of-geths AWS node
+#    - Faster than uploading tarball (~1 hour vs 3+ hours)
+#    - Requires chain-of-geths running on AWS with public port 30311
+#    - Use: SYNC_MODE=p2p ./overnight-mining-automation.sh
+#
+# 2. Tarball Upload: Upload pre-synced chaindata tarball via rsync
+#    - Good if you have chaindata locally
+#    - Use: SYNC_MODE=tarball ./overnight-mining-automation.sh
 #
 # Usage: ./overnight-mining-automation.sh
 #
+# Environment variables:
+#   SYNC_MODE       - "p2p" (default) or "tarball"
+#   P2P_ENODE       - enode URL for P2P sync (default: chain-of-geths v1.3.6)
+#   TARGET_BLOCK    - block to sync to before mining (default: 1919999)
+#   VAST_INSTANCE_ID, VAST_SSH_HOST, VAST_SSH_PORT - instance details
+#
 # Run in background with: nohup ./overnight-mining-automation.sh &
+#
+# The script will automatically:
+# - Sync chaindata to target block
+# - Disconnect peer before mining (important for P2P mode!)
+# - Install dependencies (libfaketime, CUDA drivers)
+# - Download ethminer binary
+# - Start mining with automatic difficulty crashing
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="$SCRIPT_DIR/overnight-mining.log"
-INSTANCE_ID="29620927"
-SSH_HOST="ssh5.vast.ai"
-SSH_PORT="20926"
+
+# Instance configuration - UPDATE THESE for your instance
+INSTANCE_ID="${VAST_INSTANCE_ID:-29745691}"
+SSH_HOST="${VAST_SSH_HOST:-ssh9.vast.ai}"
+SSH_PORT="${VAST_SSH_PORT:-25690}"
 SSH_USER="root"
 SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30"
 
@@ -28,7 +56,20 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCo
 MINER_ADDRESS="0x3ca943ef871bea7d0dfa34bff047b0e82be441ef"
 MINER_PRIVATE_KEY="1ef4d35813260e866883e70025a91a81d9c0f4b476868a5adcd80868a39363f5"
 
-# Chaindata tarball location on remote
+# Sync mode: "p2p" (sync from chain-of-geths) or "tarball" (upload pre-synced data)
+SYNC_MODE="${SYNC_MODE:-p2p}"
+
+# P2P sync configuration
+# The enode URL for chain-of-geths v1.3.6 node on AWS
+# Format: enode://<node_id>@<ip>:<port>
+# This node runs geth v1.3.6 with eth/61-63 protocols at block 1,919,999
+P2P_ENODE="${P2P_ENODE:-enode://a45ce9d6d92327f093d05602b30966ab1e0bf8dd4ae63f4bab2a57db514990da54149d3c50bbf3d4004c0512b6629e49ae9a349de67e008d7e7c6f6626828f3f@52.0.234.84:30311}"
+
+# Target block to sync to before starting mining
+# 1919999 = last Homestead block before DAO fork
+TARGET_BLOCK="${TARGET_BLOCK:-1919999}"
+
+# Chaindata tarball location on remote (for tarball mode)
 REMOTE_CHAINDATA="/root/chaindata.tar.gz"
 # Expected size ~27GB
 EXPECTED_SIZE=27000000000
@@ -42,6 +83,10 @@ log() {
 ssh_cmd() {
   ssh -p "$SSH_PORT" $SSH_OPTS "${SSH_USER}@${SSH_HOST}" "$@" 2>/dev/null
 }
+
+# ============================================================================
+# Tarball Mode Functions
+# ============================================================================
 
 check_upload_complete() {
   # Check if rsync is still running locally (uploading chaindata)
@@ -61,8 +106,8 @@ check_upload_complete() {
 }
 
 wait_for_upload() {
-  log "Monitoring upload progress..."
-  log "Looking for rsync process uploading to ssh4.vast.ai"
+  log "[Tarball Mode] Monitoring upload progress..."
+  log "Looking for rsync process uploading to vast.ai"
   log "Expected final size: ~27GB"
   log "Remote path: $REMOTE_CHAINDATA"
 
@@ -156,6 +201,201 @@ extract_chaindata() {
   log "Chaindata extraction complete."
 }
 
+# ============================================================================
+# Common Installation Functions
+# ============================================================================
+
+install_geth() {
+  log "Installing geth v1.3.6 on remote..."
+
+  ssh_cmd bash -lc '
+    set -e
+
+    if [ -x /root/geth ]; then
+      echo "geth already installed:"
+      /root/geth version
+      exit 0
+    fi
+
+    cd /root
+
+    # Install bzip2 if needed
+    if ! command -v bzip2 &>/dev/null; then
+      apt-get update
+      apt-get install -y bzip2
+    fi
+
+    # Download geth v1.3.6
+    GETH_URL="https://github.com/ethereum/go-ethereum/releases/download/v1.3.6/geth-Linux64-20160402135800-1.3.6-9e323d6.tar.bz2"
+    curl -L -o geth.tar.bz2 "$GETH_URL"
+    tar xjf geth.tar.bz2
+    chmod +x geth
+    rm geth.tar.bz2
+
+    echo "geth installed:"
+    /root/geth version
+  '
+
+  log "geth v1.3.6 installation complete."
+}
+
+# ============================================================================
+# P2P Sync Functions
+# ============================================================================
+
+start_geth_for_p2p_sync() {
+  log "Starting geth for P2P sync from chain-of-geths..."
+
+  ssh_cmd bash -lc "
+    set -e
+
+    # Kill any existing geth
+    pkill -9 geth 2>/dev/null || true
+    sleep 2
+
+    # Create datadir and static-nodes.json
+    mkdir -p /root/geth-data/geth
+
+    # Configure static peer for P2P sync
+    cat > /root/geth-data/static-nodes.json << 'EOFNODES'
+[\"$P2P_ENODE\"]
+EOFNODES
+
+    echo 'Static nodes configured:'
+    cat /root/geth-data/static-nodes.json
+
+    # Start geth for P2P sync
+    # - fast=false: full sync (required for mining)
+    # - nodiscover: don't connect to mainnet peers
+    # - cache 4096: use 4GB RAM for faster sync
+    # - verbosity 3: reasonable logging
+    nohup /root/geth --datadir /root/geth-data \
+      --cache 4096 \
+      --fast=false \
+      --rpc --rpcaddr 0.0.0.0 --rpcport 8545 \
+      --rpcapi 'eth,net,web3,admin' \
+      --networkid 1 \
+      --port 30303 \
+      --verbosity 3 \
+      >> /root/geth.log 2>&1 &
+
+    echo \$! > /root/geth.pid
+    echo 'geth started for P2P sync with PID:' \$(cat /root/geth.pid)
+
+    # Wait for RPC to be ready
+    for i in {1..30}; do
+      if curl -s http://127.0.0.1:8545 >/dev/null 2>&1; then
+        echo 'geth RPC is ready!'
+        break
+      fi
+      sleep 2
+    done
+  "
+
+  log "geth started for P2P sync."
+}
+
+wait_for_p2p_sync() {
+  log "Waiting for P2P sync to reach block $TARGET_BLOCK..."
+  log "This typically takes ~1 hour at ~500 blocks/sec"
+
+  local last_block=0
+  local stall_count=0
+  local start_time=$(date +%s)
+
+  while true; do
+    # Get current block number
+    local current_block
+    current_block=$(ssh_cmd "curl -s -X POST -H 'Content-Type: application/json' \
+      --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \
+      http://127.0.0.1:8545 2>/dev/null | python3 -c \"import sys,json; r=json.load(sys.stdin); print(int(r.get('result','0x0'),16))\"" 2>/dev/null || echo "0")
+
+    # Get peer count
+    local peer_count
+    peer_count=$(ssh_cmd "curl -s -X POST -H 'Content-Type: application/json' \
+      --data '{\"jsonrpc\":\"2.0\",\"method\":\"net_peerCount\",\"params\":[],\"id\":1}' \
+      http://127.0.0.1:8545 2>/dev/null | python3 -c \"import sys,json; r=json.load(sys.stdin); print(int(r.get('result','0x0'),16))\"" 2>/dev/null || echo "0")
+
+    # Calculate progress
+    local progress
+    progress=$(python3 -c "print(f'{$current_block * 100 / $TARGET_BLOCK:.2f}')" 2>/dev/null || echo "0")
+
+    # Calculate rate
+    local elapsed=$(($(date +%s) - start_time))
+    local rate=0
+    if [ "$elapsed" -gt 0 ] && [ "$current_block" -gt 0 ]; then
+      rate=$(python3 -c "print(f'{$current_block / $elapsed:.1f}')" 2>/dev/null || echo "0")
+    fi
+
+    log "Sync progress: Block $current_block / $TARGET_BLOCK ($progress%) | Peers: $peer_count | Rate: ~${rate} blocks/sec"
+
+    # Check if sync complete
+    if [ "$current_block" -ge "$TARGET_BLOCK" ]; then
+      log "✅ P2P sync complete! Reached block $current_block"
+      return 0
+    fi
+
+    # Check for stalls
+    if [ "$current_block" -eq "$last_block" ]; then
+      stall_count=$((stall_count + 1))
+      if [ "$stall_count" -ge 6 ]; then
+        log "WARNING: Sync appears stalled at block $current_block for 30 minutes"
+        log "Checking geth logs..."
+        ssh_cmd "tail -50 /root/geth.log" || true
+      fi
+    else
+      stall_count=0
+    fi
+
+    last_block=$current_block
+    sleep 300  # Check every 5 minutes
+  done
+}
+
+disconnect_p2p_peer() {
+  log "Disconnecting P2P peer before mining..."
+  log "IMPORTANT: This prevents the chain-of-geths node from following our new blocks"
+
+  ssh_cmd bash -lc "
+    set -e
+
+    # Get the peer ID to disconnect
+    echo 'Current peers:'
+    curl -s -X POST -H 'Content-Type: application/json' \
+      --data '{\"jsonrpc\":\"2.0\",\"method\":\"admin_peers\",\"params\":[],\"id\":1}' \
+      http://127.0.0.1:8545 2>/dev/null | python3 -c \"
+import sys, json
+r = json.load(sys.stdin)
+peers = r.get('result', [])
+for p in peers:
+    print(f'  - {p.get(\"enode\", \"unknown\")}')
+\"
+
+    # Remove the static peer by removing static-nodes.json
+    rm -f /root/geth-data/static-nodes.json
+    echo 'Removed static-nodes.json'
+
+    # Use admin.removePeer to disconnect immediately
+    echo 'Removing peer via admin API...'
+    curl -s -X POST -H 'Content-Type: application/json' \
+      --data '{\"jsonrpc\":\"2.0\",\"method\":\"admin_removePeer\",\"params\":[\"$P2P_ENODE\"],\"id\":1}' \
+      http://127.0.0.1:8545 2>/dev/null || true
+
+    # Verify no peers
+    sleep 2
+    echo 'Peer count after disconnect:'
+    curl -s -X POST -H 'Content-Type: application/json' \
+      --data '{\"jsonrpc\":\"2.0\",\"method\":\"net_peerCount\",\"params\":[],\"id\":1}' \
+      http://127.0.0.1:8545 2>/dev/null | python3 -c \"import sys,json; r=json.load(sys.stdin); print(int(r.get('result','0x0'),16))\"
+  "
+
+  log "Peer disconnected. Chain is now isolated for resurrection mining."
+}
+
+# ============================================================================
+# Mining Setup Functions
+# ============================================================================
+
 setup_miner_key() {
   log "Verifying miner key setup..."
 
@@ -221,55 +461,57 @@ install_libfaketime() {
   log "libfaketime installation complete."
 }
 
-build_ethminer() {
-  log "Building ethminer (Genoil) on remote - this may take 10-20 minutes..."
+install_ethminer() {
+  log "Installing ethminer on remote..."
 
   ssh_cmd bash -lc '
     set -e
 
-    # Check if already built
+    # Check if already installed
     if [ -x "/root/ethminer" ]; then
-      echo "ethminer already exists, skipping build"
-      /root/ethminer --version || /root/ethminer --help | head -5 || true
+      echo "ethminer already exists:"
+      LC_ALL=C /root/ethminer --version 2>&1 | head -5 || true
       exit 0
     fi
 
-    echo "Installing build dependencies..."
-    apt-get update
-    DEBIAN_FRONTEND=noninteractive apt-get install -y \
-      git cmake build-essential libcurl4-openssl-dev \
-      libjsoncpp-dev libmicrohttpd-dev libleveldb-dev \
-      libboost-all-dev libgmp-dev ocl-icd-opencl-dev \
-      mesa-opencl-icd clinfo
-
-    # Show OpenCL devices
-    echo "Available OpenCL devices:"
-    clinfo -l 2>/dev/null || echo "(clinfo not available)"
-
-    # Clone Genoil ethminer
     cd /root
-    if [ ! -d "cpp-ethereum" ]; then
-      echo "Cloning Genoil cpp-ethereum..."
-      git clone https://github.com/Genoil/cpp-ethereum.git
-    fi
-    cd cpp-ethereum
-    git checkout 110
 
-    # Build with OpenCL support
-    echo "Building ethminer..."
-    mkdir -p build && cd build
-    cmake -DBUNDLE=miner -DETHASHCL=ON -DETHASHCUDA=OFF ..
-    make -j$(nproc) ethminer
+    # Check GPU compute capability
+    echo "Checking GPU compute capability..."
+    compute_cap=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d " ")
+    echo "GPU Compute Capability: $compute_cap"
 
-    # Copy binary
-    cp ethminer/ethminer /root/ethminer
+    # RTX 30xx = 8.6, RTX 40xx = 8.9
+    # Pre-built ethminer 0.18.0 uses CUDA 9/10 which maxes out at compute 7.5
+    # We need ethminer compiled with CUDA 11+ for these cards
+
+    # Try downloading from ethereum-mining/ethminer releases
+    # The CUDA 10 version may work with newer drivers in compatibility mode
+    echo "Downloading ethminer 0.19.0-alpha.0 (latest with getWork support)..."
+    wget -q https://github.com/ethereum-mining/ethminer/releases/download/v0.19.0-alpha.0/ethminer-0.19.0-alpha.0-cuda-9-linux-x86_64.tar.gz || {
+      echo "Alpha version not available, trying 0.18.0..."
+      wget -q https://github.com/ethereum-mining/ethminer/releases/download/v0.18.0/ethminer-0.18.0-cuda-9-linux-x86_64.tar.gz
+    }
+
+    tar xzf ethminer-*.tar.gz
+    mv bin/ethminer /root/ethminer
     chmod +x /root/ethminer
+    rm -rf bin ethminer-*.tar.gz
 
-    echo "ethminer built successfully!"
-    /root/ethminer --help | head -10 || true
+    echo "ethminer installed:"
+    LC_ALL=C /root/ethminer --version 2>&1 | head -5 || true
+
+    # Check CUDA and GPU availability
+    echo ""
+    echo "GPU Information:"
+    nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv 2>/dev/null || echo "nvidia-smi not available"
+
+    # Note: If CUDA mining fails with "invalid device symbol", try OpenCL instead
+    echo ""
+    echo "NOTE: If CUDA mining fails, the script will fall back to OpenCL (-G flag)"
   '
 
-  log "ethminer build complete."
+  log "ethminer installation complete."
 }
 
 get_latest_block_info() {
@@ -402,19 +644,48 @@ start_ethminer() {
     pkill -9 ethminer 2>/dev/null || true
     sleep 2
 
-    # Start ethminer with OpenCL
-    echo "Starting ethminer with OpenCL..."
-    nohup /root/ethminer -G -F http://127.0.0.1:8545 >> /root/ethminer.log 2>&1 &
+    export LC_ALL=C
 
-    echo $! > /root/ethminer.pid
-    echo "ethminer started with PID: $(cat /root/ethminer.pid)"
+    # Try CUDA first, fall back to OpenCL if it fails
+    echo "Attempting to start ethminer with CUDA..."
+    nohup /root/ethminer -U -F http://127.0.0.1:8545 --cuda-devices 0 1 2 3 4 5 6 7 >> /root/ethminer.log 2>&1 &
+    MINER_PID=$!
+    echo $MINER_PID > /root/ethminer.pid
 
-    # Wait for it to start mining
-    sleep 10
+    # Wait and check if it started successfully
+    sleep 15
+
+    if pgrep -x ethminer > /dev/null; then
+      # Check for CUDA errors in log
+      if grep -q "invalid device symbol\|CUDA error" /root/ethminer.log 2>/dev/null; then
+        echo "CUDA failed - trying OpenCL instead..."
+        pkill -9 ethminer 2>/dev/null || true
+        sleep 2
+
+        # Clear log and try OpenCL
+        > /root/ethminer.log
+        nohup /root/ethminer -G -F http://127.0.0.1:8545 >> /root/ethminer.log 2>&1 &
+        echo $! > /root/ethminer.pid
+        echo "ethminer started with OpenCL, PID: $(cat /root/ethminer.pid)"
+      else
+        echo "ethminer started with CUDA, PID: $MINER_PID"
+      fi
+    else
+      echo "CUDA startup failed, trying OpenCL..."
+      # Clear log and try OpenCL
+      > /root/ethminer.log
+      nohup /root/ethminer -G -F http://127.0.0.1:8545 >> /root/ethminer.log 2>&1 &
+      echo $! > /root/ethminer.pid
+      echo "ethminer started with OpenCL, PID: $(cat /root/ethminer.pid)"
+    fi
+
+    # Wait for DAG generation
+    echo "Waiting for DAG generation (this may take a few minutes on first run)..."
+    sleep 30
 
     if pgrep -x ethminer > /dev/null; then
       echo "ethminer is running!"
-      tail -30 /root/ethminer.log
+      tail -50 /root/ethminer.log
     else
       echo "ERROR: ethminer not running!"
       cat /root/ethminer.log
@@ -516,13 +787,35 @@ main() {
   log "Instance ID: $INSTANCE_ID"
   log "SSH: ${SSH_USER}@${SSH_HOST}:${SSH_PORT}"
   log "Miner Address: $MINER_ADDRESS"
+  log "Sync Mode: $SYNC_MODE"
+  log "Target Block: $TARGET_BLOCK"
   log "============================================"
 
-  # Step 1: Wait for upload to complete
-  wait_for_upload
+  # Step 1: Install geth v1.3.6
+  install_geth
 
-  # Step 2: Extract chaindata
-  extract_chaindata
+  # Step 2: Get chaindata (either via P2P sync or tarball)
+  if [ "$SYNC_MODE" = "p2p" ]; then
+    log "Using P2P sync mode - syncing from chain-of-geths..."
+
+    # Start geth for P2P sync
+    start_geth_for_p2p_sync
+
+    # Wait for sync to complete
+    wait_for_p2p_sync
+
+    # CRITICAL: Disconnect peer before mining
+    disconnect_p2p_peer
+
+  else
+    log "Using tarball mode - waiting for chaindata upload..."
+
+    # Wait for upload to complete
+    wait_for_upload
+
+    # Extract chaindata
+    extract_chaindata
+  fi
 
   # Step 3: Setup miner key
   setup_miner_key
@@ -530,10 +823,10 @@ main() {
   # Step 4: Install libfaketime
   install_libfaketime
 
-  # Step 5: Build ethminer
-  build_ethminer
+  # Step 5: Install ethminer
+  install_ethminer
 
-  # Step 6: Start geth (determines current state and restarts with faketime)
+  # Step 6: Start geth with faketime (restarts geth in mining mode)
   start_geth_initial
 
   # Step 7: Start ethminer
