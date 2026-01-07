@@ -40,7 +40,7 @@ RUN apt-get update \
 # Build ethminer (Genoil).
 RUN set -euo pipefail; \
   git clone --depth 1 --branch "$GENOIL_REF" "$GENOIL_REPO" /src/cpp-ethereum; \
-  mkdir -p /src/cpp-ethereum/build; \
+  mkdir -p /src/cpp-ethereum/build /out; \
   cd /src/cpp-ethereum/build; \
   cmake -DBUNDLE=miner ..; \
   make -j"$(nproc)"; \
@@ -53,7 +53,7 @@ SHELL ["/bin/bash", "-lc"]
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-    ca-certificates python3 tini \
+    ca-certificates python3 tini procps \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /out/ethminer /usr/local/bin/ethminer
@@ -72,5 +72,9 @@ ENV PAUSE_BETWEEN_BLOCKS_SECONDS=0
 # -G OpenCL
 # -F getwork endpoint
 ENV ETHMINER_ARGS=-G\ -F\ http://geth:8545
+
+# Health check: verify ethminer process is running
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD pgrep -x ethminer > /dev/null || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]

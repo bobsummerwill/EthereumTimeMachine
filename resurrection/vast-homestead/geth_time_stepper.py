@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import signal
 import subprocess
 import time
@@ -29,13 +30,22 @@ def log(msg: str) -> None:
     print(f"[geth-time-stepper] {msg}", flush=True)
 
 
-def rpc(url: str, method: str, params: list | None = None) -> dict:
+def rpc(url: str, method: str, params: list | None = None, retries: int = 3) -> dict:
     if params is None:
         params = []
     data = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=2) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    last_err: Exception | None = None
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            last_err = e
+            if attempt < retries - 1:
+                delay = 0.5 * (2 ** attempt)  # 0.5s, 1s, 2s...
+                time.sleep(delay)
+    raise last_err  # type: ignore[misc]
 
 
 def eth_block_number(url: str) -> int:
@@ -91,7 +101,7 @@ def main() -> int:
     cmd_str = os.environ.get("GETH_CMD", "")
     if not cmd_str:
         raise SystemExit("GETH_CMD is required")
-    cmd = cmd_str.split(" ")
+    cmd = shlex.split(cmd_str)
 
     def env_for_fake_time(epoch_s: int) -> dict[str, str]:
         env = os.environ.copy()

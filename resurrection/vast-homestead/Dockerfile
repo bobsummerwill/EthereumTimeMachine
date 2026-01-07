@@ -93,4 +93,10 @@ ENV PAUSE_BETWEEN_BLOCKS_SECONDS=0
 
 EXPOSE 8545 30303
 
+# Health check: verify geth RPC is responding
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -fsS --max-time 5 -X POST -H "Content-Type: application/json" \
+      --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+      http://127.0.0.1:8545 || exit 1
+
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]

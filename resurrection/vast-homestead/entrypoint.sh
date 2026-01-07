@@ -76,6 +76,7 @@ ensure_account_and_etherbase() {
   if ! ls -1 /data/keystore/* >/dev/null 2>&1; then
     log "No accounts found in /data/keystore; creating a new account"
     pwfile="/tmp/pw"
+    install -m 600 /dev/null "$pwfile"
     printf '%s' "$ACCOUNT_PASSWORD" > "$pwfile"
     geth --datadir /data account new --password "$pwfile" | tee /tmp/account.out
     rm -f "$pwfile"
@@ -115,6 +116,7 @@ start_geth() {
   #
   # We enable mining so geth produces work packages; GPU hashing is done by ethminer.
   pwfile="/tmp/pw"
+  install -m 600 /dev/null "$pwfile"
   printf '%s' "$ACCOUNT_PASSWORD" > "$pwfile"
 
   log "Starting geth v1.3.6 (networkid=$GETH_NETWORK_ID, nodiscover, maxpeers=0)"
