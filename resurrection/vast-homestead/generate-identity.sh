@@ -100,7 +100,7 @@ if [ ! -d "$DATA_DIR/keystore" ] || ! ls -1 "$DATA_DIR/keystore/"UTC--* >/dev/nu
     -v "$PW_PATH:/pw:ro" \
     -v "$tmpdir/key:/key:ro" \
     ethereum/client-go:v1.16.7 \
-    --datadir /data account import /key --password /pw 2>&1 | tee "$OUT_DIR/account-import.log")
+    account import --datadir /data --password /pw /key 2>&1 | tee "$OUT_DIR/account-import.log")
 
   # Output contains: "Address: {<hex>}".
   addr=$(echo "$out" | tr -d '\r' | sed -n 's/.*Address: {\([0-9a-fA-F]\+\)}.*/\1/p' | head -n 1)

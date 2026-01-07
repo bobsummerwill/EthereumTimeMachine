@@ -28,7 +28,7 @@ services:
       GETH_RPC_PORT: "8545"
       GETH_P2P_PORT: "30303"
       GETH_CACHE: "2048"
-      CHAIN_DATA_TAR: "/input/chaindata.tar"
+      CHAIN_DATA_TAR: "/input/chaindata.tar.gz"
       ACCOUNT_PASSWORD_FILE: "/run/miner-password.txt"
       # Default behavior: lie about time so geth proposes large block timestamps without real waiting.
       USE_FAKETIME: "1"
