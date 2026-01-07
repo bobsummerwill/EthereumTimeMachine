@@ -120,7 +120,90 @@ Automation:
 - One-shot helper for fixed cutoff: [`chain-of-geths/seed-cutoff.sh`](chain-of-geths/seed-cutoff.sh)
 
 
-This avoids the “old chainstate format” / “no compatible consensus client” problem: the modern EL+CL stays authoritative for head sync, while the legacy nodes consume only the historical block range we seeded.
+This avoids the "old chainstate format" / "no compatible consensus client" problem: the modern EL+CL stays authoritative for head sync, while the legacy nodes consume only the historical block range we seeded.
+
+## Why RLP export/import instead of P2P sync?
+
+### The Post-Merge Consensus Client Requirement
+
+After The Merge (Paris hard fork, Sep 2022), Ethereum execution clients like Geth **cannot sync or progress without a paired consensus client** (beacon node). The consensus client tells the execution client which chain is canonical via the Engine API.
+
+This creates a fundamental problem for our bridge chain:
+
+```
+Pre-Merge:   Execution client syncs independently via P2P
+Post-Merge:  Execution client REQUIRES consensus client to sync ANY blocks
+```
+
+**Geth v1.11.6** is a post-Merge client. Even though we only need it to sync pre-Merge historical blocks, it still requires a consensus client to progress at all.
+
+### Failed Attempts to Pair Consensus Clients
+
+We extensively tried to pair a consensus client with Geth v1.11.6:
+
+#### Attempt 1: Modern Lighthouse (v8.0.1)
+- **Problem**: Lighthouse v8.0.1 expects SSZ format from post-Deneb era
+- **Result**: Incompatible with Geth v1.11.6's Engine API expectations
+
+#### Attempt 2: Old Lighthouse (v4.5.0, v4.6.0)
+- **Problem**: Requires checkpoint sync to avoid impractical genesis sync
+- **Result**: Checkpoint sync endpoints only serve current SSZ format data
+
+#### Attempt 3: Prysm (various versions)
+- **Problem**: Same SSZ format incompatibility
+- **Additional**: DNS resolution issues with checkpoint sync URLs
+- **Result**: Could not complete checkpoint sync
+
+#### Attempt 4: Syncing from Genesis
+- **Problem**: Beacon chain genesis sync takes weeks/months
+- **Result**: Impractical for our use case
+
+### The SSZ Format Problem
+
+The core issue is **SSZ (Simple Serialize) format evolution**. The BeaconState structure has changed through multiple hard forks:
+
+| Fork | SSZ Changes |
+|------|-------------|
+| Altair | Added sync committees |
+| Bellatrix | Added execution payload fields |
+| Capella | Added withdrawal fields |
+| Deneb | Added blob sidecar fields |
+
+**Checkpoint sync requires downloading a finalized BeaconState** from a checkpoint endpoint. All public checkpoint endpoints serve the **current** SSZ format (post-Deneb). Old consensus client versions expect **old** SSZ formats.
+
+```
+Checkpoint Endpoint (2024+) ──► Current SSZ format (Deneb+)
+                                      │
+                                      ▼
+Old Lighthouse v4.6.0 ──────► Expects pre-Deneb SSZ format
+                                      │
+                                      ▼
+                              ❌ FORMAT MISMATCH
+```
+
+No public source of historical BeaconState data in old SSZ formats exists. ERA archive files preserve historical data but still require a compatible consensus client to read them.
+
+### The Solution: Bypass Consensus Entirely
+
+RLP export/import elegantly sidesteps this entire problem:
+
+1. **Modern stack syncs normally**: `geth-v1-16-7` + `lighthouse-v8-0-1` sync mainnet with full consensus
+2. **Export blocks as raw data**: `geth export` writes RLP-encoded blocks to a file
+3. **Import into legacy client**: `geth import` loads blocks directly, no consensus required
+4. **Legacy chain syncs via P2P**: v1.10.8 and older sync from v1.11.6 using pre-Merge P2P protocols
+
+```
+Modern EL+CL          RLP Export           Legacy EL (no CL)
+┌─────────────┐       ┌─────────┐         ┌─────────────┐
+│ geth v1.16.7│──────►│ blocks  │────────►│ geth v1.11.6│
+│ lighthouse  │       │ 0..1.9M │         │ (standalone)│
+└─────────────┘       └─────────┘         └─────────────┘
+       │                                         │
+   Full Merge                              No consensus
+   consensus                               client needed
+```
+
+The offline transfer treats blocks as pure historical data rather than requiring live consensus validation. This is the **only viable approach** given the current state of Ethereum tooling.
 
 ## Static peering (no discovery for older nodes)
 

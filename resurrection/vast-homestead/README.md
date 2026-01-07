@@ -1,117 +1,166 @@
 # Vast.ai Homestead Chain Extender (from block 1,919,999)
 
-This folder provides a **single-container** chain extension setup intended for **Vast.ai**:
+This folder provides a **docker-compose** setup for crashing Homestead-era difficulty on **Vast.ai** GPU instances:
 
-- `geth` **v1.3.6** (Homestead-era)
-- a **user-supplied GPU miner** command pointed at geth's **getwork** API (`eth_getWork` / `eth_submitWork`)
+- `geth` **v1.3.6** (Homestead-era) with `libfaketime` for timestamp manipulation
+- `ethminer` (Genoil) for GPU mining via getwork API
 
-This is meant to extend a **pre-DAO** chain tip at **1,919,999** (the default cutoff used by the bridge stack in [`chain-of-geths/docker-compose.yml`](chain-of-geths/docker-compose.yml:49)).
+## Goal
 
-## What you provide
+Reduce difficulty from **~18 trillion** to **~50 million** (CPU-mineable) by mining ~259 blocks with manipulated timestamps (20-minute gaps trigger maximum difficulty reduction per EIP-2).
 
-You said you'll have a tarball containing the geth datadir.
+## Time & Cost Estimates
 
-## Deterministic identity + miner account (generated-files)
+| GPU Config | Hashrate | Time | Cost |
+|------------|----------|------|------|
+| 1x RTX 3090 | 120 MH/s | ~36 days | ~$140 |
+| 4x RTX 3090 | 480 MH/s | ~9 days | ~$130 |
+| **8x RTX 3090** | **960 MH/s** | **~4.5 days** | **~$130** |
 
-Run [`resurrection/vast-homestead/generate-identity.sh`](resurrection/vast-homestead/generate-identity.sh:1).
+Recommendation: **8x RTX 3090** ($1.12/hr on Vast.ai) for fastest completion.
 
-### Config via `.env`
+## How It Works
 
-Yes: put `IDENTITY_SEED=...` in `resurrection/vast-homestead/.env`.
+### The Difficulty Crash Algorithm (EIP-2)
 
-- `docker compose` automatically reads `.env` from the same directory as [`resurrection/vast-homestead/docker-compose.yml`](resurrection/vast-homestead/docker-compose.yml:1).
-- [`resurrection/vast-homestead/generate-identity.sh`](resurrection/vast-homestead/generate-identity.sh:1) will also auto-create and source `.env` (copied from `.env.example`) so the same config drives both identity generation and runtime.
+```
+adjustment = max(1 - (timestamp_delta // 10), -99)
+new_difficulty = parent_difficulty + (parent_difficulty // 2048) * adjustment
+```
 
-Template: [`resurrection/vast-homestead/.env.example`](resurrection/vast-homestead/.env.example:1).
+With a 20-minute (1200s) timestamp gap:
+- `adjustment = max(1 - 120, -99) = -99`
+- Each block reduces difficulty by ~4.83%
+- ~259 blocks to crash from 18T to 50M
 
-This creates a `generated-files/` tree containing:
-- `generated-files/data/v1.3.6/nodekey` (stable node identity)
-- `generated-files/data/v1.3.6/keystore/*` (miner account)
-- `generated-files/miner-password.txt` (used to unlock the miner account)
-- `generated-files/miner-address.txt` (mining coinbase)
+### Timestamp Manipulation
 
-You can override determinism inputs with:
-- `IDENTITY_SEED=...` (changes nodekey + miner key)
-- `MINER_PASSWORD=...` (changes keystore encryption password)
+Instead of waiting 20 minutes between blocks, we use `libfaketime` to lie about the system time. Geth uses the system clock to propose block timestamps, so:
 
-Example:
+1. Read latest block timestamp from chain
+2. Set fake time to `latest_timestamp + 1200s`
+3. Mine one block (geth proposes timestamp = fake "now")
+4. Repeat
+
+This is handled automatically by `geth_time_stepper.py`.
+
+## Prerequisites
+
+1. **Chaindata tarball** (~27GB) exported from chain-of-geths v1.3.6 node at block 1,919,999
+
+## Setup
+
+### 1. Generate Deterministic Identity
 
 ```bash
 cd resurrection/vast-homestead
+./generate-identity.sh
+```
+
+This creates `generated-files/` with:
+- `data/v1.3.6/nodekey` (stable node identity)
+- `data/v1.3.6/keystore/*` (miner account)
+- `miner-password.txt` (unlock password)
+- `miner-address.txt` (mining coinbase)
+
+Override with environment variables:
+```bash
 IDENTITY_SEED='my-homestead-net-1' MINER_PASSWORD='dev' ./generate-identity.sh
 ```
 
-### Expected tar layout
+### 2. Prepare Chaindata
 
-The container extracts the tar into `/data` if `/data` is empty.
+Place chaindata tarball at `./generated-files/input/chaindata.tar.gz` or set `CHAIN_DATA_TAR` in `.env`.
 
-For `geth` v1.3.6, the simplest working layout is:
-
+Expected tar layout:
 ```
 chaindata/
 dapp/
 keystore/   (optional)
 nodekey     (optional)
-static-nodes.json (optional)
-...
 ```
 
-If your tar has an extra top-level directory (e.g. `v1.3.6/chaindata/...`), the entrypoint will try to unwrap it.
+## Mining Software
 
-## Miner note (why we don’t ship one in the image)
+The setup includes **Genoil's cpp-ethereum ethminer** in a separate container:
+- Build stage: Ubuntu 14.04 (2015-era toolchain)
+- Runtime: Modern CUDA runtime
+- Uses getwork RPC API (`eth_getWork` / `eth_submitWork`)
 
-The classic open-source Ethash miner (`ethminer`) is archived and its build relies on Hunter downloading Boost from Bintray (dead), so baking a portable CUDA miner into this repo is fragile.
+See: `docker-compose.yml` and `miner-genoil/Dockerfile`.
 
-Instead, this container runs geth and executes whatever miner you provide via `MINER_CMD` (mounted into the container).
+## Vast.ai Deployment
 
-If you prefer, there is also a **second container** that builds and runs **Genoil’s cpp-ethereum ethminer**.
+### Quick Start
 
-- Build stage: **Ubuntu 14.04** (2015-era toolchain expectation)
-- Runtime stage: modern CUDA runtime
+```bash
+# 1. Search for 8x RTX 3090 instances
+vastai search offers 'num_gpus=8 gpu_name=RTX_3090 inet_down>100' -o 'dph'
 
-See: [`resurrection/vast-homestead/docker-compose.yml`](resurrection/vast-homestead/docker-compose.yml:1) and [`resurrection/vast-homestead/miner-genoil/Dockerfile`](resurrection/vast-homestead/miner-genoil/Dockerfile:1).
+# 2. Create instance
+vastai create instance OFFER_ID --image nvidia/cuda:11.8.0-devel-ubuntu22.04
 
-## Running on Vast.ai (typical workflow)
+# 3. Get SSH details
+vastai show instance INSTANCE_ID
 
-1. Run [`resurrection/vast-homestead/generate-identity.sh`](resurrection/vast-homestead/generate-identity.sh:1).
-2. Put your chain tarball at `./generated-files/input/chaindata.tar`.
-3. Build and run with docker-compose (recommended):
+# 4. Upload chaindata (~27GB, ~6-7 hours)
+rsync -avzP chaindata.tar.gz root@sshX.vast.ai:/root/ -e "ssh -p PORT"
+
+# 5. Upload this folder
+rsync -avzP resurrection/vast-homestead/ root@sshX.vast.ai:/root/vast-homestead/ -e "ssh -p PORT"
+
+# 6. Start mining
+ssh -p PORT root@sshX.vast.ai "cd /root/vast-homestead && docker compose up --build -d"
+```
+
+### Automation Script
+
+Use `overnight-mining-automation.sh` for hands-off operation:
+- Handles chaindata upload
+- Starts docker-compose
+- Monitors progress
+- Logs to `overnight-mining.log`
+
+### Monitoring
+
+```bash
+# Watch geth logs
+ssh -p PORT root@sshX.vast.ai "docker logs -f vast-homestead-geth"
+
+# Check current block number
+ssh -p PORT root@sshX.vast.ai 'curl -s -X POST -H "Content-Type: application/json" \
+  --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" \
+  http://localhost:8545'
+
+# Check difficulty
+ssh -p PORT root@sshX.vast.ai 'curl -s -X POST -H "Content-Type: application/json" \
+  --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"latest\",false],\"id\":1}" \
+  http://localhost:8545 | jq .result.difficulty'
+```
+
+## Local Testing
 
 ```bash
 docker compose up --build
 ```
 
-Security note: do **not** expose `8545` publicly. If you need remote access, use an SSH tunnel.
+Starts:
+- `vast-homestead-geth` - Geth v1.3.6 with libfaketime
+- `vast-homestead-genoil-ethminer` - GPU miner
 
-## Local test via docker-compose
+Security: Do **not** expose port 8545 publicly. Use SSH tunnels for remote access.
 
-Drop your tar at `./generated-files/input/chaindata.tar` and run:
+## Key Files
 
-```bash
-docker compose up --build
-```
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Main orchestration |
+| `entrypoint.sh` | Geth container startup |
+| `geth_time_stepper.py` | Advances fake time after each block |
+| `mining_controller.py` | Alternative pause-based time control |
+| `generate-identity.sh` | Creates deterministic node/miner keys |
+| `overnight-mining-automation.sh` | Hands-off Vast.ai deployment |
 
-This will start:
-- `geth` (v1.3.6) as `vast-homestead-geth`
-- `genoil-ethminer` as `vast-homestead-genoil-ethminer`
+## Why Geth v1.3.6?
 
-## Timestamp strategy (no waiting)
-
-You said you don’t want to actually wait 20 minutes between blocks. The default setup instead **lies about time** with a per-block step:
-
-- On startup it reads the **latest block timestamp** from your imported datadir.
-- It then sets fake time to **(latest_timestamp + 1200 seconds)** and mines **exactly one block**.
-- After the block is mined, it restarts geth with fake time set to **(new_latest_timestamp + 1200 seconds)**.
-
-This produces **~20 minutes of timestamp delta per mined block** without real waiting.
-
-Default config is in [`geth.environment`](resurrection/vast-homestead/docker-compose.yml:1) and implemented by:
-- [`resurrection/vast-homestead/entrypoint.sh`](resurrection/vast-homestead/entrypoint.sh:1)
-- [`resurrection/vast-homestead/geth_time_stepper.py`](resurrection/vast-homestead/geth_time_stepper.py:1)
-
-Notes:
-- If `libfaketime` doesn’t work with the Go 1.6 geth binary on a given host, you can fall back to the miner-side pause controller (`PAUSE_BETWEEN_BLOCKS_SECONDS`) using [`resurrection/vast-homestead/mining_controller.py`](resurrection/vast-homestead/mining_controller.py:1).
-
-## Why geth v1.3.6?
-
-The chain-of-geths bridge includes `geth v1.3.6` as the Homestead-era endpoint (see [`chain-of-geths/README.md`](chain-of-geths/README.md:76)). This setup is intentionally isolated (`--nodiscover`, `--maxpeers 0`) so you don't accidentally join real mainnet while mining a historical fork.
+The chain-of-geths bridge uses `geth v1.3.6` as the Homestead-era endpoint. This setup is intentionally isolated (`--nodiscover`, `--maxpeers 0`) to prevent accidentally joining mainnet while mining a historical fork.

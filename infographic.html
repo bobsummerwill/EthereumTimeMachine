@@ -15,48 +15,48 @@
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             color: #e8e8e8;
             min-height: 100vh;
-            padding: 40px;
-            line-height: 1.4;
+            padding: 20px;
+            line-height: 1.3;
         }
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
         }
         .header {
             text-align: center;
-            padding: 40px 20px;
+            padding: 20px 15px;
             background: rgba(0, 0, 0, 0.3);
             border: 2px solid #00d4ff;
-            border-radius: 10px;
-            margin-bottom: 30px;
+            border-radius: 8px;
+            margin-bottom: 15px;
         }
         .header h1 {
-            font-size: 2.5em;
+            font-size: 2.8em;
             color: #00d4ff;
             text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
-            margin-bottom: 10px;
+            margin-bottom: 5px;
         }
         .header .subtitle {
-            font-size: 1.2em;
+            font-size: 1.3em;
             color: #888;
         }
         .header .tagline {
-            font-size: 1em;
+            font-size: 1.1em;
             color: #ffcc00;
-            margin-top: 15px;
+            margin-top: 8px;
             font-style: italic;
         }
         .columns {
             display: flex;
-            gap: 30px;
-            margin-bottom: 30px;
+            gap: 15px;
+            margin-bottom: 15px;
         }
         .column {
             flex: 1;
             background: rgba(0, 0, 0, 0.3);
             border: 2px solid #444;
-            border-radius: 10px;
-            padding: 25px;
+            border-radius: 8px;
+            padding: 15px;
         }
         .column.left {
             border-color: #00ff88;
@@ -65,8 +65,8 @@
             border-color: #ff6b35;
         }
         .column h2 {
-            font-size: 1.4em;
-            margin-bottom: 5px;
+            font-size: 1.6em;
+            margin-bottom: 3px;
         }
         .column.left h2 {
             color: #00ff88;
@@ -75,25 +75,28 @@
             color: #ff6b35;
         }
         .column h3 {
-            font-size: 0.9em;
+            font-size: 1em;
             color: #888;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
             font-weight: normal;
         }
         .section-title {
             color: #ffcc00;
-            font-size: 1em;
-            margin: 20px 0 10px 0;
+            font-size: 1.1em;
+            margin: 12px 0 6px 0;
             border-bottom: 1px solid #444;
-            padding-bottom: 5px;
+            padding-bottom: 3px;
         }
         .diagram {
             background: rgba(0, 0, 0, 0.4);
-            padding: 15px;
-            border-radius: 5px;
+            padding: 10px;
+            border-radius: 4px;
             overflow-x: auto;
-            font-size: 0.85em;
-            margin: 10px 0;
+            font-size: 1em;
+            margin: 6px 0;
+        }
+        .diagram.large {
+            font-size: 1.1em;
         }
         .diagram pre {
             margin: 0;
@@ -106,17 +109,17 @@
             border-left: 3px solid #ff6b35;
         }
         p {
-            margin: 10px 0;
-            font-size: 0.9em;
+            margin: 6px 0;
+            font-size: 1em;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 10px 0;
-            font-size: 0.85em;
+            margin: 6px 0;
+            font-size: 0.95em;
         }
         th, td {
-            padding: 8px 10px;
+            padding: 5px 8px;
             text-align: left;
             border: 1px solid #444;
         }
@@ -129,11 +132,11 @@
         }
         .checklist {
             list-style: none;
-            margin: 10px 0;
-            font-size: 0.9em;
+            margin: 6px 0;
+            font-size: 1em;
         }
         .checklist li {
-            padding: 5px 0;
+            padding: 3px 0;
         }
         .checklist li::before {
             content: "[x] ";
@@ -141,15 +144,15 @@
         }
         .footer {
             text-align: center;
-            padding: 30px 20px;
+            padding: 15px;
             background: rgba(0, 0, 0, 0.3);
             border: 2px solid #9d4edd;
-            border-radius: 10px;
+            border-radius: 8px;
         }
         .footer h2 {
             color: #9d4edd;
-            font-size: 1.3em;
-            margin-bottom: 20px;
+            font-size: 1.5em;
+            margin-bottom: 10px;
         }
         .footer .diagram {
             border-left: 3px solid #9d4edd;
@@ -182,7 +185,7 @@
                 <div class="section-title">THE PROBLEM</div>
                 <p>Different Ethereum eras speak different "languages" (eth/* protocols). Modern clients can't talk to ancient ones directly.</p>
 
-                <div class="diagram"><pre>  eth/68-69 (2024)  <span class="highlight-orange">&lt;--X--&gt;</span>  eth/60-61 (2015)
+                <div class="diagram"><pre>  eth/68-69 (2025)  <span class="highlight-orange">&lt;--X--&gt;</span>  eth/60-61 (2015)
         |                          |
     Modern Geth              Frontier Geth
         |                          |
@@ -195,25 +198,24 @@
 ========================================
 
 <span class="highlight-blue">+------------------+  +------------------+</span>
-<span class="highlight-blue">|  LIGHTHOUSE      |  |  GETH v1.16.7    |</span>
+<span class="highlight-blue">|  Lighthouse      |  |  Geth v1.16.7    |</span>
 <span class="highlight-blue">|  v8.0.1          |&lt;&gt;|  (Modern Head)   |</span>
 <span class="highlight-blue">|  Consensus       |  |  eth/68-69       |</span>
-<span class="highlight-blue">|  Client          |  |  Port: 8545      |</span>
 <span class="highlight-blue">+------------------+  +--------+---------+</span>
                                |
-              <span class="highlight-yellow">RLP Export/Import (offline)</span>
-              <span class="highlight-yellow">Blocks 0 -&gt; 1,919,999</span>
-                               |
-                      +--------v---------+
-                      |  GETH v1.11.6    |
-                      |  (Bridge Node)   |
-                      |  eth/66-68       |
-                      +--------+---------+
-                               |
+              <span class="highlight-yellow">RLP Export/Import (offline)</span>    <span class="highlight-orange">WHY OFFLINE?</span>
+              <span class="highlight-yellow">Blocks 0 -&gt; 1,919,999</span>         Post-Merge Geth needs
+                               |              a consensus client.
+                      +--------v---------+    But old Lighthouse/Prysm
+                      |  Geth v1.11.6    |    can't checkpoint-sync:
+                      |  (Bridge Node)   |    SSZ format changed via
+                      |  eth/66-68       |    Altair→Bellatrix→Capella
+                      +--------+---------+    →Deneb. No old checkpoint
+                               |              data exists anywhere.
                         <span class="highlight-green">P2P eth/66</span>
                                |
                       +--------v---------+
-                      |  GETH v1.10.8    |
+                      |  Geth v1.10.8    |
                       |  (Bridge Node)   |
                       |  eth/65-66       |
                       +--------+---------+
@@ -221,26 +223,26 @@
                         <span class="highlight-green">P2P eth/65</span>
                                |
                       +--------v---------+
-                      |  GETH v1.9.25    |
+                      |  Geth v1.9.25    |
                       |  (Bridge Node)   |
                       |  eth/63-65       |
                       +--------+---------+
                                |
                         <span class="highlight-green">P2P eth/63</span>
                                |
-  <span class="highlight-orange">+---------------+</span>   +--------v---------+
-  <span class="highlight-orange">| RESURRECTION  |</span>&lt;--|  GETH v1.3.6     |
-  <span class="highlight-orange">| TARGET        |</span>   |  (Homestead Era) |
-  <span class="highlight-orange">| Block 1.15M+  |</span>   |  eth/61-63       |
-  <span class="highlight-orange">+---------------+</span>   +--------+---------+
+                      +--------v---------+   <span class="highlight-orange">+---------------+</span>
+                      |  Geth v1.3.6     |--&gt;<span class="highlight-orange">| RESURRECTION  |</span>
+                      |  (Homestead Era) |   <span class="highlight-orange">| TARGET        |</span>
+                      |  eth/61-63       |   <span class="highlight-orange">| Block 1.92M+  |</span>
+                      +--------+---------+   <span class="highlight-orange">+---------------+</span>
                                |
                         <span class="highlight-green">P2P eth/61</span>
                                |
-  <span class="highlight-orange">+---------------+</span>   +--------v---------+
-  <span class="highlight-orange">| RESURRECTION  |</span>&lt;--|  GETH v1.0.2     |
-  <span class="highlight-orange">| TARGET        |</span>   |  (Frontier Tail) |
-  <span class="highlight-orange">| Block 200K+   |</span>   |  eth/60-61       |
-  <span class="highlight-orange">+---------------+</span>   +------------------+</pre></div>
+                      +--------v---------+   <span class="highlight-orange">+---------------+</span>
+                      |  Geth v1.0.2     |--&gt;<span class="highlight-orange">| RESURRECTION  |</span>
+                      |  (Frontier Tail) |   <span class="highlight-orange">| TARGET        |</span>
+                      |  eth/60-61       |   <span class="highlight-orange">| Block 1.15M+  |</span>
+                      +------------------+   <span class="highlight-orange">+---------------+</span></pre></div>
             </div>
 
             <!-- RIGHT COLUMN: RESURRECTION PROJECT -->
@@ -255,7 +257,7 @@
                 <table>
                     <tr>
                         <th></th>
-                        <th>HOMESTEAD</th>
+                        <th><span class="highlight-green">HOMESTEAD</span></th>
                         <th>FRONTIER</th>
                     </tr>
                     <tr>
@@ -265,90 +267,60 @@
                     </tr>
                     <tr>
                         <td>Block</td>
-                        <td>1,150,000+</td>
-                        <td>200,000+</td>
+                        <td>1,919,999+</td>
+                        <td>1,149,999+</td>
                     </tr>
                     <tr>
                         <td>Start Diff</td>
-                        <td>~25 trillion</td>
-                        <td>~1.7 billion</td>
+                        <td>~18 trillion</td>
+                        <td>~17.5 trillion</td>
                     </tr>
                     <tr>
-                        <td>Target</td>
-                        <td>&lt; 1 trillion</td>
-                        <td>&lt; 1 trillion</td>
+                        <td>Reduction/block</td>
+                        <td><span class="highlight-green">~4.83%</span></td>
+                        <td><span class="highlight-orange">~0.049%</span></td>
                     </tr>
                     <tr>
-                        <td>Timeline</td>
-                        <td>2-4 weeks</td>
-                        <td>4-6 weeks</td>
+                        <td>Blocks needed</td>
+                        <td><span class="highlight-green">~259</span></td>
+                        <td><span class="highlight-orange">~25,600</span></td>
+                    </tr>
+                    <tr>
+                        <td>Time (8x GPU)</td>
+                        <td><span class="highlight-green">~4.5 days</span></td>
+                        <td><span class="highlight-orange">~4-6 months</span></td>
+                    </tr>
+                    <tr>
+                        <td>Cost</td>
+                        <td><span class="highlight-green">~$130</span></td>
+                        <td><span class="highlight-orange">~$3,000+</span></td>
                     </tr>
                 </table>
+                <p style="color: #888; margin-top: 6px;">
+                    Frontier lacks EIP-2's -99 multiplier, making it <span class="highlight-orange">99x slower</span> to crash difficulty.
+                </p>
 
-                <div class="section-title">DIFFICULTY ALGORITHMS</div>
-                <div class="diagram"><pre><span class="highlight-blue">FRONTIER (Binary)</span>        <span class="highlight-orange">HOMESTEAD (Proportional)</span>
-=================        =======================
+                <div class="section-title">DIFFICULTY ALGORITHM (HOMESTEAD EIP-2)</div>
+                <div class="diagram large"><pre><span class="highlight-orange">adjustment = max(1 - (timestamp_delta // 10), -99)</span>
+<span class="highlight-orange">new_diff = parent_diff + (parent_diff // 2048) * adjustment</span>
 
-if time &lt; 13s:           adj = max(1 - delta/10, <span class="highlight-orange">-99</span>)
-  diff += 0.05%          diff += (diff/2048) * adj
-else:
-  diff -= 0.05%          <span class="highlight-yellow">Can reduce up to -99x base!</span>
+With 20-minute (1200s) timestamp gaps:
+  adjustment = max(1 - 120, -99) = <span class="highlight-yellow">-99</span>
+  Each block reduces difficulty by <span class="highlight-yellow">~4.83%</span>
 
-Difficulty               Difficulty
-    ^                        ^
-    |   /----____            |   |
-    |  /         \__         |   |\
-    | /             \        |   | \_____
-    +---------------&gt;        +------------&gt;
-       <span class="highlight-blue">Time (slow)</span>              <span class="highlight-orange">Time (fast)</span></pre></div>
+<span class="highlight-green">libfaketime</span> lies about system time so geth proposes
+blocks with 20-minute gaps <span class="highlight-yellow">without waiting</span>
 
-                <div class="section-title">MINING STRATEGY: HOMESTEAD</div>
-                <table>
-                    <tr>
-                        <th>Phase</th>
-                        <th>Duration</th>
-                        <th>Action</th>
-                    </tr>
-                    <tr>
-                        <td>1. Crash</td>
-                        <td>1-2 days</td>
-                        <td>4-8 GPUs, max timestamp delta</td>
-                    </tr>
-                    <tr>
-                        <td>2. CPU</td>
-                        <td>1-2 weeks</td>
-                        <td>Transition to CPU mining</td>
-                    </tr>
-                    <tr>
-                        <td>3. Stable</td>
-                        <td>1 week</td>
-                        <td>Verify EIPs, set up peers</td>
-                    </tr>
-                </table>
-
-                <div class="section-title">MINING STRATEGY: FRONTIER</div>
-                <table>
-                    <tr>
-                        <th>Phase</th>
-                        <th>Duration</th>
-                        <th>Action</th>
-                    </tr>
-                    <tr>
-                        <td>1. GPU Grind</td>
-                        <td>4-6 weeks</td>
-                        <td>Sustained GPU mining (~0.05%/block)</td>
-                    </tr>
-                    <tr>
-                        <td>2. Transition</td>
-                        <td>1-2 weeks</td>
-                        <td>Mixed GPU/CPU as diff drops</td>
-                    </tr>
-                    <tr>
-                        <td>3. CPU Era</td>
-                        <td>Ongoing</td>
-                        <td>Pure CPU mining achieved</td>
-                    </tr>
-                </table>
+Difficulty
+    ^
+18T |###
+    |  ###
+    |    ###
+    |      ####
+    |         #####
+50M |             ###########___
+    +---------------------------&gt;
+        ~259 blocks (~4.5 days)</pre></div>
 
             </div>
         </div>
@@ -362,12 +334,15 @@ Difficulty               Difficulty
   +----------------+          +----------------+         +----------------+
   |  Synced Geth   |  Mining  |  Extended      |   IPC   |  Mist Wallet   |
   |  v1.3.6        | <span class="highlight-yellow">-------&gt;</span> |  Homestead     | <span class="highlight-yellow">&lt;-----&gt;</span> |  v0.7.4        |
-  |  Block 1.15M   |          |  Block 1.15M+  |         |  Authentic UX  |
+  |  Block 1.92M   |          |  Block 1.92M+  |         |  Authentic UX  |
   +----------------+          +----------------+         +----------------+
 
        <span class="highlight-green">Infrastructure</span>    +    <span class="highlight-orange">Chain Extension</span>    +    <span class="highlight-blue">User Experience</span>
                          =
-                              <span class="highlight-purple">COMPLETE TIME MACHINE</span></pre></div>
+                              <span class="highlight-purple">COMPLETE TIME MACHINE</span>
+
+<span class="highlight-yellow">Homestead resurrection:</span> ~4.5 days with 8x RTX 3090 (~$130 on Vast.ai)
+<span class="highlight-yellow">Frontier resurrection:</span> ~4-6 months (99x slower due to simpler algorithm)</pre></div>
         </div>
     </div>
 </body>
