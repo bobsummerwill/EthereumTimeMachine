@@ -45,7 +45,7 @@ ssh_cmd() {
 
 check_upload_complete() {
   # Check if rsync is still running locally (uploading chaindata)
-  if pgrep -f "rsync.*Geth-1.3.6-data.*ssh4.vast.ai" > /dev/null 2>&1; then
+  if pgrep -f "rsync.*chaindata.*vast.ai" > /dev/null 2>&1; then
     return 1  # Still uploading
   fi
 
@@ -79,7 +79,7 @@ wait_for_upload() {
 
     # Check if rsync is running
     local rsync_running="no"
-    if pgrep -f "rsync.*Geth-1.3.6-data.*ssh4.vast.ai" > /dev/null 2>&1; then
+    if pgrep -f "rsync.*chaindata.*vast.ai" > /dev/null 2>&1; then
       rsync_running="yes"
     fi
 
