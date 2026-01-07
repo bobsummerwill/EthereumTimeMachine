@@ -48,11 +48,11 @@
         }
         .columns {
             display: flex;
+            flex-direction: column;
             gap: 15px;
             margin-bottom: 15px;
         }
         .column {
-            flex: 1;
             background: rgba(0, 0, 0, 0.3);
             border: 2px solid #444;
             border-radius: 8px;
@@ -92,11 +92,11 @@
             padding: 10px;
             border-radius: 4px;
             overflow-x: auto;
-            font-size: 1em;
+            font-size: 1.2em;
             margin: 6px 0;
         }
         .diagram.large {
-            font-size: 1.1em;
+            font-size: 1.3em;
         }
         .diagram pre {
             margin: 0;
@@ -171,8 +171,8 @@
         <!-- HEADER -->
         <div class="header">
             <h1>ETHEREUM TIME MACHINE</h1>
-            <div class="subtitle">Bridging Ethereum's Past, Present, and Future</div>
-            <div class="tagline">"Travel back in time to experience authentic Ethereum history"</div>
+            <div class="subtitle">Experience Ethereum's past on contemporary hardware</div>
+            <div class="tagline">Original Geth binaries, original Mist wallet, original chain — all running live</div>
         </div>
 
         <!-- TWO COLUMNS -->
@@ -194,55 +194,17 @@
                 <div class="section-title">THE SOLUTION: Protocol Bridge Chain</div>
                 <p>Chain adjacent versions that share at least ONE common protocol. Each node translates between eras like a relay chain.</p>
 
-                <div class="diagram"><pre><span class="highlight-yellow">         THE CHAIN OF GETHS</span>
-========================================
+                <div class="diagram"><pre><span class="highlight-yellow">                                                                              CHAIN OF GETHS</span>
+<span class="highlight-yellow">===========================================================================================================================================================================</span>
 
-<span class="highlight-blue">+------------------+  +------------------+</span>
-<span class="highlight-blue">|  Lighthouse      |  |  Geth v1.16.7    |</span>
-<span class="highlight-blue">|  v8.0.1          |&lt;&gt;|  (Modern Head)   |</span>
-<span class="highlight-blue">|  Consensus       |  |  eth/68-69       |</span>
-<span class="highlight-blue">+------------------+  +--------+---------+</span>
-                               |
-              <span class="highlight-yellow">RLP Export/Import (offline)</span>    <span class="highlight-orange">WHY OFFLINE?</span>
-              <span class="highlight-yellow">Blocks 0 -&gt; 1,919,999</span>         Post-Merge Geth needs
-                               |              a consensus client.
-                      +--------v---------+    But old Lighthouse/Prysm
-                      |  Geth v1.11.6    |    can't checkpoint-sync:
-                      |  (Bridge Node)   |    SSZ format changed via
-                      |  eth/66-68       |    Altair→Bellatrix→Capella
-                      +--------+---------+    →Deneb. No old checkpoint
-                               |              data exists anywhere.
-                        <span class="highlight-green">P2P eth/66</span>
-                               |
-                      +--------v---------+
-                      |  Geth v1.10.8    |
-                      |  (Bridge Node)   |
-                      |  eth/65-66       |
-                      +--------+---------+
-                               |
-                        <span class="highlight-green">P2P eth/65</span>
-                               |
-                      +--------v---------+
-                      |  Geth v1.9.25    |
-                      |  (Bridge Node)   |
-                      |  eth/63-65       |
-                      +--------+---------+
-                               |
-                        <span class="highlight-green">P2P eth/63</span>
-                               |
-                      +--------v---------+   <span class="highlight-orange">+---------------+</span>
-                      |  Geth v1.3.6     |--&gt;<span class="highlight-orange">| RESURRECTION  |</span>
-                      |  (Homestead Era) |   <span class="highlight-orange">| TARGET        |</span>
-                      |  eth/61-63       |   <span class="highlight-orange">| Block 1.92M+  |</span>
-                      +--------+---------+   <span class="highlight-orange">+---------------+</span>
-                               |
-                        <span class="highlight-green">P2P eth/61</span>
-                               |
-                      +--------v---------+   <span class="highlight-orange">+---------------+</span>
-                      |  Geth v1.0.2     |--&gt;<span class="highlight-orange">| RESURRECTION  |</span>
-                      |  (Frontier Tail) |   <span class="highlight-orange">| TARGET        |</span>
-                      |  eth/60-61       |   <span class="highlight-orange">| Block 1.15M+  |</span>
-                      +------------------+   <span class="highlight-orange">+---------------+</span></pre></div>
+<span class="highlight-blue">+----------------+    +----------------+</span>       +----------------+         +----------------+         +----------------+         +----------------+         +----------------+
+<span class="highlight-blue">|  Lighthouse    |    |  Geth v1.16.7  |</span>       |  Geth v1.11.6  |         |  Geth v1.10.8  |         |  Geth v1.9.25  |         |  Geth v1.3.6   |         |  Geth v1.0.2   |
+<span class="highlight-blue">|  Nov 2025      |&lt;--&gt;|  Nov 2025      |</span><span class="highlight-yellow">--RLP-&gt;</span>|  Apr 2023      |<span class="highlight-green">-eth/66-&gt;</span>|  Sep 2021      |<span class="highlight-green">-eth/65-&gt;</span>|  Dec 2020      |<span class="highlight-green">-eth/63-&gt;</span>|  Apr 2016      |<span class="highlight-green">-eth/61-&gt;</span>|  Aug 2015      |
+<span class="highlight-blue">|  Consensus     |    |  eth/68-69     |</span>       |  eth/66-68     |         |  eth/65-66     |         |  eth/63-65     |         |  eth/61-63     |         |  eth/60-61     |
+<span class="highlight-blue">+----------------+    +----------------+</span>       +----------------+         +----------------+         +----------------+         +-------+--------+         +-------+--------+
+                                           |                                                                                            |                          |
+                              <span class="highlight-yellow">RLP Export/Import (offline)</span>                                                                         <span class="highlight-orange">RESURRECTION</span>               <span class="highlight-orange">RESURRECTION</span>
+                   <span class="highlight-yellow">Post-Merge needs CL; old CL can't checkpoint-sync</span>                                                              <span class="highlight-orange">Block 1.92M+</span>               <span class="highlight-orange">Block 1.15M+</span></pre></div>
             </div>
 
             <!-- RIGHT COLUMN: RESURRECTION PROJECT -->
@@ -253,55 +215,58 @@
                 <div class="section-title">THE GOAL</div>
                 <p>Extend historical Ethereum chains BEYOND their original blocks. Reduce difficulty to CPU-mineable levels for educational testnets.</p>
 
-                <div class="section-title">TWO RESURRECTION OPTIONS</div>
-                <table>
-                    <tr>
-                        <th></th>
-                        <th><span class="highlight-green">HOMESTEAD</span></th>
-                        <th>FRONTIER</th>
-                    </tr>
-                    <tr>
-                        <td>Geth</td>
-                        <td>v1.3.6</td>
-                        <td>v1.0.3</td>
-                    </tr>
-                    <tr>
-                        <td>Block</td>
-                        <td>1,919,999+</td>
-                        <td>1,149,999+</td>
-                    </tr>
-                    <tr>
-                        <td>Start Diff</td>
-                        <td>~18 trillion</td>
-                        <td>~17.5 trillion</td>
-                    </tr>
-                    <tr>
-                        <td>Reduction/block</td>
-                        <td><span class="highlight-green">~4.83%</span></td>
-                        <td><span class="highlight-orange">~0.049%</span></td>
-                    </tr>
-                    <tr>
-                        <td>Blocks needed</td>
-                        <td><span class="highlight-green">~259</span></td>
-                        <td><span class="highlight-orange">~25,600</span></td>
-                    </tr>
-                    <tr>
-                        <td>Time (8x GPU)</td>
-                        <td><span class="highlight-green">~4.5 days</span></td>
-                        <td><span class="highlight-orange">~4-6 months</span></td>
-                    </tr>
-                    <tr>
-                        <td>Cost</td>
-                        <td><span class="highlight-green">~$130</span></td>
-                        <td><span class="highlight-orange">~$3,000+</span></td>
-                    </tr>
-                </table>
-                <p style="color: #888; margin-top: 6px;">
-                    Frontier lacks EIP-2's -99 multiplier, making it <span class="highlight-orange">99x slower</span> to crash difficulty.
-                </p>
-
-                <div class="section-title">DIFFICULTY ALGORITHM (HOMESTEAD EIP-2)</div>
-                <div class="diagram large"><pre><span class="highlight-orange">adjustment = max(1 - (timestamp_delta // 10), -99)</span>
+                <div style="display: flex; gap: 15px;">
+                    <div style="flex: 1;">
+                        <div class="section-title">TWO RESURRECTION OPTIONS</div>
+                        <table>
+                            <tr>
+                                <th></th>
+                                <th><span class="highlight-green">HOMESTEAD</span></th>
+                                <th>FRONTIER</th>
+                            </tr>
+                            <tr>
+                                <td>Geth</td>
+                                <td>v1.3.6</td>
+                                <td>v1.0.3</td>
+                            </tr>
+                            <tr>
+                                <td>Block</td>
+                                <td>1,919,999+</td>
+                                <td>1,149,999+</td>
+                            </tr>
+                            <tr>
+                                <td>Start Diff</td>
+                                <td>~18 trillion</td>
+                                <td>~17.5 trillion</td>
+                            </tr>
+                            <tr>
+                                <td>Reduction/block</td>
+                                <td><span class="highlight-green">~4.83%</span></td>
+                                <td><span class="highlight-orange">~0.049%</span></td>
+                            </tr>
+                            <tr>
+                                <td>Blocks needed</td>
+                                <td><span class="highlight-green">~259</span></td>
+                                <td><span class="highlight-orange">~25,600</span></td>
+                            </tr>
+                            <tr>
+                                <td>Time (8x GPU)</td>
+                                <td><span class="highlight-green">~4.5 days</span></td>
+                                <td><span class="highlight-orange">~4-6 months</span></td>
+                            </tr>
+                            <tr>
+                                <td>Cost</td>
+                                <td><span class="highlight-green">~$130</span></td>
+                                <td><span class="highlight-orange">~$3,000+</span></td>
+                            </tr>
+                        </table>
+                        <p style="color: #888; margin-top: 6px;">
+                            Frontier lacks EIP-2's -99 multiplier, making it <span class="highlight-orange">99x slower</span> to crash difficulty.
+                        </p>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="section-title">DIFFICULTY ALGORITHM (HOMESTEAD EIP-2)</div>
+                        <div class="diagram large"><pre><span class="highlight-orange">adjustment = max(1 - (timestamp_delta // 10), -99)</span>
 <span class="highlight-orange">new_diff = parent_diff + (parent_diff // 2048) * adjustment</span>
 
 With 20-minute (1200s) timestamp gaps:
@@ -321,6 +286,8 @@ Difficulty
 50M |             ###########___
     +---------------------------&gt;
         ~259 blocks (~4.5 days)</pre></div>
+                    </div>
+                </div>
 
             </div>
         </div>
@@ -328,7 +295,14 @@ Difficulty
         <!-- FOOTER -->
         <div class="footer">
             <h2>HOW IT ALL FITS TOGETHER</h2>
-            <div class="diagram"><pre>   <span class="highlight-green">CHAIN OF GETHS</span>              <span class="highlight-orange">RESURRECTION</span>               <span class="highlight-blue">RUNNING MIST</span>
+            <div style="display: flex; align-items: center;">
+                <div style="flex: 1; display: flex; justify-content: center;">
+                    <div style="text-align: center;">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://github.com/bobsummerwill/EthereumTimeMachine&bgcolor=1a1a2e&color=00d4ff" alt="QR Code" style="border: 2px solid #00d4ff; border-radius: 4px;">
+                        <div style="font-size: 0.8em; color: #00d4ff; margin-top: 5px;">github.com/bobsummerwill/<br>EthereumTimeMachine</div>
+                    </div>
+                </div>
+                <div class="diagram" style="flex-shrink: 0;"><pre>   <span class="highlight-green">CHAIN OF GETHS</span>              <span class="highlight-orange">RESURRECTION</span>               <span class="highlight-blue">RUNNING MIST</span>
    ==============              ============               ============
 
   +----------------+          +----------------+         +----------------+
@@ -343,6 +317,13 @@ Difficulty
 
 <span class="highlight-yellow">Homestead resurrection:</span> ~4.5 days with 8x RTX 3090 (~$130 on Vast.ai)
 <span class="highlight-yellow">Frontier resurrection:</span> ~4-6 months (99x slower due to simpler algorithm)</pre></div>
+                <div style="flex: 1; display: flex; justify-content: center;">
+                    <div style="text-align: center;">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://github.com/bobsummerwill/EthereumTimeMachine&bgcolor=1a1a2e&color=00d4ff" alt="QR Code" style="border: 2px solid #00d4ff; border-radius: 4px;">
+                        <div style="font-size: 0.8em; color: #00d4ff; margin-top: 5px;">github.com/bobsummerwill/<br>EthereumTimeMachine</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </body>
