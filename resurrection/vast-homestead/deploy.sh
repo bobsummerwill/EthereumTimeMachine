@@ -31,6 +31,9 @@ GPU_NAME="RTX_3090"  # or RTX_4090
 MIN_GPU_RAM=20       # GB
 MAX_PRICE=1.50       # $/hr
 
+# SSH key for Vast.ai (default: ~/.ssh/vastai-deploy)
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/vastai-deploy}"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -160,7 +163,7 @@ cmd_deploy() {
   # Wait for SSH to be available
   log "Waiting for SSH to be ready..."
   for i in {1..30}; do
-    if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p "$port" "root@${host}" "echo ok" &>/dev/null; then
+    if ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p "$port" "root@${host}" "echo ok" &>/dev/null; then
       break
     fi
     echo -n "."
@@ -170,11 +173,11 @@ cmd_deploy() {
 
   # Copy the mining script
   log "Copying vast-mining.sh..."
-  scp -o StrictHostKeyChecking=no -P "$port" "${SCRIPT_DIR}/vast-mining.sh" "root@${host}:/root/"
+  scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -P "$port" "${SCRIPT_DIR}/vast-mining.sh" "root@${host}:/root/"
 
   # Make executable and start
   log "Starting mining script..."
-  ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s << 'EOF'
+  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s << 'EOF'
 chmod +x /root/vast-mining.sh
 
 # Create OpenCL ICD for NVIDIA (needed for GPU mining)
@@ -206,7 +209,7 @@ cmd_ssh() {
   port=$(echo "$ssh_info" | cut -d: -f2)
 
   log "Connecting to ${host}:${port}..."
-  ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}"
+  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}"
 }
 
 # Check mining status
@@ -220,7 +223,7 @@ cmd_status() {
   host=$(echo "$ssh_info" | cut -d: -f1)
   port=$(echo "$ssh_info" | cut -d: -f2)
 
-  ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s << 'EOF'
+  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s << 'EOF'
 echo "=== Process Status ==="
 ps aux | grep -E "geth|ethminer|vast-mining" | grep -v grep || echo "No mining processes found"
 
@@ -260,7 +263,7 @@ cmd_logs() {
   port=$(echo "$ssh_info" | cut -d: -f2)
 
   log "Tailing logs (Ctrl+C to stop)..."
-  ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" "tail -f /root/mining.log"
+  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}" "tail -f /root/mining.log"
 }
 
 # Destroy instance
