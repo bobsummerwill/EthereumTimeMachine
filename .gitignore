@@ -13,13 +13,17 @@ chain-of-geths/.env.*
 # Compiled python output
 *.pyc
 
+# Python virtual environments
+.venv/
+*/.venv/
+**/.venv/
+
 # OS cruft
 .DS_Store
 
 # Vast Homestead miner local artifacts
 resurrection/vast-homestead/generated-files/**
 resurrection/vast-homestead/.cache/**
-resurrection/vast-homestead/.venv/
 resurrection/vast-homestead/.ssh/
 resurrection/vast-homestead/__pycache__/
 resurrection/vast-homestead/*.log
