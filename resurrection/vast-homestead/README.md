@@ -138,6 +138,17 @@ ssh -p PORT root@sshX.vast.ai 'curl -s -X POST -H "Content-Type: application/jso
   http://localhost:8545 | jq .result.difficulty'
 ```
 
+### GPU Mining on Bare Metal (non-Docker)
+
+If you prefer to run the standalone `vast-mining.sh` on a Vast instance and mine directly with GPUs (no CPU mining):
+
+1. Build a current OpenCL-only ethminer (avoids CUDA crashes on Ampere): `./install-ethminer-opencl.sh`
+2. Start mining (external ethminer only):
+   ```bash
+   ./vast-mining.sh
+   ```
+   Logs: `mining.log` (geth/script) and `/root/ethminer.log` (ethminer).
+
 ## Local Testing
 
 ```bash
@@ -160,6 +171,8 @@ Security: Do **not** expose port 8545 publicly. Use SSH tunnels for remote acces
 | `mining_controller.py` | Alternative pause-based time control |
 | `generate-identity.sh` | Creates deterministic node/miner keys |
 | `overnight-mining-automation.sh` | Hands-off Vast.ai deployment |
+| `install-ethminer-opencl.sh` | Builds OpenCL-only ethminer for Ampere GPUs (Vast bare-metal) |
+| `vast-mining.sh` | Single-host Vast GPU script (GPU mining on by default via external ethminer) |
 
 ## Why Geth v1.3.6?
 

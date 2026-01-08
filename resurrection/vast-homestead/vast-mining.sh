@@ -9,12 +9,12 @@
 # 2. Syncs chaindata via P2P from chain-of-geths AWS node
 # 3. Disconnects peer at target block (prevents chain-of-geths from following)
 # 4. Starts geth with faketime (20-min gaps to crash difficulty)
-# 5. Starts mining with CPU (geth's internal miner)
+# 5. Starts external GPU mining via ethminer
 # 6. Monitors and restarts after each block with updated faketime
 #
 # PREREQUISITES:
 # - Fresh Vast.ai instance with Ubuntu 22.04 LTS
-# - GPUs (optional - script uses CPU mining by default for reliability)
+# - GPUs (required; external ethminer only)
 # - chain-of-geths running on AWS with public port 30311
 #
 # USAGE:
@@ -27,11 +27,10 @@
 #   tail -f /root/geth.log          # Geth output
 #
 # Environment variables (optional):
-#   P2P_ENODE       - enode URL for P2P sync (default: chain-of-geths v1.3.6)
-#   TARGET_BLOCK    - block to sync to before mining (default: 1919999)
-#   MINER_ADDRESS   - etherbase address for mining rewards
-#   MINER_KEY       - private key for miner address
-#   CPU_THREADS     - number of CPU mining threads (default: 8)
+#   P2P_ENODE     - enode URL for P2P sync (default: chain-of-geths v1.3.6)
+#   TARGET_BLOCK  - block to sync to before mining (default: 1919999)
+#   MINER_ADDRESS - etherbase address for mining rewards
+#   MINER_KEY     - private key for miner address
 
 set -euo pipefail
 
@@ -54,8 +53,9 @@ P2P_ENODE="${P2P_ENODE:-enode://a45ce9d6d92327f093d05602b30966ab1e0bf8dd4ae63f4b
 # Target block (last Homestead block before DAO fork)
 TARGET_BLOCK="${TARGET_BLOCK:-1919999}"
 
-# Mining config
-CPU_THREADS="${CPU_THREADS:-8}"
+# External GPU miner (required; fixed paths)
+ETHMINER_BIN="/root/ethminer-src/build/ethminer/ethminer"
+ETHMINER_LOG="/root/ethminer.log"
 
 # ============================================================================
 # Utility Functions
@@ -270,7 +270,7 @@ start_geth_with_faketime() {
   pkill -9 geth 2>/dev/null || true
   sleep 3
 
-  # Start geth with faketime and CPU mining
+  # Start geth with faketime (mining handled by external ethminer)
   export LD_PRELOAD=/usr/local/lib/faketime/libfaketime.so.1
   export FAKETIME="@$fake_date"
   export FAKETIME_NO_CACHE=1
@@ -279,7 +279,6 @@ start_geth_with_faketime() {
     --rpc --rpcaddr 0.0.0.0 --rpcport 8545 \
     --rpcapi "eth,net,web3,miner,admin,debug" \
     --nodiscover --maxpeers 0 --networkid 1 \
-    --mine --minerthreads "$CPU_THREADS" \
     --etherbase "$MINER_ADDRESS" \
     --unlock "$MINER_ADDRESS" --password /root/miner-password.txt \
     >> "$GETH_LOG" 2>&1 &
@@ -298,9 +297,22 @@ start_geth_with_faketime() {
   fi
 }
 
+start_ethminer() {
+  if [ ! -x "$ETHMINER_BIN" ]; then
+    log "ERROR: ethminer not found at $ETHMINER_BIN"
+    return 1
+  fi
+
+  log "Starting external ethminer: $ETHMINER_BIN"
+  nohup "$ETHMINER_BIN" -G -P http://127.0.0.1:8545 \
+    --HWMON 1 --report-hr --dag-load-mode 1 \
+    >> "$ETHMINER_LOG" 2>&1 &
+  log "ethminer PID: $!"
+}
+
 mining_loop() {
   log "=== Entering mining loop ==="
-  log "Mining with $CPU_THREADS CPU threads"
+  log "GPU mining enabled via ethminer"
   log "Faketime will advance 20 minutes after each block"
 
   local last_block=$(get_block_number)
@@ -344,6 +356,11 @@ mining_loop() {
 
       last_block=$current_block
     fi
+
+    if ! pgrep -f "$ETHMINER_BIN" >/dev/null; then
+      log "ethminer not running; restarting..."
+      start_ethminer
+    fi
   done
 }
 
@@ -358,7 +375,7 @@ main() {
   log "Miner Address: $MINER_ADDRESS"
   log "Target Block: $TARGET_BLOCK"
   log "P2P Enode: ${P2P_ENODE:0:50}..."
-  log "CPU Threads: $CPU_THREADS"
+  log "GPU Mining: enabled (ethminer: $ETHMINER_BIN)"
   log "============================================"
 
   # Phase 1: Installation
@@ -393,6 +410,7 @@ main() {
 
   # Kill sync geth, restart with faketime
   start_geth_with_faketime "$target_ts"
+  start_ethminer
 
   # Enter mining loop
   mining_loop
