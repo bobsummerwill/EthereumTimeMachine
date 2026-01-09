@@ -7,17 +7,19 @@ This folder provides a **docker-compose** setup for crashing Homestead-era diffi
 
 ## Goal
 
-Reduce difficulty from **~18 trillion** to **~50 million** (CPU-mineable) by mining ~259 blocks with manipulated timestamps (20-minute gaps trigger maximum difficulty reduction per EIP-2).
+Reduce difficulty from **~62 TH** (DAO fork) to **~10 MH** (CPU-mineable) by mining ~320 blocks with manipulated timestamps (20-minute gaps trigger maximum difficulty reduction per EIP-2).
+
+The script auto-stops at 10 MH and keeps geth running for P2P sync, enabling CPU mining handoff to other machines.
 
 ## Time & Cost Estimates
 
 | GPU Config | Hashrate | Time | Cost |
 |------------|----------|------|------|
-| 1x RTX 3090 | 120 MH/s | ~36 days | ~$140 |
-| 4x RTX 3090 | 480 MH/s | ~9 days | ~$130 |
-| **8x RTX 3090** | **960 MH/s** | **~4.5 days** | **~$130** |
+| 1x RTX 3090 | 105 MH/s | ~60 days | ~$1,440 |
+| 4x RTX 3090 | 420 MH/s | ~15 days | ~$360 |
+| **8x RTX 3090** | **846 MH/s** | **~8 days** | **~$180** |
 
-Recommendation: **8x RTX 3090** ($1.12/hr on Vast.ai) for fastest completion.
+Recommendation: **8x RTX 3090** (~$1/hr on Vast.ai) for fastest completion at lowest cost.
 
 ## How It Works
 
@@ -31,7 +33,7 @@ new_difficulty = parent_difficulty + (parent_difficulty // 2048) * adjustment
 With a 20-minute (1200s) timestamp gap:
 - `adjustment = max(1 - 120, -99) = -99`
 - Each block reduces difficulty by ~4.83%
-- ~259 blocks to crash from 18T to 50M
+- ~320 blocks to crash from 62 TH to 10 MH
 
 ### Timestamp Manipulation
 
@@ -172,8 +174,25 @@ Security: Do **not** expose port 8545 publicly. Use SSH tunnels for remote acces
 | `generate-identity.sh` | Creates deterministic node/miner keys |
 | `overnight-mining-automation.sh` | Hands-off Vast.ai deployment |
 | `install-ethminer-opencl.sh` | Builds OpenCL-only ethminer for Ampere GPUs (Vast bare-metal) |
-| `vast-mining.sh` | Single-host Vast GPU script (GPU mining on by default via external ethminer) |
+| `vast-mining.sh` | Single-host Vast GPU script (8 GPUs, auto-stop at 10 MH for CPU handoff) |
+
+## vast-mining.sh Features
+
+The standalone `vast-mining.sh` script provides:
+- **8 GPU mining** throughout (no tapering for fastest completion)
+- **Auto-stop at 10 MH** difficulty threshold
+- **P2P handoff mode**: When stopped, restarts geth with peers enabled for chaindata sync
+- **Automatic restart** of geth/ethminer if they crash
+
+### CPU Mining After Handoff
+
+Once GPU mining auto-stops at 10 MH:
+1. Geth keeps running with P2P enabled
+2. Connect other nodes to sync the extended chaindata
+3. Start CPU mining on those nodes (~500 KH/s)
+4. First CPU block takes ~20 seconds, then accelerates rapidly
+5. After ~50 blocks, mining is essentially instant
 
 ## Why Geth v1.3.6?
 
-The chain-of-geths bridge uses `geth v1.3.6` as the Homestead-era endpoint. This setup is intentionally isolated (`--nodiscover`, `--maxpeers 0`) to prevent accidentally joining mainnet while mining a historical fork.
+The chain-of-geths bridge uses `geth v1.3.6` as the Homestead-era endpoint. This setup is intentionally isolated (`--nodiscover`, `--maxpeers 0`) during mining to prevent accidentally joining mainnet while mining a historical fork.

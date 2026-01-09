@@ -15,7 +15,7 @@ The goal is to create functional, CPU-mineable historical chains that serve as e
 ## Core Objectives
 
 1. Extend historical chains beyond their original blocks
-2. Reduce mining difficulty to CPU-viable levels (~50 million, down from ~18 trillion)
+2. Reduce mining difficulty to CPU-viable levels (~10 MH, down from ~62 TH)
 3. Maintain era-specific protocol compatibility
 4. Enable sustainable CPU mining for long-term operation
 5. Provide educational access to historical Ethereum mining
@@ -27,11 +27,11 @@ This phase offers two independent revival projects:
 ### Option 1: Homestead Era Revival (Recommended - Faster)
 - **Target Era**: Pre-DAO Homestead (block 1,919,999, July 2016)
 - **Starting Point**: Geth v1.3.6 synced to block 1,919,999
-- **Initial Difficulty**: ~18 trillion
-- **Target Difficulty**: ~50 million (CPU-mineable)
-- **Blocks Required**: ~259 blocks
-- **Timeline**: ~4.5 days with 8x RTX 3090 (~960 MH/s)
-- **Cost**: ~$130 on Vast.ai ($1.12/hr)
+- **Initial Difficulty**: ~62 TH (DAO fork difficulty)
+- **Target Difficulty**: ~10 MH (CPU-mineable, auto-stop threshold)
+- **Blocks Required**: ~320 blocks
+- **Timeline**: ~8 days with 8x RTX 3090 (~846 MH/s)
+- **Cost**: ~$180 on Vast.ai ($1/hr)
 
 ### Option 2: Frontier Era Revival (Much Slower - Advanced)
 - **Target Era**: Original Frontier release (blocks 0-1,149,999)
@@ -58,7 +58,7 @@ new_difficulty = parent_difficulty + (parent_difficulty // 2048) * adjustment + 
 With a 20-minute (1200 second) timestamp gap:
 - `adjustment = max(1 - (1200 // 10), -99) = max(1 - 120, -99) = -99`
 - Each block reduces difficulty by: `(difficulty // 2048) * 99 ≈ 4.83%`
-- **~259 blocks** to crash from 18T to 50M
+- **~320 blocks** to crash from 62 TH to 10 MH
 
 #### Frontier Era Algorithm (Pre-Homestead)
 ```
@@ -83,7 +83,7 @@ With manipulated timestamps (> 13 seconds):
 
 3. **Difficulty Bomb**: Based on block number only, not timestamps. A 10-year timestamp gap doesn't accelerate the bomb - we only add ~259 blocks, so bomb impact is negligible.
 
-4. **Mining Requirements**: At 18T difficulty with 960 MH/s (8x RTX 3090), expected block time is ~5.2 hours. Total mining time is dominated by the first few blocks.
+4. **Mining Requirements**: At 62 TH difficulty with 846 MH/s (8x RTX 3090), expected first block time is ~20 hours. Total mining time is dominated by the first ~50 blocks.
 
 ## Option 1: Homestead Era Revival (Recommended)
 
@@ -92,22 +92,28 @@ Extend the pre-DAO Homestead chain (block 1,919,999) using Geth v1.3.6 with its 
 
 ### Technical Specifications
 - **Starting Block**: 1,919,999 (pre-DAO, from chain-of-geths bridge)
-- **Initial Difficulty**: ~18 trillion
-- **Target Difficulty**: ~50 million (CPU-mineable)
-- **Blocks Required**: ~259 blocks
+- **Initial Difficulty**: ~62 TH (DAO fork difficulty)
+- **Target Difficulty**: ~10 MH (CPU-mineable, auto-stop for handoff)
+- **Blocks Required**: ~320 blocks
 - **Gas Limit**: Dynamic (3M-4.7M range)
 - **Block Reward**: 5 ETH
 
-### Difficulty Progression (8x RTX 3090, 960 MH/s)
+### Difficulty Progression (8x RTX 3090, 846 MH/s)
 
 | Block | Difficulty | Block Time | Cumulative Time |
 |-------|------------|------------|-----------------|
-| 1 | 18.0T | 5.2 hours | 5.2 hours |
-| 50 | 1.6T | 28 minutes | 27.4 hours |
-| 100 | 144B | 2.5 minutes | 37.0 hours |
-| 150 | 13B | 13.5 seconds | 40.6 hours |
-| 200 | 1.1B | 1.2 seconds | 41.2 hours |
-| 259 | 50M | instant | ~107 hours |
+| 1 | 62.4 TH | 20.5 hours | 20.5 hours |
+| 50 | 5.5 TH | 1.8 hours | 89 hours |
+| 100 | 490 GH | 9.7 minutes | 155 hours |
+| 150 | 43 GH | 51 seconds | 171 hours |
+| 200 | 3.8 GH | 4.5 seconds | 175 hours |
+| 250 | 340 MH | 0.4 seconds | 176 hours |
+| 300 | 30 MH | instant | 176 hours |
+| ~320 | 10 MH | instant | ~176 hours |
+
+**Total wall clock time**: ~180 hours (~7.5 days). This includes ~176 hours of GPU mining plus ~4 hours of overhead (geth restarts after each block).
+
+The script auto-stops at 10 MH (~block 320) for CPU handoff.
 
 ### Mining Architecture
 
@@ -130,16 +136,16 @@ Extend the pre-DAO Homestead chain (block 1,919,999) using Geth v1.3.6 with its 
 
 | GPU Config | Hashrate | Time | Cost |
 |------------|----------|------|------|
-| 1x RTX 3090 | 120 MH/s | ~36 days | ~$140 |
-| 4x RTX 3090 | 480 MH/s | ~9 days | ~$130 |
-| 8x RTX 3090 | 960 MH/s | ~4.5 days | ~$130 |
+| 1x RTX 3090 | 105 MH/s | ~60 days | ~$1,440 |
+| 4x RTX 3090 | 420 MH/s | ~15 days | ~$360 |
+| 8x RTX 3090 | 846 MH/s | ~8 days | ~$180 |
 
-Recommendation: **8x RTX 3090** for fastest completion at similar cost.
+Recommendation: **8x RTX 3090** (~$1/hr on Vast.ai) for fastest completion at lowest cost.
 
 ### Success Criteria
-- Difficulty reduced to < 100 million
-- Chain extended 259+ blocks beyond 1,919,999
-- CPU can mine blocks in < 1 minute
+- Difficulty reduced to < 10 MH (auto-stop threshold)
+- Chain extended 320+ blocks beyond 1,919,999
+- Ready for CPU mining handoff (blocks mine in seconds)
 
 ## Option 2: Frontier Era Revival
 
@@ -165,10 +171,10 @@ if timestamp_delta >= 13:
 
 There is **no multiplier** like Homestead's `-99`. Each block only removes `difficulty // 2048`, regardless of how large the timestamp gap is.
 
-| Era | Reduction per block | Blocks to crash 17T→50M |
-|-----|---------------------|-------------------------|
-| Homestead | ~4.83% (with -99 multiplier) | ~259 |
-| Frontier | ~0.049% (fixed 1/2048) | ~25,600 |
+| Era | Reduction per block | Blocks to crash to CPU |
+|-----|---------------------|------------------------|
+| Homestead | ~4.83% (with -99 multiplier) | ~320 (from 62 TH) |
+| Frontier | ~0.049% (fixed 1/2048) | ~25,600 (from 17.5 TH) |
 
 ### Cost Estimate (Vast.ai)
 
@@ -230,6 +236,10 @@ The [overnight-mining-automation.sh](resurrection/vast-homestead/overnight-minin
 
 ## Conclusion
 
-Phase 2 uses GPU cloud computing (Vast.ai) to rapidly crash historical chain difficulty. With 8x RTX 3090 GPUs (~$1.12/hr), the difficulty can be reduced from 18 trillion to CPU-mineable levels (~50 million) in approximately 4.5 days at a total cost of ~$130.
+Phase 2 uses GPU cloud computing (Vast.ai) to rapidly crash historical chain difficulty. With 8x RTX 3090 GPUs (~$1/hr), the difficulty can be reduced from 62 TH to CPU-mineable levels (~10 MH) in approximately 17 days at a total cost of ~$180.
 
-**Current Status**: Homestead chain extension in progress on Vast.ai instance 29620927 (8x RTX 3090, Croatia).
+The script automatically stops when difficulty drops below 10 MH and keeps geth running for P2P sync, allowing other nodes to connect and sync the extended chaindata before starting CPU mining.
+
+**CPU Mining After Handoff**: Once difficulty is below 10 MH, a single CPU (~500 KH/s) can mine blocks rapidly. With 20-minute timestamp gaps, blocks accelerate from ~20 seconds to instant within ~50 blocks.
+
+**Current Status**: Homestead chain extension in progress on Vast.ai (8x RTX 3090).

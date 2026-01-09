@@ -9,8 +9,9 @@
 # 2. Syncs chaindata via P2P from chain-of-geths AWS node
 # 3. Disconnects peer at target block (prevents chain-of-geths from following)
 # 4. Starts geth with faketime (20-min gaps to crash difficulty)
-# 5. Starts external GPU mining via ethminer
+# 5. Starts mining with 8 GPUs
 # 6. Monitors and restarts after each block with updated faketime
+# 7. Auto-stops when difficulty drops below threshold (ready for CPU handoff)
 #
 # PREREQUISITES:
 # - Fresh Vast.ai instance with Ubuntu 22.04 LTS
@@ -60,6 +61,14 @@ TARGET_BLOCK="${TARGET_BLOCK:-1919999}"
 ETHMINER_BIN="/root/ethminer-src/build/ethminer/ethminer"
 ETHMINER_LOG="/root/ethminer.log"
 
+# Auto-stop threshold - when difficulty drops below this, stop mining
+# and signal readiness for CPU handoff on other machines
+# 10 MH = takes ~12 seconds with 8x RTX 3090 (846 MH/s)
+STOP_THRESHOLD=10000000       # 10 MH - stop for CPU handoff
+
+# Fixed GPU count (all 8 GPUs throughout)
+GPU_COUNT=8
+
 # ============================================================================
 # Utility Functions
 # ============================================================================
@@ -87,6 +96,34 @@ get_peer_count() {
     --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":1}' \
     http://127.0.0.1:8545 2>/dev/null | \
     python3 -c "import sys,json; print(int(json.load(sys.stdin).get('result','0x0'),16))" 2>/dev/null || echo "0"
+}
+
+get_difficulty() {
+  curl -s -X POST -H "Content-Type: application/json" \
+    --data '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest",false],"id":1}' \
+    http://127.0.0.1:8545 2>/dev/null | \
+    python3 -c "import sys,json; b=json.load(sys.stdin).get('result',{}); print(int(b.get('difficulty','0x0'),16))" 2>/dev/null || echo "0"
+}
+
+format_difficulty() {
+  local diff="$1"
+  python3 -c "
+d = $diff
+if d >= 1e12:
+    print(f'{d/1e12:.2f} TH')
+elif d >= 1e9:
+    print(f'{d/1e9:.2f} GH')
+elif d >= 1e6:
+    print(f'{d/1e6:.2f} MH')
+else:
+    print(f'{d:.0f} H')
+" 2>/dev/null || echo "$diff H"
+}
+
+# Check if difficulty is below stop threshold
+should_stop_mining() {
+  local diff="$1"
+  [ "$diff" -lt "$STOP_THRESHOLD" ]
 }
 
 wait_for_rpc() {
@@ -364,7 +401,8 @@ start_ethminer() {
     return 1
   fi
 
-  log "Starting external ethminer: $ETHMINER_BIN"
+  log "Starting ethminer with $GPU_COUNT GPUs"
+
   # LC_ALL=C fixes "locale::facet::_S_create_c_locale name not valid" error
   LC_ALL=C LANG=C nohup "$ETHMINER_BIN" -G -P http://127.0.0.1:8545 \
     --HWMON 1 --report-hr --dag-load-mode 1 \
@@ -372,14 +410,24 @@ start_ethminer() {
   log "ethminer PID: $!"
 }
 
+# Kill ethminer
+stop_mining() {
+  pkill -9 -f "$ETHMINER_BIN" 2>/dev/null || true
+}
+
 mining_loop() {
   log "=== Entering mining loop ==="
-  log "GPU mining enabled via ethminer"
+  log "Using $GPU_COUNT GPUs throughout (no tapering)"
+  log "Auto-stop threshold: $(format_difficulty $STOP_THRESHOLD) (for CPU handoff)"
   log "Faketime will advance 20 minutes after each block"
 
   local last_block=$(get_block_number)
   local blocks_mined=0
   local start_block=$last_block
+
+  local init_diff=$(get_difficulty)
+  local init_diff_fmt=$(format_difficulty "$init_diff")
+  log "Initial difficulty: $init_diff_fmt"
 
   while true; do
     sleep 30
@@ -393,6 +441,7 @@ mining_loop() {
       local ts=$(get_block_timestamp)
       if [ "$ts" -gt 0 ]; then
         start_geth_with_faketime $((ts + 1200))
+        start_ethminer
       else
         log "ERROR: Cannot determine block timestamp for restart"
         exit 1
@@ -408,26 +457,62 @@ mining_loop() {
       # Get block details
       local ts=$(get_block_timestamp)
       local ts_human=$(date -d "@$ts" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "$ts")
+      local diff=$(get_difficulty)
+      local diff_fmt=$(format_difficulty "$diff")
 
-      log "NEW BLOCK #$current_block mined! | Timestamp: $ts_human | Session total: $blocks_mined blocks"
+      log "NEW BLOCK #$current_block mined! | Timestamp: $ts_human | Difficulty: $diff_fmt | Session total: $blocks_mined blocks"
+
+      # Check if we should stop for CPU handoff
+      if should_stop_mining "$diff"; then
+        log ""
+        log "============================================"
+        log "AUTO-STOP: Difficulty dropped below $(format_difficulty $STOP_THRESHOLD)"
+        log "============================================"
+        log "READY FOR CPU HANDOFF!"
+        log ""
+        log "Final block: #$current_block"
+        log "Final difficulty: $diff_fmt"
+        log "Total blocks mined this session: $blocks_mined"
+        log ""
+        log "Geth is still running for P2P sync."
+        log "Connect other nodes to sync chaindata, then start CPU mining."
+        log ""
+        log "To peer with this node from another machine:"
+        log "  admin.addPeer(\"enode://...@<this-ip>:30303\")"
+        log "============================================"
+
+        stop_mining
+
+        # Restart geth WITHOUT faketime and WITH peer connections enabled
+        log "Restarting geth for P2P sync (no faketime, peers enabled)..."
+        pkill -9 geth 2>/dev/null || true
+        sleep 3
+
+        nohup /root/geth --datadir "$DATA_DIR" \
+          --rpc --rpcaddr 0.0.0.0 --rpcport 8545 \
+          --rpcapi "eth,net,web3,admin,debug" \
+          --networkid 1 \
+          --port 30303 \
+          --etherbase "$MINER_ADDRESS" \
+          >> "$GETH_LOG" 2>&1 &
+
+        log "Geth running for P2P handoff. PID: $!"
+        log "Script exiting. Geth will continue running."
+        exit 0
+      fi
 
       # Restart geth with new faketime (20 min ahead of new block)
       local new_ts=$((ts + 1200))
       log "Restarting geth with new faketime (+20 min)..."
 
-      # Kill ethminer before restarting geth (it will lose connection anyway)
-      pkill -9 -f "$ETHMINER_BIN" 2>/dev/null || true
-
+      stop_mining
       start_geth_with_faketime "$new_ts"
-
-      # Restart ethminer after geth is back up
-      log "Restarting ethminer..."
       start_ethminer
 
       last_block=$current_block
     fi
 
-    # Also check if ethminer died for other reasons
+    # Check if ethminer died
     if ! pgrep -f "$ETHMINER_BIN" >/dev/null; then
       log "ethminer not running; restarting..."
       start_ethminer
@@ -444,7 +529,8 @@ resume() {
   log "Homestead Resurrection Mining (RESUME MODE)"
   log "============================================"
   log "Miner Address: $MINER_ADDRESS"
-  log "GPU Mining: enabled (ethminer: $ETHMINER_BIN)"
+  log "GPUs: $GPU_COUNT (no tapering)"
+  log "Auto-stop at: $(format_difficulty $STOP_THRESHOLD)"
   log "============================================"
 
   # Check if geth is running
@@ -482,12 +568,9 @@ resume() {
 
   log "Current block: $(get_block_number)"
 
-  # Start ethminer if not running
-  if ! pgrep -f "$ETHMINER_BIN" >/dev/null; then
-    start_ethminer
-  else
-    log "ethminer is already running"
-  fi
+  # Start mining with all GPUs
+  stop_mining
+  start_ethminer
 
   # Enter mining loop
   mining_loop
@@ -500,7 +583,8 @@ main() {
   log "Miner Address: $MINER_ADDRESS"
   log "Target Block: $TARGET_BLOCK"
   log "P2P Enode: ${P2P_ENODE:0:50}..."
-  log "GPU Mining: enabled (ethminer: $ETHMINER_BIN)"
+  log "GPUs: $GPU_COUNT (no tapering)"
+  log "Auto-stop at: $(format_difficulty $STOP_THRESHOLD)"
   log "============================================"
 
   # Phase 1: Installation
@@ -536,6 +620,8 @@ main() {
 
   # Kill sync geth, restart with faketime
   start_geth_with_faketime "$target_ts"
+
+  # Start mining with all GPUs
   start_ethminer
 
   # Enter mining loop
