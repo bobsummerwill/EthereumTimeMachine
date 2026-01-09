@@ -41,11 +41,15 @@ Documentation: [`resurrection/README.md`](resurrection/README.md)
 - **Cost**: ~$180 on Vast.ai
 
 ### Frontier Revival (Advanced)
-- **Starting point**: Block 1,149,999
-- **Time**: ~4-6 months (99x slower due to simpler difficulty algorithm)
-- **Cost**: ~$3,000+
+- **Starting point**: Block 1,149,999 (pre-Homestead fork)
+- **Initial difficulty**: ~17.5 TH
+- **Target difficulty**: ~50 MH (auto-stop for CPU handoff)
+- **Time**: ~4-6 months with 8x RTX 3090 (99x slower due to simpler difficulty algorithm)
+- **Cost**: ~$3,000-4,000 on Vast.ai
 
-See [`resurrection/vast-homestead/`](resurrection/vast-homestead/) for Vast.ai deployment scripts.
+Vast.ai deployment scripts:
+- [`resurrection/vast-homestead/`](resurrection/vast-homestead/) - Homestead mining
+- [`resurrection/vast-frontier/`](resurrection/vast-frontier/) - Frontier mining
 
 ## Infographic
 

@@ -8,7 +8,7 @@ The goal is to create functional, CPU-mineable historical chains that serve as e
 
 ## Prerequisites
 
-- Completed chain-of-Geths setup with synced Geth v1.0.3 (Frontier) and Geth v1.3.6 (Homestead) nodes
+- Completed chain-of-Geths setup with synced Geth v1.0.2 (Frontier) and Geth v1.3.6 (Homestead) nodes
 - GPU mining infrastructure (cloud GPU rental recommended - Vast.ai)
 - Chaindata tarball exported from chain-of-Geths bridge nodes
 
@@ -35,7 +35,7 @@ This phase offers two independent revival projects:
 
 ### Option 2: Frontier Era Revival (Much Slower - Advanced)
 - **Target Era**: Original Frontier release (blocks 0-1,149,999)
-- **Starting Point**: Geth v1.0.3 synced to block 1,149,999
+- **Starting Point**: Geth v1.0.2 synced to block 1,149,999
 - **Initial Difficulty**: ~17.5 trillion
 - **Target Difficulty**: ~50 million (CPU-mineable)
 - **Blocks Required**: ~25,600 blocks (99x more than Homestead!)
@@ -150,7 +150,7 @@ Recommendation: **8x RTX 3090** (~$1/hr on Vast.ai) for fastest completion at lo
 ## Option 2: Frontier Era Revival
 
 ### Overview
-Extend the original Frontier chain using Geth v1.0.3 for the purest historical experience. **This is significantly harder than Homestead** due to the simpler difficulty algorithm.
+Extend the original Frontier chain using Geth v1.0.2 for the purest historical experience. **This is significantly harder than Homestead** due to the simpler difficulty algorithm.
 
 ### Technical Specifications
 - **Starting Block**: ~1,149,999 (from chain-of-geths Frontier node)
@@ -191,7 +191,14 @@ There is **no multiplier** like Homestead's `-99`. Each block only removes `diff
 
 ## Implementation: Vast.ai Deployment
 
-The [resurrection/vast-homestead/](resurrection/vast-homestead/) folder contains everything needed to deploy on Vast.ai:
+Two deployment options are available:
+
+- **[vast-homestead/](vast-homestead/)** - Homestead revival (~8 days, ~$180)
+- **[vast-frontier/](vast-frontier/)** - Frontier revival (~4-6 months, ~$3,000-4,000)
+
+### Homestead Deployment (Recommended)
+
+The [vast-homestead/](vast-homestead/) folder contains everything needed to deploy on Vast.ai:
 
 ### Quick Start
 
@@ -228,18 +235,40 @@ ssh -p PORT root@sshX.vast.ai 'curl -s -X POST -H "Content-Type: application/jso
 
 ### Automation Script
 
-The [overnight-mining-automation.sh](resurrection/vast-homestead/overnight-mining-automation.sh) script handles:
+The [overnight-mining-automation.sh](vast-homestead/overnight-mining-automation.sh) script handles:
 - Uploading chaindata
 - Starting docker-compose
 - Periodic status checks
 - Automatic logging
 
+### Frontier Deployment (Advanced)
+
+The [vast-frontier/](vast-frontier/) folder contains a standalone mining script for Frontier revival:
+
+```bash
+# 1. Get the v1.0.2 enode from chain-of-geths
+docker exec geth-v1-0-2 geth attach --exec 'admin.nodeInfo.enode' /data/geth.ipc
+
+# 2. Update P2P_ENODE in vast-frontier/vast-mining.sh
+
+# 3. Upload and run on Vast.ai
+rsync -avzP vast-frontier/ root@sshX.vast.ai:/root/vast-frontier/ -e "ssh -p PORT"
+ssh -p PORT root@sshX.vast.ai "cd /root/vast-frontier && chmod +x vast-mining.sh && nohup ./vast-mining.sh > mining-output.log 2>&1 &"
+```
+
+**Note**: Frontier mining takes 4-6 months. Consider alternatives like personal GPU hardware for continuous operation.
+
 ## Conclusion
 
-Phase 2 uses GPU cloud computing (Vast.ai) to rapidly crash historical chain difficulty. With 8x RTX 3090 GPUs (~$1/hr), the difficulty can be reduced from 62 TH to CPU-mineable levels (~10 MH) in approximately 17 days at a total cost of ~$180.
+Phase 2 uses GPU cloud computing (Vast.ai) to crash historical chain difficulty:
 
-The script automatically stops when difficulty drops below 10 MH and keeps geth running for P2P sync, allowing other nodes to connect and sync the extended chaindata before starting CPU mining.
+| Revival | Time | Cost | Blocks |
+|---------|------|------|--------|
+| **Homestead** | ~8 days | ~$180 | ~320 |
+| Frontier | ~4-6 months | ~$3,000-4,000 | ~25,600 |
 
-**CPU Mining After Handoff**: Once difficulty is below 10 MH, a single CPU (~500 KH/s) can mine blocks rapidly. With 20-minute timestamp gaps, blocks accelerate from ~20 seconds to instant within ~50 blocks.
+Both scripts auto-stop at their target difficulty and restart geth with P2P enabled for chaindata sync to other nodes.
+
+**CPU Mining After Handoff**: Once difficulty is at CPU-mineable levels, a single CPU (~500 KH/s) can mine blocks rapidly. With 20-minute timestamp gaps, blocks accelerate from seconds to instant within ~50 blocks.
 
 **Current Status**: Homestead chain extension in progress on Vast.ai (8x RTX 3090).
