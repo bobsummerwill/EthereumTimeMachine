@@ -5,7 +5,7 @@
 # This script runs DIRECTLY on a Vast.ai instance (not via SSH).
 # It automates the complete Ethereum Homestead resurrection process:
 #
-# 1. Installs geth v1.3.6 and dependencies (libfaketime)
+# 1. Installs geth v1.3.6, ethminer, and dependencies (libfaketime)
 # 2. Syncs chaindata via P2P from chain-of-geths AWS node
 # 3. Disconnects peer at target block (prevents chain-of-geths from following)
 # 4. Starts geth with faketime (20-min gaps to crash difficulty)
@@ -21,6 +21,9 @@
 #   # Copy this script to the Vast.ai instance and run:
 #   chmod +x vast-mining.sh
 #   nohup ./vast-mining.sh > mining-output.log 2>&1 &
+#
+#   # To resume mining without re-syncing (requires geth already running):
+#   ./vast-mining.sh --resume
 #
 # MONITORING:
 #   tail -f /root/mining.log        # Main script log
@@ -105,7 +108,7 @@ install_dependencies() {
   log "Installing system dependencies..."
 
   apt-get update -qq
-  apt-get install -y -qq curl bzip2 git build-essential python3
+  apt-get install -y -qq curl bzip2 git build-essential python3 ocl-icd-opencl-dev
 
   log "Dependencies installed."
 }
@@ -146,6 +149,64 @@ install_libfaketime() {
   make install >/dev/null 2>&1
 
   log "libfaketime installed."
+}
+
+install_ethminer() {
+  log "Installing ethminer (OpenCL)..."
+
+  if [ -x "$ETHMINER_BIN" ]; then
+    log "ethminer already installed at $ETHMINER_BIN"
+    return 0
+  fi
+
+  local CMAKE_VERSION="3.27.9"
+  local CMAKE_TARBALL="cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz"
+  local CMAKE_URL="https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/${CMAKE_TARBALL}"
+  local CMAKE_DIR="/root/cmake-${CMAKE_VERSION}-linux-x86_64"
+  local ETHMINER_REPO="https://github.com/ethereum-mining/ethminer.git"
+  local ETHMINER_DIR="/root/ethminer-src"
+
+  cd /root
+
+  # Install CMake if needed
+  if [ ! -x "${CMAKE_DIR}/bin/cmake" ]; then
+    log "Fetching portable CMake ${CMAKE_VERSION}..."
+    rm -f "${CMAKE_TARBALL}"
+    curl -L -o "${CMAKE_TARBALL}" "${CMAKE_URL}"
+    tar xzf "${CMAKE_TARBALL}"
+    rm -f "${CMAKE_TARBALL}"
+  fi
+
+  # Clone ethminer
+  if [ ! -d "${ETHMINER_DIR}" ]; then
+    log "Cloning ethminer..."
+    git clone --depth 1 "${ETHMINER_REPO}" "${ETHMINER_DIR}"
+  fi
+
+  cd "${ETHMINER_DIR}"
+  log "Updating submodules..."
+  git submodule update --init --recursive
+
+  # Hunter Boost mirror fix: use p0 release to avoid JFrog 409/redirects
+  local HUNTER_CFG="${ETHMINER_DIR}/cmake/Hunter/config.cmake"
+  if ! grep -q "Boost VERSION 1.66.0-p0" "${HUNTER_CFG}" 2>/dev/null; then
+    log "Setting Hunter Boost version to 1.66.0-p0..."
+    sed -i 's/Boost VERSION 1.66.0/Boost VERSION 1.66.0-p0/' "${HUNTER_CFG}"
+  fi
+
+  log "Configuring ethminer (OpenCL only, no CUDA)..."
+  mkdir -p build
+  cd build
+  "${CMAKE_DIR}/bin/cmake" .. \
+    -DETHASHCUDA=OFF \
+    -DETHASHCL=ON \
+    -DETHASHCPU=OFF \
+    -DCMAKE_BUILD_TYPE=Release
+
+  log "Building ethminer (this may take several minutes)..."
+  "${CMAKE_DIR}/bin/cmake" --build . --target ethminer -- -j"$(nproc)"
+
+  log "ethminer installed at: $ETHMINER_BIN"
 }
 
 setup_miner_key() {
@@ -304,7 +365,8 @@ start_ethminer() {
   fi
 
   log "Starting external ethminer: $ETHMINER_BIN"
-  nohup "$ETHMINER_BIN" -G -P http://127.0.0.1:8545 \
+  # LC_ALL=C fixes "locale::facet::_S_create_c_locale name not valid" error
+  LC_ALL=C LANG=C nohup "$ETHMINER_BIN" -G -P http://127.0.0.1:8545 \
     --HWMON 1 --report-hr --dag-load-mode 1 \
     >> "$ETHMINER_LOG" 2>&1 &
   log "ethminer PID: $!"
@@ -352,11 +414,20 @@ mining_loop() {
       # Restart geth with new faketime (20 min ahead of new block)
       local new_ts=$((ts + 1200))
       log "Restarting geth with new faketime (+20 min)..."
+
+      # Kill ethminer before restarting geth (it will lose connection anyway)
+      pkill -9 -f "$ETHMINER_BIN" 2>/dev/null || true
+
       start_geth_with_faketime "$new_ts"
+
+      # Restart ethminer after geth is back up
+      log "Restarting ethminer..."
+      start_ethminer
 
       last_block=$current_block
     fi
 
+    # Also check if ethminer died for other reasons
     if ! pgrep -f "$ETHMINER_BIN" >/dev/null; then
       log "ethminer not running; restarting..."
       start_ethminer
@@ -367,6 +438,60 @@ mining_loop() {
 # ============================================================================
 # Main
 # ============================================================================
+
+resume() {
+  log "============================================"
+  log "Homestead Resurrection Mining (RESUME MODE)"
+  log "============================================"
+  log "Miner Address: $MINER_ADDRESS"
+  log "GPU Mining: enabled (ethminer: $ETHMINER_BIN)"
+  log "============================================"
+
+  # Check if geth is running
+  if ! pgrep -x geth > /dev/null; then
+    log "geth not running. Starting with current block timestamp + 20 min..."
+
+    # Start geth temporarily to get block timestamp
+    log "Starting geth temporarily to read block timestamp..."
+    nohup /root/geth --datadir "$DATA_DIR" \
+      --rpc --rpcaddr 127.0.0.1 --rpcport 8545 \
+      --rpcapi "eth,net,web3,debug" \
+      --nodiscover --maxpeers 0 --networkid 1 \
+      >> "$GETH_LOG" 2>&1 &
+
+    if ! wait_for_rpc 60; then
+      log "ERROR: Cannot start geth to read block timestamp"
+      exit 1
+    fi
+
+    local current_ts=$(get_block_timestamp)
+    if [ "$current_ts" -eq 0 ]; then
+      log "ERROR: Cannot get block timestamp"
+      exit 1
+    fi
+
+    local target_ts=$((current_ts + 1200))
+    log "Current block timestamp: $current_ts"
+    log "Target faketime: $target_ts (+20 min)"
+
+    # Kill temp geth, restart with faketime
+    start_geth_with_faketime "$target_ts"
+  else
+    log "geth is already running"
+  fi
+
+  log "Current block: $(get_block_number)"
+
+  # Start ethminer if not running
+  if ! pgrep -f "$ETHMINER_BIN" >/dev/null; then
+    start_ethminer
+  else
+    log "ethminer is already running"
+  fi
+
+  # Enter mining loop
+  mining_loop
+}
 
 main() {
   log "============================================"
@@ -384,6 +509,7 @@ main() {
   install_dependencies
   install_geth
   install_libfaketime
+  install_ethminer
   setup_miner_key
 
   # Phase 2: P2P Sync
@@ -416,5 +542,12 @@ main() {
   mining_loop
 }
 
-# Run
-main "$@"
+# Parse arguments and run
+case "${1:-}" in
+  --resume|-r)
+    resume
+    ;;
+  *)
+    main "$@"
+    ;;
+esac
