@@ -246,15 +246,12 @@ The [overnight-mining-automation.sh](vast-homestead/overnight-mining-automation.
 The [vast-frontier/](vast-frontier/) folder contains a standalone mining script for Frontier revival:
 
 ```bash
-# 1. Get the v1.0.2 enode from chain-of-geths
-docker exec geth-v1-0-2 geth attach --exec 'admin.nodeInfo.enode' /data/geth.ipc
-
-# 2. Update P2P_ENODE in vast-frontier/vast-mining.sh
-
-# 3. Upload and run on Vast.ai
+# Upload and run on Vast.ai
 rsync -avzP vast-frontier/ root@sshX.vast.ai:/root/vast-frontier/ -e "ssh -p PORT"
 ssh -p PORT root@sshX.vast.ai "cd /root/vast-frontier && chmod +x vast-mining.sh && nohup ./vast-mining.sh > mining-output.log 2>&1 &"
 ```
+
+The v1.0.2 enode is pre-configured. Override `P2P_ENODE` in the script if using a different chain-of-geths deployment.
 
 **Note**: Frontier mining takes 4-6 months. Consider alternatives like personal GPU hardware for continuous operation.
 

@@ -68,20 +68,9 @@ The ratio: 99/1 = **99x slower**.
 2. **Vast.ai account** with GPU credit
 3. **Patience** - this is a multi-month project
 
-## Setup
-
-### 1. Get P2P Enode from Chain-of-Geths
-
-You need the enode URL for the v1.0.2 node on your chain-of-geths deployment:
-
-```bash
-# On the chain-of-geths host:
-docker exec geth-v1-0-2 geth attach --exec 'admin.nodeInfo.enode' /data/geth.ipc
-```
-
-Update `P2P_ENODE` in `vast-mining.sh` with this value.
-
 ## Vast.ai Deployment
+
+The script has the chain-of-geths v1.0.2 enode pre-configured. If you're using a different deployment, override `P2P_ENODE` in the script.
 
 ### Quick Start
 

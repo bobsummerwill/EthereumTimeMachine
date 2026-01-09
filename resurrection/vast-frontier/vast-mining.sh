@@ -59,7 +59,7 @@ MINER_PASSWORD="dev"
 
 # P2P sync configuration - chain-of-geths v1.0.2 node
 # Note: v1.0.2 syncs from v1.3.6 on port 30311, but we peer with v1.0.2 on 30312
-P2P_ENODE="${P2P_ENODE:-enode://PLACEHOLDER_FRONTIER_ENODE@52.0.234.84:30312}"
+P2P_ENODE="${P2P_ENODE:-enode://bbb688b660e8359409f45e52ce24d8ed0afd476e34eedce46a4a50cd3dc6998a109568c479ca171254a46004f738115b52061dcb4a173435c1215568600676e3@52.0.234.84:30312}"
 
 # Target block (Frontier era, before Homestead fork at 1,150,000)
 TARGET_BLOCK="${TARGET_BLOCK:-1149999}"
