@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# Deploy Homestead resurrection mining to Vast.ai
+# Deploy Ethereum resurrection mining to Vast.ai
 #
 # This script handles the complete deployment workflow:
 # 1. Search for suitable GPU instances
 # 2. Create an instance
 # 3. Wait for it to be ready
-# 4. Deploy and start vast-mining.sh
+# 4. Deploy and start mining-script.sh
 #
 # Prerequisites:
 #   pip install vastai
@@ -15,7 +15,7 @@
 # Usage:
 #   ./deploy.sh search              # Find available instances
 #   ./deploy.sh create <offer_id>   # Create instance from offer
-#   ./deploy.sh deploy <instance_id> # Deploy mining script to instance
+#   ./deploy.sh deploy <instance_id> [homestead|frontier]
 #   ./deploy.sh ssh <instance_id>   # SSH into instance
 #   ./deploy.sh status <instance_id> # Check mining status
 #   ./deploy.sh logs <instance_id>  # Tail mining logs
@@ -26,31 +26,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Requirements for the instance
-MIN_GPUS=4
-GPU_NAME="RTX_3090"  # or RTX_4090
-MIN_GPU_RAM=20       # GB
-MAX_PRICE=1.50       # $/hr
+MIN_GPUS=8
+GPU_NAME="RTX_3090"
+MIN_GPU_RAM=20
+MAX_PRICE=1.50
 
-# SSH key for Vast.ai (default: ~/.ssh/vastai-deploy)
-SSH_KEY="${SSH_KEY:-$HOME/.ssh/vastai-deploy}"
+# SSH key for Vast.ai
+SSH_KEY="${SSH_KEY:-$SCRIPT_DIR/generated-files/vast-ssh-key}"
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-log() {
-  echo -e "${GREEN}[deploy]${NC} $*"
-}
-
-warn() {
-  echo -e "${YELLOW}[deploy]${NC} $*"
-}
-
-error() {
-  echo -e "${RED}[deploy]${NC} $*" >&2
-}
+log() { echo -e "${GREEN}[deploy]${NC} $*"; }
+warn() { echo -e "${YELLOW}[deploy]${NC} $*"; }
+error() { echo -e "${RED}[deploy]${NC} $*" >&2; }
 
 check_vastai() {
   if ! command -v vastai &>/dev/null; then
@@ -60,13 +52,23 @@ check_vastai() {
   fi
 }
 
-# Search for suitable instances
+check_ssh_key() {
+  if [ ! -f "$SSH_KEY" ]; then
+    warn "SSH key not found at $SSH_KEY"
+    warn "Creating new SSH key..."
+    ssh-keygen -t ed25519 -f "$SSH_KEY" -N "" -C "vast-mining"
+    log "Add this public key to Vast.ai:"
+    cat "${SSH_KEY}.pub"
+    exit 0
+  fi
+}
+
 cmd_search() {
   check_vastai
   log "Searching for instances with ${MIN_GPUS}+ ${GPU_NAME} GPUs under \$${MAX_PRICE}/hr..."
 
   vastai search offers \
-    "gpu_name=${GPU_NAME} num_gpus>=${MIN_GPUS} gpu_ram>=${MIN_GPU_RAM} dph<=${MAX_PRICE} cuda_vers>=11.0 rentable=True" \
+    "gpu_name=${GPU_NAME} num_gpus>=${MIN_GPUS} gpu_ram>=${MIN_GPU_RAM} dph<=${MAX_PRICE} cuda_vers>=11.0 rentable=True inet_down>100" \
     --order "dph" \
     --limit 20
 
@@ -74,26 +76,22 @@ cmd_search() {
   log "To create an instance: ./deploy.sh create <offer_id>"
 }
 
-# Create instance from offer
 cmd_create() {
   local offer_id="$1"
   check_vastai
 
   log "Creating instance from offer ${offer_id}..."
 
-  # Create with Ubuntu 22.04, SSH access
   local result
   result=$(vastai create instance "$offer_id" \
-    --image "ubuntu:22.04" \
-    --disk 50 \
+    --image "nvidia/cuda:11.8.0-devel-ubuntu22.04" \
+    --disk 100 \
     --ssh \
     --direct \
-    --onstart-cmd "apt-get update && apt-get install -y curl bzip2 git build-essential python3" \
     2>&1)
 
   echo "$result"
 
-  # Extract instance ID
   local instance_id
   instance_id=$(echo "$result" | grep -oP "new contract id: \K\d+" || echo "")
 
@@ -101,7 +99,6 @@ cmd_create() {
     log "Instance created: ${instance_id}"
     log "Waiting for instance to be ready..."
 
-    # Wait for instance to be running
     for i in {1..60}; do
       local status
       status=$(vastai show instance "$instance_id" --raw 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('actual_status',''))" 2>/dev/null || echo "")
@@ -111,7 +108,8 @@ cmd_create() {
         echo ""
         vastai show instance "$instance_id"
         echo ""
-        log "To deploy: ./deploy.sh deploy ${instance_id}"
+        log "To deploy Homestead: ./deploy.sh deploy ${instance_id} homestead"
+        log "To deploy Frontier:  ./deploy.sh deploy ${instance_id} frontier"
         return 0
       fi
 
@@ -126,7 +124,6 @@ cmd_create() {
   fi
 }
 
-# Get SSH connection details for instance
 get_ssh_info() {
   local instance_id="$1"
   check_vastai
@@ -146,9 +143,16 @@ get_ssh_info() {
   echo "${host}:${port}"
 }
 
-# Deploy mining script to instance
 cmd_deploy() {
   local instance_id="$1"
+  local era="${2:-homestead}"
+
+  if [ "$era" != "homestead" ] && [ "$era" != "frontier" ]; then
+    error "ERA must be 'homestead' or 'frontier'"
+    exit 1
+  fi
+
+  check_ssh_key
 
   log "Getting SSH info for instance ${instance_id}..."
   local ssh_info
@@ -158,9 +162,14 @@ cmd_deploy() {
   host=$(echo "$ssh_info" | cut -d: -f1)
   port=$(echo "$ssh_info" | cut -d: -f2)
 
-  log "Connecting to ${host}:${port}..."
+  log "Deploying ${era} mining to ${host}:${port}..."
 
-  # Wait for SSH to be available
+  if [ "$era" = "frontier" ]; then
+    warn "WARNING: Frontier is 99x slower than Homestead!"
+    warn "Expected time: 4-6 months | Cost: ~\$3,000+"
+  fi
+
+  # Wait for SSH
   log "Waiting for SSH to be ready..."
   for i in {1..30}; do
     if ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p "$port" "root@${host}" "echo ok" &>/dev/null; then
@@ -171,21 +180,22 @@ cmd_deploy() {
   done
   echo ""
 
-  # Copy the mining script
-  log "Copying vast-mining.sh..."
-  scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -P "$port" "${SCRIPT_DIR}/vast-mining.sh" "root@${host}:/root/"
+  # Copy mining script
+  log "Copying mining-script.sh..."
+  scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -P "$port" "${SCRIPT_DIR}/mining-script.sh" "root@${host}:/root/"
 
-  # Make executable and start
-  log "Starting mining script..."
-  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s << 'EOF'
-chmod +x /root/vast-mining.sh
+  # Start mining
+  log "Starting ${era} mining..."
+  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s "$era" << 'EOF'
+ERA="$1"
+chmod +x /root/mining-script.sh
 
-# Create OpenCL ICD for NVIDIA (needed for GPU mining)
+# Create OpenCL ICD for NVIDIA
 mkdir -p /etc/OpenCL/vendors
 echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
 
-# Start mining in background
-nohup /root/vast-mining.sh > /root/mining-output.log 2>&1 &
+# Start mining
+nohup /root/mining-script.sh --era "$ERA" > /root/mining-output.log 2>&1 &
 echo "Mining script started with PID: $!"
 EOF
 
@@ -197,14 +207,12 @@ EOF
   log "  ./deploy.sh ssh ${instance_id}"
 }
 
-# SSH into instance
 cmd_ssh() {
   local instance_id="$1"
+  check_ssh_key
 
-  local ssh_info
+  local ssh_info host port
   ssh_info=$(get_ssh_info "$instance_id")
-
-  local host port
   host=$(echo "$ssh_info" | cut -d: -f1)
   port=$(echo "$ssh_info" | cut -d: -f2)
 
@@ -212,14 +220,12 @@ cmd_ssh() {
   ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}"
 }
 
-# Check mining status
 cmd_status() {
   local instance_id="$1"
+  check_ssh_key
 
-  local ssh_info
+  local ssh_info host port
   ssh_info=$(get_ssh_info "$instance_id")
-
-  local host port
   host=$(echo "$ssh_info" | cut -d: -f1)
   port=$(echo "$ssh_info" | cut -d: -f2)
 
@@ -251,14 +257,12 @@ tail -20 /root/mining.log 2>/dev/null || echo "No log file yet"
 EOF
 }
 
-# Tail mining logs
 cmd_logs() {
   local instance_id="$1"
+  check_ssh_key
 
-  local ssh_info
+  local ssh_info host port
   ssh_info=$(get_ssh_info "$instance_id")
-
-  local host port
   host=$(echo "$ssh_info" | cut -d: -f1)
   port=$(echo "$ssh_info" | cut -d: -f2)
 
@@ -266,7 +270,6 @@ cmd_logs() {
   ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}" "tail -f /root/mining.log"
 }
 
-# Destroy instance
 cmd_destroy() {
   local instance_id="$1"
   check_vastai
@@ -289,58 +292,40 @@ case "${1:-help}" in
     cmd_search
     ;;
   create)
-    if [ -z "${2:-}" ]; then
-      error "Usage: ./deploy.sh create <offer_id>"
-      exit 1
-    fi
+    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh create <offer_id>"; exit 1; }
     cmd_create "$2"
     ;;
   deploy)
-    if [ -z "${2:-}" ]; then
-      error "Usage: ./deploy.sh deploy <instance_id>"
-      exit 1
-    fi
-    cmd_deploy "$2"
+    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh deploy <instance_id> [homestead|frontier]"; exit 1; }
+    cmd_deploy "$2" "${3:-homestead}"
     ;;
   ssh)
-    if [ -z "${2:-}" ]; then
-      error "Usage: ./deploy.sh ssh <instance_id>"
-      exit 1
-    fi
+    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh ssh <instance_id>"; exit 1; }
     cmd_ssh "$2"
     ;;
   status)
-    if [ -z "${2:-}" ]; then
-      error "Usage: ./deploy.sh status <instance_id>"
-      exit 1
-    fi
+    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh status <instance_id>"; exit 1; }
     cmd_status "$2"
     ;;
   logs)
-    if [ -z "${2:-}" ]; then
-      error "Usage: ./deploy.sh logs <instance_id>"
-      exit 1
-    fi
+    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh logs <instance_id>"; exit 1; }
     cmd_logs "$2"
     ;;
   destroy)
-    if [ -z "${2:-}" ]; then
-      error "Usage: ./deploy.sh destroy <instance_id>"
-      exit 1
-    fi
+    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh destroy <instance_id>"; exit 1; }
     cmd_destroy "$2"
     ;;
   help|--help|-h|*)
-    echo "Vast.ai Homestead Mining Deployment"
+    echo "Vast.ai Ethereum Mining Deployment"
     echo ""
     echo "Usage:"
-    echo "  ./deploy.sh search              # Find available GPU instances"
-    echo "  ./deploy.sh create <offer_id>   # Create instance from offer"
-    echo "  ./deploy.sh deploy <instance_id> # Deploy mining script"
-    echo "  ./deploy.sh ssh <instance_id>   # SSH into instance"
-    echo "  ./deploy.sh status <instance_id> # Check mining status"
-    echo "  ./deploy.sh logs <instance_id>  # Tail mining logs"
-    echo "  ./deploy.sh destroy <instance_id> # Destroy instance"
+    echo "  ./deploy.sh search                           # Find available GPU instances"
+    echo "  ./deploy.sh create <offer_id>                # Create instance from offer"
+    echo "  ./deploy.sh deploy <instance_id> [era]       # Deploy mining (era: homestead|frontier)"
+    echo "  ./deploy.sh ssh <instance_id>                # SSH into instance"
+    echo "  ./deploy.sh status <instance_id>             # Check mining status"
+    echo "  ./deploy.sh logs <instance_id>               # Tail mining logs"
+    echo "  ./deploy.sh destroy <instance_id>            # Destroy instance"
     echo ""
     echo "Prerequisites:"
     echo "  pip install vastai"

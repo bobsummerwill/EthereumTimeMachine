@@ -1,45 +1,107 @@
 #!/usr/bin/env bash
 #
-# Homestead Resurrection Mining Script for Vast.ai
+# Ethereum Resurrection Mining Script
 #
-# This script runs DIRECTLY on a Vast.ai instance (not via SSH).
-# It automates the complete Ethereum Homestead resurrection process:
+# Automates GPU mining to crash difficulty on historical Ethereum chains.
+# Works on any Linux system with NVIDIA GPUs (Vast.ai, local, cloud, etc.)
 #
-# 1. Installs geth v1.3.6, ethminer, and dependencies (libfaketime)
-# 2. Syncs chaindata via P2P from chain-of-geths AWS node
-# 3. Disconnects peer at target block (prevents chain-of-geths from following)
+# 1. Installs geth, ethminer, and dependencies (libfaketime)
+# 2. Syncs chaindata via P2P from chain-of-geths node
+# 3. Disconnects peer at target block (prevents source from following)
 # 4. Starts geth with faketime (20-min gaps to crash difficulty)
-# 5. Starts mining with 8 GPUs
+# 5. Starts mining with GPUs
 # 6. Monitors and restarts after each block with updated faketime
 # 7. Auto-stops when difficulty drops below threshold (ready for CPU handoff)
 #
-# PREREQUISITES:
-# - Fresh Vast.ai instance with Ubuntu 22.04 LTS
-# - GPUs (required; external ethminer only)
-# - chain-of-geths running on AWS with public port 30311
-#
 # USAGE:
-#   # Copy this script to the Vast.ai instance and run:
-#   chmod +x vast-mining.sh
-#   nohup ./vast-mining.sh > mining-output.log 2>&1 &
-#
-#   # To resume mining without re-syncing (requires geth already running):
-#   ./vast-mining.sh --resume
+#   ./mining-script.sh --era homestead          # Full run (sync + mine)
+#   ./mining-script.sh --era frontier           # Frontier era
+#   ./mining-script.sh --era homestead --resume # Resume mining only
 #
 # MONITORING:
 #   tail -f /root/mining.log        # Main script log
 #   tail -f /root/geth.log          # Geth output
-#
-# Environment variables (optional):
-#   P2P_ENODE     - enode URL for P2P sync (default: chain-of-geths v1.3.6)
-#   TARGET_BLOCK  - block to sync to before mining (default: 1919999)
-#   MINER_ADDRESS - etherbase address for mining rewards
-#   MINER_KEY     - private key for miner address
+#   tail -f /root/ethminer.log      # Miner output
 
 set -euo pipefail
 
 # ============================================================================
-# Configuration
+# Argument Parsing
+# ============================================================================
+
+show_usage() {
+  echo "Ethereum Resurrection Mining Script"
+  echo ""
+  echo "Usage: $0 --era <homestead|frontier> [--resume]"
+  echo ""
+  echo "Options:"
+  echo "  --era <era>   Required. Either 'homestead' or 'frontier'"
+  echo "  --resume      Resume mining without re-syncing"
+  echo ""
+  echo "Examples:"
+  echo "  $0 --era homestead          # Full run for Homestead"
+  echo "  $0 --era frontier           # Full run for Frontier"
+  echo "  $0 --era homestead --resume # Resume Homestead mining"
+}
+
+ERA=""
+RESUME_MODE=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --era|-e)
+      ERA="$2"
+      shift 2
+      ;;
+    --resume|-r)
+      RESUME_MODE=true
+      shift
+      ;;
+    --help|-h)
+      show_usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      show_usage
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "$ERA" ]; then
+  echo "ERROR: --era is required"
+  show_usage
+  exit 1
+fi
+
+case "$ERA" in
+  homestead|Homestead|HOMESTEAD)
+    ERA="homestead"
+    GETH_VERSION="v1.3.6"
+    GETH_URL="https://github.com/ethereum/go-ethereum/releases/download/v1.3.6/geth-Linux64-20160402135800-1.3.6-9e323d6.tar.bz2"
+    P2P_ENODE="${P2P_ENODE:-enode://a45ce9d6d92327f093d05602b30966ab1e0bf8dd4ae63f4bab2a57db514990da54149d3c50bbf3d4004c0512b6629e49ae9a349de67e008d7e7c6f6626828f3f@52.0.234.84:30311}"
+    TARGET_BLOCK="${TARGET_BLOCK:-1919999}"
+    STOP_THRESHOLD="${STOP_THRESHOLD:-10000000}"  # 10 MH
+    SYNC_TIME_EST="~1 hour"
+    ;;
+  frontier|Frontier|FRONTIER)
+    ERA="frontier"
+    GETH_VERSION="v1.0.2"
+    GETH_URL="https://github.com/ethereum/go-ethereum/releases/download/v1.0.2/geth-Linux64-20150812231906-1.0.2-b1ec849.tar.bz2"
+    P2P_ENODE="${P2P_ENODE:-enode://bbb688b660e8359409f45e52ce24d8ed0afd476e34eedce46a4a50cd3dc6998a109568c479ca171254a46004f738115b52061dcb4a173435c1215568600676e3@52.0.234.84:30312}"
+    TARGET_BLOCK="${TARGET_BLOCK:-1149999}"
+    STOP_THRESHOLD="${STOP_THRESHOLD:-50000000}"  # 50 MH
+    SYNC_TIME_EST="~40 minutes"
+    ;;
+  *)
+    echo "ERROR: Unknown ERA '$ERA'. Must be 'homestead' or 'frontier'"
+    exit 1
+    ;;
+esac
+
+# ============================================================================
+# Common Configuration
 # ============================================================================
 
 LOG_FILE="/root/mining.log"
@@ -51,23 +113,12 @@ MINER_ADDRESS="${MINER_ADDRESS:-0x3ca943ef871bea7d0dfa34bff047b0e82be441ef}"
 MINER_KEY="${MINER_KEY:-1ef4d35813260e866883e70025a91a81d9c0f4b476868a5adcd80868a39363f5}"
 MINER_PASSWORD="dev"
 
-# P2P sync configuration
-P2P_ENODE="${P2P_ENODE:-enode://a45ce9d6d92327f093d05602b30966ab1e0bf8dd4ae63f4bab2a57db514990da54149d3c50bbf3d4004c0512b6629e49ae9a349de67e008d7e7c6f6626828f3f@52.0.234.84:30311}"
-
-# Target block (last Homestead block before DAO fork)
-TARGET_BLOCK="${TARGET_BLOCK:-1919999}"
-
 # External GPU miner (required; fixed paths)
 ETHMINER_BIN="/root/ethminer-src/build/ethminer/ethminer"
 ETHMINER_LOG="/root/ethminer.log"
 
-# Auto-stop threshold - when difficulty drops below this, stop mining
-# and signal readiness for CPU handoff on other machines
-# 10 MH = takes ~12 seconds with 8x RTX 3090 (846 MH/s)
-STOP_THRESHOLD=10000000       # 10 MH - stop for CPU handoff
-
 # Fixed GPU count (all 8 GPUs throughout)
-GPU_COUNT=8
+GPU_COUNT="${GPU_COUNT:-8}"
 
 # ============================================================================
 # Utility Functions
@@ -120,7 +171,42 @@ else:
 " 2>/dev/null || echo "$diff H"
 }
 
-# Check if difficulty is below stop threshold
+# Estimate blocks remaining based on difficulty algorithm
+estimate_blocks_remaining() {
+  local current_diff="$1"
+  local target_diff="$STOP_THRESHOLD"
+
+  if [ "$ERA" = "homestead" ]; then
+    # Homestead: ~4.83% reduction per block with 20-min gaps
+    python3 -c "
+import math
+current = $current_diff
+target = $target_diff
+if current <= target:
+    print('0')
+else:
+    # Each block reduces by ~4.83% (adjustment = -99, so new = old * (1 - 99/2048))
+    ratio = 1 - 99/2048
+    n = math.log(target / current) / math.log(ratio)
+    print(f'{int(n)}')
+" 2>/dev/null || echo "unknown"
+  else
+    # Frontier: ~0.049% reduction per block (1/2048)
+    python3 -c "
+import math
+current = $current_diff
+target = $target_diff
+if current <= target:
+    print('0')
+else:
+    # Frontier: new_diff = old_diff * (2047/2048)
+    ratio = 2047 / 2048
+    n = math.log(target / current) / math.log(ratio)
+    print(f'{int(n)}')
+" 2>/dev/null || echo "unknown"
+  fi
+}
+
 should_stop_mining() {
   local diff="$1"
   [ "$diff" -lt "$STOP_THRESHOLD" ]
@@ -143,15 +229,13 @@ wait_for_rpc() {
 
 install_dependencies() {
   log "Installing system dependencies..."
-
   apt-get update -qq
   apt-get install -y -qq curl bzip2 git build-essential python3 ocl-icd-opencl-dev
-
   log "Dependencies installed."
 }
 
 install_geth() {
-  log "Installing geth v1.3.6..."
+  log "Installing geth $GETH_VERSION ($ERA era)..."
 
   if [ -x /root/geth ]; then
     log "geth already installed: $(/root/geth version 2>&1 | head -1)"
@@ -160,13 +244,23 @@ install_geth() {
 
   cd /root
 
-  local GETH_URL="https://github.com/ethereum/go-ethereum/releases/download/v1.3.6/geth-Linux64-20160402135800-1.3.6-9e323d6.tar.bz2"
-  curl -L -o geth.tar.bz2 "$GETH_URL"
-  tar xjf geth.tar.bz2
-  chmod +x geth
-  rm geth.tar.bz2
+  if ! curl -L -o geth.tar.bz2 "$GETH_URL" 2>/dev/null; then
+    log "WARNING: geth $GETH_VERSION binary not available from GitHub"
+    log "Attempting to download from chain-of-geths docker image..."
 
-  log "geth v1.3.6 installed."
+    docker pull "ethereumtimemachine/geth:$GETH_VERSION" || {
+      log "ERROR: Cannot obtain geth $GETH_VERSION. Build from source required."
+      exit 1
+    }
+    docker run --rm -v /root:/out "ethereumtimemachine/geth:$GETH_VERSION" cp /usr/bin/geth /out/geth
+    chmod +x /root/geth
+  else
+    tar xjf geth.tar.bz2
+    chmod +x geth
+    rm geth.tar.bz2
+  fi
+
+  log "geth $GETH_VERSION installed: $(/root/geth version 2>&1 | head -1)"
 }
 
 install_libfaketime() {
@@ -286,7 +380,6 @@ start_geth_for_sync() {
   # Start geth for sync
   nohup /root/geth --datadir "$DATA_DIR" \
     --cache 4096 \
-    --fast=false \
     --rpc --rpcaddr 0.0.0.0 --rpcport 8545 \
     --rpcapi "eth,net,web3,admin" \
     --networkid 1 \
@@ -307,9 +400,8 @@ start_geth_for_sync() {
 
 wait_for_sync() {
   log "Waiting for P2P sync to reach block $TARGET_BLOCK..."
-  log "This typically takes ~1 hour at ~500 blocks/sec"
+  log "Estimated time: $SYNC_TIME_EST at ~500 blocks/sec"
 
-  local last_block=0
   local start_time=$(date +%s)
 
   while true; do
@@ -333,7 +425,6 @@ wait_for_sync() {
       return 0
     fi
 
-    last_block=$current_block
     sleep 60
   done
 }
@@ -410,16 +501,22 @@ start_ethminer() {
   log "ethminer PID: $!"
 }
 
-# Kill ethminer
 stop_mining() {
   pkill -9 -f "$ETHMINER_BIN" 2>/dev/null || true
 }
 
 mining_loop() {
   log "=== Entering mining loop ==="
-  log "Using $GPU_COUNT GPUs throughout (no tapering)"
+  log "Era: $ERA | Geth: $GETH_VERSION | GPUs: $GPU_COUNT"
   log "Auto-stop threshold: $(format_difficulty $STOP_THRESHOLD) (for CPU handoff)"
   log "Faketime will advance 20 minutes after each block"
+
+  if [ "$ERA" = "frontier" ]; then
+    log ""
+    log "IMPORTANT: Frontier difficulty algorithm is 99x SLOWER than Homestead!"
+    log "Expected blocks: ~25,600 | Expected time: 4-6 months"
+  fi
+  log ""
 
   local last_block=$(get_block_number)
   local blocks_mined=0
@@ -427,7 +524,9 @@ mining_loop() {
 
   local init_diff=$(get_difficulty)
   local init_diff_fmt=$(format_difficulty "$init_diff")
+  local est_blocks=$(estimate_blocks_remaining "$init_diff")
   log "Initial difficulty: $init_diff_fmt"
+  log "Estimated blocks remaining: ~$est_blocks"
 
   while true; do
     sleep 30
@@ -459,8 +558,9 @@ mining_loop() {
       local ts_human=$(date -d "@$ts" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "$ts")
       local diff=$(get_difficulty)
       local diff_fmt=$(format_difficulty "$diff")
+      local remaining=$(estimate_blocks_remaining "$diff")
 
-      log "NEW BLOCK #$current_block mined! | Timestamp: $ts_human | Difficulty: $diff_fmt | Session total: $blocks_mined blocks"
+      log "NEW BLOCK #$current_block mined! | Timestamp: $ts_human | Difficulty: $diff_fmt | Session: $blocks_mined blocks | Remaining: ~$remaining"
 
       # Check if we should stop for CPU handoff
       if should_stop_mining "$diff"; then
@@ -526,11 +626,10 @@ mining_loop() {
 
 resume() {
   log "============================================"
-  log "Homestead Resurrection Mining (RESUME MODE)"
+  log "${ERA^} Resurrection Mining (RESUME MODE)"
   log "============================================"
-  log "Miner Address: $MINER_ADDRESS"
-  log "GPUs: $GPU_COUNT (no tapering)"
-  log "Auto-stop at: $(format_difficulty $STOP_THRESHOLD)"
+  log "Geth: $GETH_VERSION | Miner: $MINER_ADDRESS"
+  log "GPUs: $GPU_COUNT | Auto-stop: $(format_difficulty $STOP_THRESHOLD)"
   log "============================================"
 
   # Check if geth is running
@@ -578,13 +677,18 @@ resume() {
 
 main() {
   log "============================================"
-  log "Homestead Resurrection Mining"
+  log "${ERA^} Resurrection Mining"
   log "============================================"
-  log "Miner Address: $MINER_ADDRESS"
+  log "Geth: $GETH_VERSION | Miner: $MINER_ADDRESS"
   log "Target Block: $TARGET_BLOCK"
   log "P2P Enode: ${P2P_ENODE:0:50}..."
-  log "GPUs: $GPU_COUNT (no tapering)"
-  log "Auto-stop at: $(format_difficulty $STOP_THRESHOLD)"
+  log "GPUs: $GPU_COUNT | Auto-stop: $(format_difficulty $STOP_THRESHOLD)"
+
+  if [ "$ERA" = "frontier" ]; then
+    log ""
+    log "WARNING: Frontier is 99x SLOWER than Homestead!"
+    log "Expected: ~25,600 blocks over 4-6 months"
+  fi
   log "============================================"
 
   # Phase 1: Installation
@@ -628,12 +732,9 @@ main() {
   mining_loop
 }
 
-# Parse arguments and run
-case "${1:-}" in
-  --resume|-r)
-    resume
-    ;;
-  *)
-    main "$@"
-    ;;
-esac
+# Run based on mode
+if [ "$RESUME_MODE" = true ]; then
+  resume
+else
+  main
+fi

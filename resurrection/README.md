@@ -44,17 +44,57 @@ We use `libfaketime` to make geth think the system time is 20 minutes ahead. Get
 
 Scripts auto-stop when difficulty reaches target threshold, then restart geth with P2P enabled for chaindata sync to other machines for CPU mining.
 
+## Directory Structure
+
+```
+resurrection/
+├── mining-script.sh        # GPU mining script (--era homestead|frontier)
+├── deploy-vast.sh               # Vast.ai deployment CLI (search, create, deploy, ssh, logs)
+└── generated-files/
+    ├── miner-address.txt   # Mining reward address
+    ├── miner-private-key.hex
+    ├── miner-password.txt
+    ├── vast-ssh-key        # SSH key for Vast.ai (auto-created)
+    └── data/               # Nodekeys for P2P identity
+```
+
 ## Deployment
 
-- **[vast-homestead/](vast-homestead/)** - Homestead mining on Vast.ai
-- **[vast-frontier/](vast-frontier/)** - Frontier mining on Vast.ai
-
-### Quick Start (Homestead)
+### Using deploy-vast.sh (Recommended)
 
 ```bash
-# Upload and run
-rsync -avzP vast-homestead/ root@sshX.vast.ai:/root/vast-homestead/ -e "ssh -p PORT"
-ssh -p PORT root@sshX.vast.ai "cd /root/vast-homestead && chmod +x vast-mining.sh && nohup ./vast-mining.sh > mining-output.log 2>&1 &"
+# Prerequisites
+pip install vastai
+vastai set api-key YOUR_API_KEY
+
+# 1. Search for instances
+./deploy-vast.sh search
+
+# 2. Create instance
+./deploy-vast.sh create OFFER_ID
+
+# 3. Deploy mining (default: homestead)
+./deploy-vast.sh deploy INSTANCE_ID homestead
+# Or for Frontier:
+./deploy-vast.sh deploy INSTANCE_ID frontier
+
+# 4. Monitor
+./deploy-vast.sh logs INSTANCE_ID
+./deploy-vast.sh status INSTANCE_ID
+./deploy-vast.sh ssh INSTANCE_ID
+
+# 5. Cleanup
+./deploy-vast.sh destroy INSTANCE_ID
+```
+
+### Manual Deployment
+
+```bash
+# Upload script
+rsync -avzP mining-script.sh root@sshX.vast.ai:/root/ -e "ssh -p PORT"
+
+# Run
+ssh -p PORT root@sshX.vast.ai "nohup /root/mining-script.sh --era homestead > mining-output.log 2>&1 &"
 
 # Monitor
 ssh -p PORT root@sshX.vast.ai "tail -f /root/mining.log"
