@@ -33,3 +33,6 @@ resurrection/vast-homestead/**/*.log
 resurrection/vast-homestead/.env
 resurrection/vast-homestead/.env.*
 !resurrection/vast-homestead/.env.example
+
+# Resurrection generated files (binaries, keys, etc.)
+resurrection/generated-files/

@@ -48,14 +48,13 @@ Scripts auto-stop when difficulty reaches target threshold, then restart geth wi
 
 ```
 resurrection/
-├── mining-script.sh        # GPU mining script (--era homestead|frontier)
-├── deploy-vast.sh               # Vast.ai deployment CLI (search, create, deploy, ssh, logs)
+├── mining-script.sh   # GPU mining script (--era homestead|frontier)
+├── deploy-vast.sh     # Vast.ai deployment CLI (search, create, deploy, ssh, logs)
 └── generated-files/
-    ├── miner-address.txt   # Mining reward address
+    ├── miner-address.txt
     ├── miner-private-key.hex
     ├── miner-password.txt
-    ├── vast-ssh-key        # SSH key for Vast.ai (auto-created)
-    └── data/               # Nodekeys for P2P identity
+    └── data/          # Nodekeys for P2P identity
 ```
 
 ## Deployment
@@ -112,3 +111,61 @@ ssh -p PORT root@sshX.vast.ai "tail -f /root/mining.log"
 | ~320 | 10 MH | instant | ~176 hours |
 
 Total: ~180 hours (~7.5 days) including overhead.
+
+## Troubleshooting
+
+### P2P Sync: "No peers connected"
+
+The mining script syncs chaindata from a chain-of-geths node before mining. If it reports no peers:
+
+1. **Check the source node is running**:
+   ```bash
+   # On your chain-of-geths host (e.g., AWS EC2)
+   docker ps | grep geth
+   ```
+
+2. **Check network connectivity from Vast.ai**:
+   ```bash
+   # Test TCP connection to the P2P port
+   nc -zv 52.0.234.84 30311  # Homestead
+   nc -zv 52.0.234.84 30312  # Frontier
+   ```
+
+3. **Check firewall/security groups**:
+   - **AWS**: The Security Group must allow inbound TCP on port 30311 (Homestead) or 30312 (Frontier)
+   - Common mistake: Port is only open for internal traffic, not external
+   - Go to EC2 → Security Groups → Edit inbound rules → Add TCP port 30311/30312 from 0.0.0.0/0
+
+### Frontier: "geth v1.0.2 binary not found"
+
+Geth v1.0.2 has no official prebuilt Linux binary. The deploy script automatically builds it locally using Docker and uploads it to Vast.ai.
+
+If this fails, ensure:
+1. Docker is installed and running on your local machine
+2. The `ethereumtimemachine/geth:v1.0.2` image exists (built by `chain-of-geths/build-images.sh`)
+
+**Manual fix** (if automatic build fails):
+```bash
+# Build the image first (if needed)
+cd chain-of-geths && ONLY_VERSION=v1.0.2 ./build-images.sh
+
+# Extract the binary
+docker run --rm --entrypoint /bin/sh -v /tmp:/out \
+  ethereumtimemachine/geth:v1.0.2 \
+  -c 'cp /usr/local/bin/geth /out/geth-v1.0.2'
+
+# Upload to Vast.ai instance
+scp -P PORT /tmp/geth-v1.0.2 root@sshX.vast.ai:/root/geth
+```
+
+### Mining stalled / ethminer died
+
+The script auto-restarts ethminer if it crashes. Check logs:
+```bash
+tail -100 /root/ethminer.log
+tail -100 /root/geth.log
+```
+
+Common issues:
+- **GPU memory errors**: Reduce DAG load mode or check GPU health with `nvidia-smi`
+- **OpenCL not found**: Ensure `/etc/OpenCL/vendors/nvidia.icd` exists

@@ -244,20 +244,56 @@ install_geth() {
 
   cd /root
 
-  if ! curl -L -o geth.tar.bz2 "$GETH_URL" 2>/dev/null; then
-    log "WARNING: geth $GETH_VERSION binary not available from GitHub"
-    log "Attempting to download from chain-of-geths docker image..."
-
-    docker pull "ethereumtimemachine/geth:$GETH_VERSION" || {
-      log "ERROR: Cannot obtain geth $GETH_VERSION. Build from source required."
+  # v1.0.2 has no prebuilt Linux binary - should be pre-uploaded by deploy script
+  if [ "$GETH_VERSION" = "v1.0.2" ]; then
+    if [ ! -x /root/geth ]; then
+      log ""
+      log "============================================"
+      log "ERROR: geth v1.0.2 binary not found"
+      log "============================================"
+      log ""
+      log "geth v1.0.2 has no official prebuilt Linux binary."
+      log "The deploy script should have uploaded it automatically."
+      log ""
+      log "To fix manually:"
+      log "  1. On your local machine (with Docker):"
+      log "     docker run --rm --entrypoint /bin/sh -v /tmp:/out \\"
+      log "       ethereumtimemachine/geth:v1.0.2 \\"
+      log "       -c 'cp /usr/local/bin/geth /out/geth-v1.0.2'"
+      log ""
+      log "  2. Upload to this instance:"
+      log "     scp /tmp/geth-v1.0.2 root@<host>:/root/geth"
+      log ""
+      log "============================================"
       exit 1
-    }
-    docker run --rm -v /root:/out "ethereumtimemachine/geth:$GETH_VERSION" cp /usr/bin/geth /out/geth
-    chmod +x /root/geth
+    fi
+    log "geth v1.0.2 found (pre-uploaded): $(/root/geth version 2>&1 | head -1)"
+    return 0
+  fi
+
+  # Try downloading prebuilt binary
+  if curl -L -o geth.tar.bz2 "$GETH_URL" 2>/dev/null; then
+    # Verify it's actually a bzip2 file
+    if bzip2 -t geth.tar.bz2 2>/dev/null; then
+      tar xjf geth.tar.bz2
+      # Find and move the geth binary
+      local geth_bin
+      geth_bin=$(find . -maxdepth 2 -type f -name geth 2>/dev/null | head -1)
+      if [ -n "$geth_bin" ] && [ "$geth_bin" != "./geth" ]; then
+        mv "$geth_bin" /root/geth
+      fi
+      chmod +x /root/geth
+      rm -f geth.tar.bz2
+    else
+      log "Downloaded file is not bzip2, extracting from Docker..."
+      rm -f geth.tar.bz2
+      extract_geth_from_docker
+      return $?
+    fi
   else
-    tar xjf geth.tar.bz2
-    chmod +x geth
-    rm geth.tar.bz2
+    log "WARNING: geth $GETH_VERSION binary not available, extracting from Docker..."
+    extract_geth_from_docker
+    return $?
   fi
 
   log "geth $GETH_VERSION installed: $(/root/geth version 2>&1 | head -1)"
@@ -398,11 +434,67 @@ start_geth_for_sync() {
   fi
 }
 
+wait_for_peer() {
+  log "Waiting for P2P peer connection..."
+  log "Expected peer: ${P2P_ENODE:0:50}..."
+
+  local max_wait=300  # 5 minutes
+  local wait_time=0
+  local check_interval=10
+
+  while [ "$wait_time" -lt "$max_wait" ]; do
+    local peer_count=$(get_peer_count)
+
+    if [ "$peer_count" -gt 0 ]; then
+      log "Connected to $peer_count peer(s)!"
+      return 0
+    fi
+
+    log "Waiting for peer... ($wait_time/$max_wait sec)"
+    sleep "$check_interval"
+    wait_time=$((wait_time + check_interval))
+  done
+
+  # No peers after timeout - provide helpful error
+  log ""
+  log "============================================"
+  log "ERROR: No P2P peers connected after ${max_wait}s"
+  log "============================================"
+  log ""
+  log "The sync source node may not be reachable."
+  log ""
+  log "Troubleshooting steps:"
+  log ""
+  log "1. Check if the source node is running:"
+  log "   ssh to your chain-of-geths host and verify the container is up"
+  log ""
+  log "2. Check network connectivity:"
+  log "   nc -zv ${P2P_ENODE#*@} (should show 'open')"
+  log ""
+  log "3. Check firewall/security groups:"
+  log "   - AWS: Ensure the Security Group allows inbound TCP on port 30311/30312"
+  log "   - The port must be open to external connections, not just localhost"
+  log ""
+  log "4. Verify the enode URL is correct:"
+  log "   P2P_ENODE=$P2P_ENODE"
+  log ""
+  log "============================================"
+  return 1
+}
+
 wait_for_sync() {
   log "Waiting for P2P sync to reach block $TARGET_BLOCK..."
   log "Estimated time: $SYNC_TIME_EST at ~500 blocks/sec"
 
+  # First wait for peer connection
+  if ! wait_for_peer; then
+    exit 1
+  fi
+
   local start_time=$(date +%s)
+  local last_block=0
+  local stall_count=0
+  local max_stall=10  # 10 minutes of no progress = error
 
   while true; do
     local current_block=$(get_block_number)
@@ -425,6 +517,25 @@ wait_for_sync() {
       return 0
     fi
 
+    # Check for stalled sync
+    if [ "$current_block" -eq "$last_block" ]; then
+      stall_count=$((stall_count + 1))
+      if [ "$stall_count" -ge "$max_stall" ]; then
+        log ""
+        log "WARNING: Sync appears stalled at block $current_block for ${max_stall} minutes"
+        log "Peers: $peer_count"
+        if [ "$peer_count" -eq 0 ]; then
+          log "No peers connected - source node may have disconnected"
+          log "Restarting geth to re-establish connection..."
+          start_geth_for_sync
+          stall_count=0
+        fi
+      fi
+    else
+      stall_count=0
+    fi
+
+    last_block=$current_block
     sleep 60
   done
 }

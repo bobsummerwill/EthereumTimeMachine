@@ -31,9 +31,6 @@ GPU_NAME="RTX_3090"
 MIN_GPU_RAM=20
 MAX_PRICE=1.50
 
-# SSH key for Vast.ai
-SSH_KEY="${SSH_KEY:-$SCRIPT_DIR/generated-files/vast-ssh-key}"
-
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -49,17 +46,6 @@ check_vastai() {
     error "vastai CLI not found. Install with: pip install vastai"
     error "Then set API key: vastai set api-key YOUR_API_KEY"
     exit 1
-  fi
-}
-
-check_ssh_key() {
-  if [ ! -f "$SSH_KEY" ]; then
-    warn "SSH key not found at $SSH_KEY"
-    warn "Creating new SSH key..."
-    ssh-keygen -t ed25519 -f "$SSH_KEY" -N "" -C "vast-mining"
-    log "Add this public key to Vast.ai:"
-    cat "${SSH_KEY}.pub"
-    exit 0
   fi
 }
 
@@ -143,6 +129,67 @@ get_ssh_info() {
   echo "${host}:${port}"
 }
 
+# Build geth v1.0.2 locally using Docker (same as chain-of-geths)
+# Returns path to the binary on stdout (all log messages go to stderr)
+build_geth_v102() {
+  local binary_path="${SCRIPT_DIR}/generated-files/geth-binaries/geth-linux-amd64-v1.0.2"
+
+  # Check if already built
+  if [ -x "$binary_path" ]; then
+    log "geth v1.0.2 binary already exists at $binary_path" >&2
+    echo "$binary_path"
+    return 0
+  fi
+
+  log "Building geth v1.0.2 locally using Docker..." >&2
+  log "This uses the same build process as chain-of-geths" >&2
+
+  # Check Docker is available
+  if ! command -v docker &>/dev/null; then
+    error "Docker is required to build geth v1.0.2"
+    error "Install Docker or build manually using chain-of-geths/build-images.sh"
+    exit 1
+  fi
+
+  # Create output directory
+  mkdir -p "${SCRIPT_DIR}/generated-files/geth-binaries"
+
+  # Extract binary from the Docker image (built by chain-of-geths)
+  log "Extracting geth binary from ethereumtimemachine/geth:v1.0.2..." >&2
+  if ! docker run --rm --entrypoint /bin/sh \
+    -v "${SCRIPT_DIR}/generated-files/geth-binaries:/out" \
+    ethereumtimemachine/geth:v1.0.2 \
+    -c 'cp /usr/local/bin/geth /out/geth-linux-amd64-v1.0.2 && chmod +x /out/geth-linux-amd64-v1.0.2' 2>/dev/null; then
+
+    # Image doesn't exist locally - need to build it first
+    warn "Docker image not found locally. Building from chain-of-geths..." >&2
+
+    local chain_of_geths_dir="${SCRIPT_DIR}/../chain-of-geths"
+    if [ ! -f "${chain_of_geths_dir}/build-images.sh" ]; then
+      error "chain-of-geths/build-images.sh not found"
+      error "Run: cd ../chain-of-geths && ONLY_VERSION=v1.0.2 ./build-images.sh"
+      exit 1
+    fi
+
+    log "Building geth v1.0.2 Docker image (this may take several minutes)..." >&2
+    (cd "$chain_of_geths_dir" && ONLY_VERSION=v1.0.2 ./build-images.sh) >&2
+
+    # Try extraction again
+    docker run --rm --entrypoint /bin/sh \
+      -v "${SCRIPT_DIR}/generated-files/geth-binaries:/out" \
+      ethereumtimemachine/geth:v1.0.2 \
+      -c 'cp /usr/local/bin/geth /out/geth-linux-amd64-v1.0.2 && chmod +x /out/geth-linux-amd64-v1.0.2'
+  fi
+
+  if [ ! -x "$binary_path" ]; then
+    error "Failed to build/extract geth v1.0.2 binary"
+    exit 1
+  fi
+
+  log "geth v1.0.2 binary ready: $binary_path" >&2
+  echo "$binary_path"
+}
+
 cmd_deploy() {
   local instance_id="$1"
   local era="${2:-homestead}"
@@ -151,8 +198,6 @@ cmd_deploy() {
     error "ERA must be 'homestead' or 'frontier'"
     exit 1
   fi
-
-  check_ssh_key
 
   log "Getting SSH info for instance ${instance_id}..."
   local ssh_info
@@ -169,10 +214,16 @@ cmd_deploy() {
     warn "Expected time: 4-6 months | Cost: ~\$3,000+"
   fi
 
+  # For Frontier, build geth v1.0.2 locally first
+  local geth_binary=""
+  if [ "$era" = "frontier" ]; then
+    geth_binary=$(build_geth_v102)
+  fi
+
   # Wait for SSH
   log "Waiting for SSH to be ready..."
   for i in {1..30}; do
-    if ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p "$port" "root@${host}" "echo ok" &>/dev/null; then
+    if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p "$port" "root@${host}" "echo ok" &>/dev/null; then
       break
     fi
     echo -n "."
@@ -182,11 +233,18 @@ cmd_deploy() {
 
   # Copy mining script
   log "Copying mining-script.sh..."
-  scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -P "$port" "${SCRIPT_DIR}/mining-script.sh" "root@${host}:/root/"
+  scp -o StrictHostKeyChecking=no -P "$port" "${SCRIPT_DIR}/mining-script.sh" "root@${host}:/root/"
+
+  # For Frontier, upload the pre-built geth binary
+  if [ "$era" = "frontier" ] && [ -n "$geth_binary" ]; then
+    log "Uploading geth v1.0.2 binary..."
+    scp -o StrictHostKeyChecking=no -P "$port" "$geth_binary" "root@${host}:/root/geth"
+    ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" "chmod +x /root/geth"
+  fi
 
   # Start mining
   log "Starting ${era} mining..."
-  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s "$era" << 'EOF'
+  ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s "$era" << 'EOF'
 ERA="$1"
 chmod +x /root/mining-script.sh
 
@@ -209,7 +267,6 @@ EOF
 
 cmd_ssh() {
   local instance_id="$1"
-  check_ssh_key
 
   local ssh_info host port
   ssh_info=$(get_ssh_info "$instance_id")
@@ -217,19 +274,18 @@ cmd_ssh() {
   port=$(echo "$ssh_info" | cut -d: -f2)
 
   log "Connecting to ${host}:${port}..."
-  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}"
+  ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}"
 }
 
 cmd_status() {
   local instance_id="$1"
-  check_ssh_key
 
   local ssh_info host port
   ssh_info=$(get_ssh_info "$instance_id")
   host=$(echo "$ssh_info" | cut -d: -f1)
   port=$(echo "$ssh_info" | cut -d: -f2)
 
-  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s << 'EOF'
+  ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s << 'EOF'
 echo "=== Process Status ==="
 ps aux | grep -E "geth|ethminer|vast-mining" | grep -v grep || echo "No mining processes found"
 
@@ -259,7 +315,6 @@ EOF
 
 cmd_logs() {
   local instance_id="$1"
-  check_ssh_key
 
   local ssh_info host port
   ssh_info=$(get_ssh_info "$instance_id")
@@ -267,7 +322,7 @@ cmd_logs() {
   port=$(echo "$ssh_info" | cut -d: -f2)
 
   log "Tailing logs (Ctrl+C to stop)..."
-  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -p "$port" "root@${host}" "tail -f /root/mining.log"
+  ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" "tail -f /root/mining.log"
 }
 
 cmd_destroy() {
