@@ -624,8 +624,8 @@ mining_loop() {
 
   if [ "$ERA" = "frontier" ]; then
     log ""
-    log "IMPORTANT: Frontier difficulty algorithm is 99x SLOWER than Homestead!"
-    log "Expected blocks: ~25,600 | Expected time: 4-6 months"
+    log "IMPORTANT: Frontier requires ~80x more blocks than Homestead!"
+    log "Expected blocks: ~26,100 | Expected time: ~16 months (8x 3090 @ 845 MH/s)"
   fi
   log ""
 
@@ -797,8 +797,8 @@ main() {
 
   if [ "$ERA" = "frontier" ]; then
     log ""
-    log "WARNING: Frontier is 99x SLOWER than Homestead!"
-    log "Expected: ~25,600 blocks over 4-6 months"
+    log "WARNING: Frontier requires ~80x more blocks than Homestead!"
+    log "Expected: ~26,100 blocks over ~16 months"
   fi
   log "============================================"
 

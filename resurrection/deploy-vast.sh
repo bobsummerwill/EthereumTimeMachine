@@ -210,8 +210,8 @@ cmd_deploy() {
   log "Deploying ${era} mining to ${host}:${port}..."
 
   if [ "$era" = "frontier" ]; then
-    warn "WARNING: Frontier is 99x slower than Homestead!"
-    warn "Expected time: 4-6 months | Cost: ~\$3,000+"
+    warn "WARNING: Frontier is ~80x more blocks than Homestead!"
+    warn "Expected time: ~16 months | Cost: ~\$11,500 (8x RTX 3090 @ \$1/hr)"
   fi
 
   # For Frontier, build geth v1.0.2 locally first
