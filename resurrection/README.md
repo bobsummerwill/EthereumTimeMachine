@@ -8,13 +8,13 @@ GPU mining to extend historical chains beyond their original blocks, reducing di
 |--|-----------|----------|
 | Geth | v1.3.6 | v1.0.2 |
 | Block | 1,919,999+ | 1,149,999+ |
-| Start difficulty | ~62 TH | ~17.2 TH |
+| Start difficulty | ~62 TH | ~20.5 TH |
 | Target difficulty | ~10 MH | ~50 MH |
 | Reduction/block | ~4.83% | ~0.049% |
-| Blocks needed | ~320 | ~26,100 |
+| Blocks needed | ~320 | ~26,500 |
 | GPUs | 8x RTX 3090 | 8x RTX 3090 |
-| Time | ~8 days | **~16 months** |
-| Cost | ~$180 | **~$11,500** |
+| Time | ~8 days | **~19 months** |
+| Cost | ~$180 | **~$14,000** |
 
 **Recommendation**: Start with Homestead. Frontier requires ~80x more blocks due to its simpler difficulty algorithm that only reduces by 1/2048 per block regardless of timestamp gap.
 
@@ -114,21 +114,21 @@ Total: ~180 hours (~7.5 days) including overhead.
 
 ## Frontier Difficulty Progression
 
-With 8x RTX 3090 @ 845 MH/s:
+With 8x RTX 3090 @ 845 MH/s (actual starting difficulty: 20.5 TH):
 
 | Block | Difficulty | Block Time | Cumulative |
 |-------|------------|------------|------------|
-| 1 | 17.2 TH | 5.6 hours | 0.2 days |
-| 100 | 16.4 TH | 5.4 hours | 23 days |
-| 500 | 13.5 TH | 4.4 hours | 104 days |
-| 1,000 | 10.5 TH | 3.5 hours | 186 days |
-| 2,000 | 6.5 TH | 2.1 hours | 300 days |
-| 5,000 | 1.5 TH | 30 min | 440 days |
-| 10,000 | 130 GH | 2.6 min | 478 days |
-| 20,000 | 984 MH | 1.2 sec | 482 days |
-| ~26,100 | 50 MH | instant | ~482 days |
+| 1 | 20.5 TH | 6.7 hours | 0.3 days |
+| 100 | 19.5 TH | 6.4 hours | 27 days |
+| 500 | 16.1 TH | 5.3 hours | 124 days |
+| 1,000 | 12.6 TH | 4.1 hours | 223 days |
+| 2,000 | 7.7 TH | 2.5 hours | 358 days |
+| 5,000 | 1.8 TH | 36 min | 525 days |
+| 10,000 | 158 GH | 3.1 min | 570 days |
+| 20,000 | 1.2 GH | 1.4 sec | 575 days |
+| ~26,500 | 50 MH | instant | ~575 days |
 
-Total: ~482 days (~16 months) at $1/hr = ~$11,500.
+Total: ~575 days (~19 months) at $1/hr = ~$14,000.
 
 **Why so slow?** Frontier's difficulty only drops by 1/2048 (~0.049%) per block, regardless of timestamp gap. The first 5,000 blocks consume 91% of total mining time.
 

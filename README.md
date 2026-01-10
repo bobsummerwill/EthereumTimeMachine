@@ -23,7 +23,7 @@ GPU mining to crash difficulty from ~62 TH to CPU-mineable levels.
 | Option | Time | Cost | Blocks |
 |--------|------|------|--------|
 | **Homestead** (recommended) | ~8 days | ~$180 | ~320 |
-| Frontier | ~4-6 months | ~$3,000+ | ~25,600 |
+| Frontier | ~19 months | ~$14,000 | ~26,500 |
 
 See [`resurrection/README.md`](resurrection/README.md)
 
