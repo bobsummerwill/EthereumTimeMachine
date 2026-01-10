@@ -132,6 +132,16 @@ Total: ~575 days (~19 months) at $1/hr = ~$14,000.
 
 **Why so slow?** Frontier's difficulty only drops by 1/2048 (~0.049%) per block, regardless of timestamp gap. The first 5,000 blocks consume 91% of total mining time.
 
+## GPU Mining Details
+
+The mining script uses **ethminer with CUDA** for NVIDIA GPUs. CUDA provides:
+- Fast DAG generation across all GPUs (~1 second per GPU)
+- No multi-GPU serialization issues (unlike OpenCL)
+- Optimized for RTX 3090 (Compute 8.6)
+
+Expected hashrates:
+- 8x RTX 3090: ~845 MH/s total (~105 MH/s per GPU)
+
 ## Troubleshooting
 
 ### P2P Sync: "No peers connected"
@@ -187,5 +197,5 @@ tail -100 /root/geth.log
 ```
 
 Common issues:
-- **GPU memory errors**: Reduce DAG load mode or check GPU health with `nvidia-smi`
-- **OpenCL not found**: Ensure `/etc/OpenCL/vendors/nvidia.icd` exists
+- **GPU memory errors**: Check GPU health with `nvidia-smi`
+- **CUDA errors**: Ensure CUDA toolkit is installed (the nvidia/cuda Docker image includes it)

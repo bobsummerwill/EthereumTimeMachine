@@ -319,7 +319,8 @@ install_libfaketime() {
 }
 
 install_ethminer() {
-  log "Installing ethminer (OpenCL)..."
+  # Use CUDA for both Frontier and Homestead (faster DAG generation on multi-GPU NVIDIA)
+  log "Installing ethminer (CUDA for RTX 3090)..."
 
   if [ -x "$ETHMINER_BIN" ]; then
     log "ethminer already installed at $ETHMINER_BIN"
@@ -361,13 +362,15 @@ install_ethminer() {
     sed -i 's/Boost VERSION 1.66.0/Boost VERSION 1.66.0-p0/' "${HUNTER_CFG}"
   fi
 
-  log "Configuring ethminer (OpenCL only, no CUDA)..."
   mkdir -p build
   cd build
+
+  log "Configuring ethminer (CUDA for RTX 3090, Compute 8.6)..."
   "${CMAKE_DIR}/bin/cmake" .. \
-    -DETHASHCUDA=OFF \
-    -DETHASHCL=ON \
+    -DETHASHCUDA=ON \
+    -DETHASHCL=OFF \
     -DETHASHCPU=OFF \
+    -DCUDA_ARCH="86" \
     -DCMAKE_BUILD_TYPE=Release
 
   log "Building ethminer (this may take several minutes)..."
@@ -603,11 +606,12 @@ start_ethminer() {
     return 1
   fi
 
-  log "Starting ethminer with $GPU_COUNT GPUs"
+  log "Starting ethminer with $GPU_COUNT GPUs (CUDA)"
 
   # LC_ALL=C fixes "locale::facet::_S_create_c_locale name not valid" error
-  LC_ALL=C LANG=C nohup "$ETHMINER_BIN" -G -P http://127.0.0.1:8545 \
-    --HWMON 1 --report-hr --dag-load-mode 1 \
+  # -U = CUDA backend (faster DAG generation on multi-GPU NVIDIA systems)
+  LC_ALL=C LANG=C nohup "$ETHMINER_BIN" -U -P http://127.0.0.1:8545 \
+    --HWMON 1 --report-hr \
     >> "$ETHMINER_LOG" 2>&1 &
   log "ethminer PID: $!"
 }
