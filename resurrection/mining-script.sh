@@ -8,7 +8,7 @@
 # 1. Installs geth, ethminer, and dependencies (libfaketime)
 # 2. Syncs chaindata via P2P from chain-of-geths node
 # 3. Disconnects peer at target block (prevents source from following)
-# 4. Starts geth with faketime (20-min gaps to crash difficulty)
+# 4. Starts geth with faketime (1000s gaps to crash difficulty)
 # 5. Starts mining with GPUs
 # 6. Monitors and restarts after each block with updated faketime
 # 7. Auto-stops when difficulty drops below threshold (ready for CPU handoff)
@@ -624,7 +624,7 @@ mining_loop() {
   log "=== Entering mining loop ==="
   log "Era: $ERA | Geth: $GETH_VERSION | GPUs: $GPU_COUNT"
   log "Auto-stop threshold: $(format_difficulty $STOP_THRESHOLD) (for CPU handoff)"
-  log "Faketime will advance 20 minutes after each block"
+  log "Faketime will advance 1000 seconds after each block"
 
   if [ "$ERA" = "frontier" ]; then
     log ""
@@ -654,7 +654,7 @@ mining_loop() {
 
       local ts=$(get_block_timestamp)
       if [ "$ts" -gt 0 ]; then
-        start_geth_with_faketime $((ts + 1200))
+        start_geth_with_faketime $((ts + 1000))
         start_ethminer
       else
         log "ERROR: Cannot determine block timestamp for restart"
@@ -716,9 +716,9 @@ mining_loop() {
         exit 0
       fi
 
-      # Restart geth with new faketime (20 min ahead of new block)
-      local new_ts=$((ts + 1200))
-      log "Restarting geth with new faketime (+20 min)..."
+      # Restart geth with new faketime (1000s ahead of new block)
+      local new_ts=$((ts + 1000))
+      log "Restarting geth with new faketime (+1000s)..."
 
       stop_mining
       start_geth_with_faketime "$new_ts"
@@ -749,7 +749,7 @@ resume() {
 
   # Check if geth is running
   if ! pgrep -x geth > /dev/null; then
-    log "geth not running. Starting with current block timestamp + 20 min..."
+    log "geth not running. Starting with current block timestamp + 1000s..."
 
     # Start geth temporarily to get block timestamp
     log "Starting geth temporarily to read block timestamp..."
@@ -770,9 +770,9 @@ resume() {
       exit 1
     fi
 
-    local target_ts=$((current_ts + 1200))
+    local target_ts=$((current_ts + 1000))
     log "Current block timestamp: $current_ts"
-    log "Target faketime: $target_ts (+20 min)"
+    log "Target faketime: $target_ts (+1000s)"
 
     # Kill temp geth, restart with faketime
     start_geth_with_faketime "$target_ts"
@@ -833,9 +833,9 @@ main() {
     exit 1
   fi
 
-  local target_ts=$((current_ts + 1200))
+  local target_ts=$((current_ts + 1000))
   log "Current block timestamp: $current_ts"
-  log "Target faketime: $target_ts (+20 min)"
+  log "Target faketime: $target_ts (+1000s)"
 
   # Kill sync geth, restart with faketime
   start_geth_with_faketime "$target_ts"

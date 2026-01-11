@@ -274,12 +274,12 @@
                         <div class="diagram large"><pre><span class="highlight-orange">adjustment = max(1 - (timestamp_delta // 10), -99)</span>
 <span class="highlight-orange">new_diff = parent_diff + (parent_diff // 2048) * adjustment</span>
 
-With 20-minute (1200s) timestamp gaps:
-  adjustment = max(1 - 120, -99) = <span class="highlight-yellow">-99</span>
+With 1000s timestamp gaps (minimum for max effect):
+  adjustment = max(1 - 100, -99) = <span class="highlight-yellow">-99</span>
   Each block reduces difficulty by <span class="highlight-yellow">~4.83%</span>
 
 <span class="highlight-green">libfaketime</span> lies about system time so geth proposes
-blocks with 20-minute gaps <span class="highlight-yellow">without waiting</span>
+blocks with 1000s gaps <span class="highlight-yellow">without waiting</span>
 
 Difficulty
     ^

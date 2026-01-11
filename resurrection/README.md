@@ -27,7 +27,7 @@ GPU mining to extend historical chains beyond their original blocks, reducing di
 adjustment = max(1 - (timestamp_delta // 10), -99)
 new_difficulty = parent_difficulty + (parent_difficulty // 2048) * adjustment
 ```
-With 20-minute gaps: adjustment = -99, reducing difficulty by ~4.83% per block.
+With 1000s gaps: `floor(1000/10) = 100`, so `adjustment = max(1-100, -99) = -99`, reducing difficulty by ~4.83% per block. This is the minimum gap that achieves maximum reduction.
 
 **Frontier**:
 ```
@@ -38,7 +38,7 @@ Only reduces by 1/2048 (~0.049%) per block regardless of timestamp gap.
 
 ### Timestamp Manipulation
 
-We use `libfaketime` to make geth think the system time is 20 minutes ahead. Geth proposes blocks with that timestamp, triggering maximum difficulty reduction without waiting.
+We use `libfaketime` to make geth think the system time is 1000 seconds (~16.7 min) ahead. This is the **minimum gap that maxes out difficulty reduction** — the Homestead formula hits its -99 floor when `timestamp_delta >= 1000` (since `floor(1000/10) = 100`, and `1 - 100 = -99`). Larger gaps (20 min, 1 hour, etc.) have no additional effect.
 
 ### Auto-Stop & P2P Handoff
 
