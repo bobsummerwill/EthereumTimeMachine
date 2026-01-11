@@ -304,3 +304,12 @@ This script:
 - Monitoring shortcuts: custom JSON-RPC exporter (not Geth metrics) for old versions, synthetic export/import rows, and gating `v1.11.6` progress until seeding is done.
 - Build/runtime tweaks for old binaries: `v1.0.2` built with Go 1.4 on Debian jessie archive; `v1.3.6` download with fallback extraction; `v1.10.8` patched. Some artifacts lack upstream checksums.
 - Lab-facing defaults: HTTP/RPC bound to `0.0.0.0` for monitoring and remote deploy scripts with hardcoded defaults/volume wipes; lock down before any exposed deployment.
+
+### Base images we use (and why)
+
+- **Debian jessie (build stage only for v1.0.2)**: Go 1.4’s cgo parser breaks on newer binutils/DWARF. Jessie’s GCC 4.9 keeps the v1.0.2 build stable; runtime is not jessie.
+- **Debian bullseye-slim (most Geth runtimes; v1.10.8 build stage; 1.9.25/1.11.6 binaries)**: A stable floor that matches the era of the shipped tarballs and upstream build targets. Newer bookworm is possible for self-built binaries, but tarball-based runtimes are safer on bullseye.
+- **python:3.12-slim**: Debian-based (bookworm-era) slim image for the exporter; small and current Python.
+- **node:22-alpine**: Alpine for the sync UI to keep the Node runtime small; no native deps expected.
+
+If you want to upgrade to bookworm universally, rebuild the Geth binaries on it and validate runtime. Tarball-based images (1.9.25/1.11.6) should stay on bullseye unless rebuilt. Jessie remains required only for the v1.0.2 build toolchain.
