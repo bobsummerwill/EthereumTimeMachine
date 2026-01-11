@@ -278,9 +278,9 @@ EOF
   log "Deployment complete!"
   log ""
   log "Monitor with:"
-  log "  ./deploy.sh logs ${instance_id}"
-  log "  ./deploy.sh status ${instance_id}"
-  log "  ./deploy.sh ssh ${instance_id}"
+  log "  ./deploy-vast.sh logs ${instance_id}"
+  log "  ./deploy-vast.sh status ${instance_id}"
+  log "  ./deploy-vast.sh ssh ${instance_id}"
 }
 
 cmd_ssh() {
