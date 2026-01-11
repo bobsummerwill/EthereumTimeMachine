@@ -68,8 +68,11 @@ BRIDGE_SEED_CUTOFF_BLOCK="${BRIDGE_SEED_CUTOFF_BLOCK:-1919999}"
 echo "Generating keys locally..."
 ./generate-keys.sh
 
-echo "Generating Windows Geth v1.1.0 bundle locally..."
-./generate-windows-zip.sh
+echo "Generating Windows Geth v1.3.6 bundle locally..."
+./generate-geth-1.3.6-windows.sh
+
+echo "Generating macOS Geth v1.4.0 bundle locally..."
+./generate-geth-1.4.0-macos.sh
 
 echo "Building Docker images locally..."
 ./build-images.sh
@@ -103,8 +106,8 @@ ssh $SSH_OPTS -i "$SSH_KEY_PATH" "$VM_USER@$VM_IP" \
 
 scp $SSH_OPTS -i "$SSH_KEY_PATH" -r \
   generated-files monitoring \
-  generate-keys.sh generate-windows-zip.sh build-images.sh docker-compose.yml \
-  seed-v1.11.6-when-ready.sh seed-cutoff.sh start-legacy-staged.sh \
+  docker-compose.yml \
+  seed-v1.11.6-when-ready.sh start-legacy-staged.sh \
   "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
 
 echo "Running setup on Ubuntu VM..."
