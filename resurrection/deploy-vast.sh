@@ -25,11 +25,19 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Activate venv if it exists (for vastai CLI)
+if [ -f "${SCRIPT_DIR}/.venv/bin/activate" ]; then
+  source "${SCRIPT_DIR}/.venv/bin/activate"
+fi
+
 # Requirements for the instance
 MIN_GPUS=8
 GPU_NAME="RTX_3090"
 MIN_GPU_RAM=20
-MAX_PRICE=1.50
+MAX_PRICE=1.50  # Per-hour price cap (8x 3090 typically $1.10-$1.40)
+
+# SSH wait time (seconds) - Vast.ai needs time to start SSH service
+SSH_WAIT_TIME=180
 
 # Colors
 RED='\033[0;31m'
@@ -69,11 +77,11 @@ cmd_create() {
   log "Creating instance from offer ${offer_id}..."
 
   local result
+  # Use proxy SSH (works universally) - don't use --direct
   result=$(vastai create instance "$offer_id" \
     --image "nvidia/cuda:11.8.0-devel-ubuntu22.04" \
     --disk 100 \
     --ssh \
-    --direct \
     2>&1)
 
   echo "$result"
@@ -220,16 +228,26 @@ cmd_deploy() {
     geth_binary=$(build_geth_v102)
   fi
 
-  # Wait for SSH
-  log "Waiting for SSH to be ready..."
-  for i in {1..30}; do
-    if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p "$port" "root@${host}" "echo ok" &>/dev/null; then
+  # Wait for SSH - Vast.ai needs ~3 minutes for SSH service to start
+  log "Waiting ${SSH_WAIT_TIME}s for SSH to be ready (Vast.ai startup time)..."
+  local ssh_ready=false
+  for i in $(seq 1 $((SSH_WAIT_TIME / 5))); do
+    if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p "$port" "root@${host}" "echo ok" &>/dev/null; then
+      ssh_ready=true
       break
     fi
-    echo -n "."
-    sleep 2
+    local elapsed=$((i * 5))
+    echo -ne "\r  Waiting... ${elapsed}/${SSH_WAIT_TIME}s"
+    sleep 5
   done
   echo ""
+
+  if [ "$ssh_ready" != "true" ]; then
+    error "SSH not ready after ${SSH_WAIT_TIME}s. Instance may have issues."
+    error "Check: vastai show instance <id>"
+    return 1
+  fi
+  log "SSH is ready!"
 
   # Copy mining script
   log "Copying mining-script.sh..."
@@ -341,46 +359,241 @@ cmd_destroy() {
   fi
 }
 
+# Auto-deploy: systematically try 8x 3090 instances until one works
+cmd_auto_deploy() {
+  local era="${1:-homestead}"
+  check_vastai
+
+  if [ "$era" != "homestead" ] && [ "$era" != "frontier" ]; then
+    error "ERA must be 'homestead' or 'frontier'"
+    exit 1
+  fi
+
+  log "Auto-deploying ${era} mining on 8x ${GPU_NAME}..."
+  log "Will try each available instance until one works"
+  log ""
+
+  # Get list of available 8x 3090 offers sorted by price
+  local offers
+  offers=$(vastai search offers \
+    "gpu_name=${GPU_NAME} num_gpus>=${MIN_GPUS} dph<=${MAX_PRICE} rentable=True" \
+    --order "dph" \
+    --raw 2>/dev/null | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for offer in data[:10]:  # Try up to 10 offers
+    print(f\"{offer['id']}|{offer.get('num_gpus',0)}|{offer.get('geolocation','Unknown')}|{offer.get('dph_total',0):.4f}\")
+" 2>/dev/null)
+
+  if [ -z "$offers" ]; then
+    error "No suitable offers found"
+    exit 1
+  fi
+
+  log "Found offers to try:"
+  echo "$offers" | while IFS='|' read -r id gpus location price; do
+    echo "  - Offer $id: ${gpus}x GPU in $location @ \$${price}/hr"
+  done
+  echo ""
+
+  # For Frontier, pre-build geth binary
+  local geth_binary=""
+  if [ "$era" = "frontier" ]; then
+    log "Pre-building geth v1.0.2 for Frontier..."
+    geth_binary=$(build_geth_v102)
+  fi
+
+  # Try each offer (use process substitution to avoid subshell)
+  while IFS='|' read -r offer_id gpus location price; do
+    log "============================================"
+    log "Trying offer $offer_id (${gpus}x GPU in $location @ \$${price}/hr)..."
+    log "============================================"
+
+    # Create instance
+    local result
+    result=$(vastai create instance "$offer_id" \
+      --image "nvidia/cuda:11.8.0-devel-ubuntu22.04" \
+      --disk 100 \
+      --ssh \
+      2>&1)
+
+    local instance_id
+    instance_id=$(echo "$result" | grep -oP "new_contract['\"]?: \K\d+" || echo "")
+
+    if [ -z "$instance_id" ]; then
+      warn "Failed to create instance from offer $offer_id"
+      continue
+    fi
+
+    log "Created instance $instance_id"
+
+    # Wait for instance to be running
+    log "Waiting for instance to start..."
+    local instance_ready=false
+    for i in {1..24}; do  # 2 minutes max
+      local status
+      status=$(vastai show instance "$instance_id" --raw 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('actual_status',''))" 2>/dev/null || echo "")
+
+      if [ "$status" = "running" ]; then
+        instance_ready=true
+        break
+      fi
+      echo -n "."
+      sleep 5
+    done
+    echo ""
+
+    if [ "$instance_ready" != "true" ]; then
+      warn "Instance $instance_id not running after 2 minutes, destroying..."
+      vastai destroy instance "$instance_id" >/dev/null 2>&1 || true
+      continue
+    fi
+
+    # Get SSH info
+    local ssh_info host port
+    ssh_info=$(vastai show instance "$instance_id" --raw 2>/dev/null | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(f\"{d.get('ssh_host','')}:{d.get('ssh_port','')}\")
+" 2>/dev/null)
+    host=$(echo "$ssh_info" | cut -d: -f1)
+    port=$(echo "$ssh_info" | cut -d: -f2)
+
+    if [ -z "$host" ] || [ -z "$port" ]; then
+      warn "Could not get SSH info for instance $instance_id, destroying..."
+      vastai destroy instance "$instance_id" >/dev/null 2>&1 || true
+      continue
+    fi
+
+    # Wait for SSH with 3-minute timeout
+    log "Waiting ${SSH_WAIT_TIME}s for SSH on ${host}:${port}..."
+    local ssh_ready=false
+    for i in $(seq 1 $((SSH_WAIT_TIME / 5))); do
+      if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p "$port" "root@${host}" "echo ok" &>/dev/null; then
+        ssh_ready=true
+        break
+      fi
+      local elapsed=$((i * 5))
+      echo -ne "\r  Waiting... ${elapsed}/${SSH_WAIT_TIME}s"
+      sleep 5
+    done
+    echo ""
+
+    if [ "$ssh_ready" != "true" ]; then
+      warn "SSH not ready after ${SSH_WAIT_TIME}s, destroying instance $instance_id..."
+      vastai destroy instance "$instance_id" >/dev/null 2>&1 || true
+      continue
+    fi
+
+    # SSH works! Verify GPUs
+    log "SSH connected! Verifying GPUs..."
+    local gpu_count
+    gpu_count=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p "$port" "root@${host}" \
+      "nvidia-smi --query-gpu=name --format=csv,noheader | wc -l" 2>/dev/null || echo "0")
+
+    if [ "$gpu_count" -lt "$MIN_GPUS" ]; then
+      warn "Only $gpu_count GPUs detected (need $MIN_GPUS), destroying..."
+      vastai destroy instance "$instance_id" >/dev/null 2>&1 || true
+      continue
+    fi
+
+    log "SUCCESS! Instance $instance_id has $gpu_count GPUs"
+    log ""
+
+    # Deploy mining
+    log "Deploying ${era} mining..."
+
+    # Copy mining script
+    scp -o StrictHostKeyChecking=no -P "$port" "${SCRIPT_DIR}/mining-script.sh" "root@${host}:/root/"
+
+    # For Frontier, upload geth binary
+    if [ "$era" = "frontier" ] && [ -n "$geth_binary" ]; then
+      log "Uploading geth v1.0.2 binary..."
+      scp -o StrictHostKeyChecking=no -P "$port" "$geth_binary" "root@${host}:/root/geth"
+      ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" "chmod +x /root/geth"
+    fi
+
+    # Start mining
+    log "Starting ${era} mining..."
+    ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s "$era" << 'DEPLOY_EOF'
+ERA="$1"
+chmod +x /root/mining-script.sh
+mkdir -p /etc/OpenCL/vendors
+echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
+nohup /root/mining-script.sh --era "$ERA" > /root/mining-output.log 2>&1 &
+echo "Mining script started with PID: $!"
+DEPLOY_EOF
+
+    log ""
+    log "============================================"
+    log "DEPLOYMENT SUCCESSFUL!"
+    log "============================================"
+    log "Instance ID: $instance_id"
+    log "Location: $location"
+    log "GPUs: ${gpu_count}x ${GPU_NAME}"
+    log "Cost: \$${price}/hr"
+    log ""
+    log "Monitor with:"
+    log "  ./deploy-vast.sh logs $instance_id"
+    log "  ./deploy-vast.sh status $instance_id"
+    log "============================================"
+
+    # Exit on success
+    return 0
+  done <<< "$offers"
+
+  error "All offers failed. No working instance found."
+  exit 1
+}
+
 # Main
 case "${1:-help}" in
   search)
     cmd_search
     ;;
   create)
-    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh create <offer_id>"; exit 1; }
+    [ -z "${2:-}" ] && { error "Usage: ./deploy-vast.sh create <offer_id>"; exit 1; }
     cmd_create "$2"
     ;;
   deploy)
-    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh deploy <instance_id> [homestead|frontier]"; exit 1; }
+    [ -z "${2:-}" ] && { error "Usage: ./deploy-vast.sh deploy <instance_id> [homestead|frontier]"; exit 1; }
     cmd_deploy "$2" "${3:-homestead}"
     ;;
+  auto-deploy)
+    cmd_auto_deploy "${2:-homestead}"
+    ;;
   ssh)
-    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh ssh <instance_id>"; exit 1; }
+    [ -z "${2:-}" ] && { error "Usage: ./deploy-vast.sh ssh <instance_id>"; exit 1; }
     cmd_ssh "$2"
     ;;
   status)
-    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh status <instance_id>"; exit 1; }
+    [ -z "${2:-}" ] && { error "Usage: ./deploy-vast.sh status <instance_id>"; exit 1; }
     cmd_status "$2"
     ;;
   logs)
-    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh logs <instance_id>"; exit 1; }
+    [ -z "${2:-}" ] && { error "Usage: ./deploy-vast.sh logs <instance_id>"; exit 1; }
     cmd_logs "$2"
     ;;
   destroy)
-    [ -z "${2:-}" ] && { error "Usage: ./deploy.sh destroy <instance_id>"; exit 1; }
+    [ -z "${2:-}" ] && { error "Usage: ./deploy-vast.sh destroy <instance_id>"; exit 1; }
     cmd_destroy "$2"
     ;;
   help|--help|-h|*)
     echo "Vast.ai Ethereum Mining Deployment"
     echo ""
     echo "Usage:"
-    echo "  ./deploy.sh search                           # Find available GPU instances"
-    echo "  ./deploy.sh create <offer_id>                # Create instance from offer"
-    echo "  ./deploy.sh deploy <instance_id> [era]       # Deploy mining (era: homestead|frontier)"
-    echo "  ./deploy.sh ssh <instance_id>                # SSH into instance"
-    echo "  ./deploy.sh status <instance_id>             # Check mining status"
-    echo "  ./deploy.sh logs <instance_id>               # Tail mining logs"
-    echo "  ./deploy.sh destroy <instance_id>            # Destroy instance"
+    echo "  ./deploy-vast.sh search                      # Find available GPU instances"
+    echo "  ./deploy-vast.sh create <offer_id>           # Create instance from offer"
+    echo "  ./deploy-vast.sh deploy <instance_id> [era]  # Deploy mining (era: homestead|frontier)"
+    echo "  ./deploy-vast.sh auto-deploy [era]           # Auto-find and deploy (tries until success)"
+    echo "  ./deploy-vast.sh ssh <instance_id>           # SSH into instance"
+    echo "  ./deploy-vast.sh status <instance_id>        # Check mining status"
+    echo "  ./deploy-vast.sh logs <instance_id>          # Tail mining logs"
+    echo "  ./deploy-vast.sh destroy <instance_id>       # Destroy instance"
+    echo ""
+    echo "Examples:"
+    echo "  ./deploy-vast.sh auto-deploy homestead       # Auto-deploy Homestead mining"
+    echo "  ./deploy-vast.sh auto-deploy frontier        # Auto-deploy Frontier mining"
     echo ""
     echo "Prerequisites:"
     echo "  pip install vastai"
