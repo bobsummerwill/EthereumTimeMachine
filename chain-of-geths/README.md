@@ -293,3 +293,14 @@ This script:
 4. Starts the head node + monitoring
 5. Seeds the bridge via export/import (once)
 6. Starts the legacy runner (brings up the rest of the chain)
+
+## Required hacks/workarounds (and why they exist)
+
+- Offline export/import for `v1.11.6`: no consensus client exists that both speaks the Engine API `v1.11.x` expects and can checkpoint-sync from today’s Deneb/Cancun BeaconStates. We seed `v1.11.6` from `v1.16.7` RLP export up to a cutoff instead of P2P/CL sync.
+- Disable trusted checkpoint in `v1.10.8`: unpatched 1.10.x demands snap pivot headers (~12.9M) the truncated bridge will never have. We set the checkpoint to nil so it can sync only the seeded range from `v1.11.6`.
+- Force full sync, no snap/fast on legacy nodes: `v1.10.8`/`v1.9.25` use `--snapshot=false --syncmode full`; `v1.3.6` uses `--fast=false`. Prevents pivot/state downloads beyond the cutoff their upstream can serve.
+- Static identities/peering: pre-generated nodekeys/enodes, fixed Docker bridge IPs, discovery disabled on legacy nodes. Keeps very old clients peered despite DNS/protocol gaps.
+- Watchdog + staged startup with resets: entrypoint watchdog restarts stalled nodes; `start-legacy-staged.sh` gates downstream startup until upstream serves blocks and can wipe downstream chaindata if stuck/ahead, avoiding latch-at-genesis/ahead-of-upstream deadlocks.
+- Monitoring shortcuts: custom JSON-RPC exporter (not Geth metrics) for old versions, synthetic export/import rows, and gating `v1.11.6` progress until seeding is done.
+- Build/runtime tweaks for old binaries: `v1.0.2` built with Go 1.4 on Debian jessie archive; `v1.3.6` download with fallback extraction; `v1.10.8` patched. Some artifacts lack upstream checksums.
+- Lab-facing defaults: HTTP/RPC bound to `0.0.0.0` for monitoring and remote deploy scripts with hardcoded defaults/volume wipes; lock down before any exposed deployment.
