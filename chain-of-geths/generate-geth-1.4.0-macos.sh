@@ -85,6 +85,6 @@ EOF
 echo "Creating $OUT_TAR..."
 mkdir -p generated-files
 rm -f "$OUT_TAR"
-tar -czf "$OUT_TAR" -C "$(dirname "$geth_dir")" "$(basename "$geth_dir")"
+tar -czf "$SCRIPT_DIR/$OUT_TAR" -C "$(dirname "$geth_dir")" "$(basename "$geth_dir")"
 
 echo "Done: $OUT_TAR"

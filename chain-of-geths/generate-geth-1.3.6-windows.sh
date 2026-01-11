@@ -84,6 +84,6 @@ EOF
 echo "Creating $OUT_ZIP..."
 mkdir -p generated-files
 rm -f "$OUT_ZIP"
-(cd "$geth_dir" && zip -qr "$PWD/$OUT_ZIP" .)
+(cd "$geth_dir" && zip -qr "$SCRIPT_DIR/$OUT_ZIP" .)
 
 echo "Done: $OUT_ZIP"
