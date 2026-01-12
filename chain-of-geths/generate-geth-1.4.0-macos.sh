@@ -60,6 +60,12 @@ if [ -z "$geth_dir" ]; then
   geth_dir="$tmp"
 fi
 
+# Rename the geth binary to just 'geth' for convenience
+geth_binary=$(find "$geth_dir" -type f -name "geth-*" | head -n 1)
+if [ -n "$geth_binary" ]; then
+  mv "$geth_binary" "$geth_dir/geth"
+fi
+
 # Create static-nodes.json
 mkdir -p "$geth_dir/data"
 echo "[\"$ENODE\"]" > "$geth_dir/data/static-nodes.json"
