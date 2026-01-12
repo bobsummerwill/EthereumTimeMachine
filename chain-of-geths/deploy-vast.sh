@@ -2,6 +2,12 @@
 #
 # Deploy chain-of-geths on Vast.ai
 #
+# !! KNOWN ISSUE !!
+# Vast.ai instances run inside containers, which prevents Docker-in-Docker
+# from working properly (iptables permission denied). This script is kept
+# for reference but chain-of-geths should continue to run on AWS until
+# a non-Docker deployment approach is implemented.
+#
 # This creates a Vast.ai instance running the full chain-of-geths stack
 # (multiple geth versions + Lighthouse) with exposed P2P ports for peering.
 #
