@@ -23,7 +23,8 @@
 #   tail -f /root/geth.log          # Geth output
 #   tail -f /root/ethminer.log      # Miner output
 
-set -euo pipefail
+# Note: We don't use 'set -e' because the watchdog wrapper handles errors
+set -uo pipefail
 
 # ============================================================================
 # Argument Parsing
@@ -126,6 +127,49 @@ GPU_COUNT="${GPU_COUNT:-8}"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+}
+
+# Get block timestamp from chaindata directly (works even when geth is dead)
+get_last_block_timestamp_from_chaindata() {
+  # Start a temporary geth instance just to read chaindata
+  local temp_log=$(mktemp)
+
+  /root/geth --datadir "$DATA_DIR" \
+    --rpc --rpcaddr 127.0.0.1 --rpcport 18545 \
+    --rpcapi "eth" \
+    --nodiscover --maxpeers 0 --networkid 1 \
+    >> "$temp_log" 2>&1 &
+  local temp_pid=$!
+
+  # Wait for RPC to be available (max 60s)
+  local waited=0
+  while [ $waited -lt 60 ]; do
+    if curl -s http://127.0.0.1:18545 >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+
+  if [ $waited -ge 60 ]; then
+    kill $temp_pid 2>/dev/null || true
+    rm -f "$temp_log"
+    echo "0"
+    return
+  fi
+
+  # Get the timestamp
+  local ts=$(curl -s -X POST -H "Content-Type: application/json" \
+    --data '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest",false],"id":1}' \
+    http://127.0.0.1:18545 2>/dev/null | \
+    python3 -c "import sys,json; b=json.load(sys.stdin).get('result',{}); print(int(b.get('timestamp','0x0'),16))" 2>/dev/null || echo "0")
+
+  # Kill the temporary geth
+  kill $temp_pid 2>/dev/null || true
+  wait $temp_pid 2>/dev/null || true
+  rm -f "$temp_log"
+
+  echo "$ts"
 }
 
 get_block_number() {
@@ -582,6 +626,7 @@ start_geth_with_faketime() {
     --rpc --rpcaddr 0.0.0.0 --rpcport 8545 \
     --rpcapi "eth,net,web3,miner,admin,debug" \
     --nodiscover --maxpeers 0 --networkid 1 \
+    --mine --minerthreads 0 \
     --etherbase "$MINER_ADDRESS" \
     --unlock "$MINER_ADDRESS" --password /root/miner-password.txt \
     >> "$GETH_LOG" 2>&1 &
@@ -652,13 +697,21 @@ mining_loop() {
       tail -30 "$GETH_LOG"
       log "Attempting restart..."
 
+      # Try to get timestamp from running geth first, then fall back to chaindata
       local ts=$(get_block_timestamp)
+      if [ "$ts" -eq 0 ]; then
+        log "RPC unavailable, reading timestamp from chaindata..."
+        ts=$(get_last_block_timestamp_from_chaindata)
+      fi
+
       if [ "$ts" -gt 0 ]; then
         start_geth_with_faketime $((ts + 1000))
         start_ethminer
       else
         log "ERROR: Cannot determine block timestamp for restart"
-        exit 1
+        log "Retrying in 30 seconds..."
+        sleep 30
+        continue
       fi
     fi
 
@@ -751,7 +804,7 @@ resume() {
   if ! pgrep -x geth > /dev/null; then
     log "geth not running. Starting with current block timestamp + 1000s..."
 
-    # Start geth temporarily to get block timestamp
+    # Try to get timestamp by starting a temporary geth
     log "Starting geth temporarily to read block timestamp..."
     nohup /root/geth --datadir "$DATA_DIR" \
       --rpc --rpcaddr 127.0.0.1 --rpcport 8545 \
@@ -759,14 +812,21 @@ resume() {
       --nodiscover --maxpeers 0 --networkid 1 \
       >> "$GETH_LOG" 2>&1 &
 
-    if ! wait_for_rpc 60; then
-      log "ERROR: Cannot start geth to read block timestamp"
-      exit 1
+    local current_ts=0
+    if wait_for_rpc 60; then
+      current_ts=$(get_block_timestamp)
     fi
 
-    local current_ts=$(get_block_timestamp)
+    # If we couldn't get timestamp from RPC, try chaindata directly
     if [ "$current_ts" -eq 0 ]; then
-      log "ERROR: Cannot get block timestamp"
+      log "RPC unavailable, trying to read timestamp from chaindata..."
+      pkill -9 geth 2>/dev/null || true
+      sleep 2
+      current_ts=$(get_last_block_timestamp_from_chaindata)
+    fi
+
+    if [ "$current_ts" -eq 0 ]; then
+      log "ERROR: Cannot get block timestamp from any source"
       exit 1
     fi
 
@@ -847,9 +907,51 @@ main() {
   mining_loop
 }
 
-# Run based on mode
-if [ "$RESUME_MODE" = true ]; then
-  resume
-else
-  main
-fi
+# ============================================================================
+# Watchdog Wrapper - Auto-restart on any failure
+# ============================================================================
+
+run_with_watchdog() {
+  local max_restarts=100
+  local restart_count=0
+  local restart_delay=30
+
+  while [ $restart_count -lt $max_restarts ]; do
+    log "=========================================="
+    log "Mining session starting (attempt $((restart_count + 1))/$max_restarts)"
+    log "=========================================="
+
+    # Run the mining function
+    if [ "$RESUME_MODE" = true ]; then
+      resume
+    else
+      main
+    fi
+
+    local exit_code=$?
+
+    # Check if this was a clean exit (difficulty threshold reached)
+    if grep -q "AUTO-STOP: Difficulty dropped below" "$LOG_FILE" 2>/dev/null | tail -5; then
+      log "Clean exit - difficulty threshold reached. Not restarting."
+      exit 0
+    fi
+
+    restart_count=$((restart_count + 1))
+    log "Mining session ended with exit code $exit_code"
+    log "Restarting in $restart_delay seconds... (restart $restart_count/$max_restarts)"
+
+    # Clean up any zombie processes before restart
+    pkill -9 geth 2>/dev/null || true
+    pkill -9 -f ethminer 2>/dev/null || true
+    sleep $restart_delay
+
+    # After first restart, always use resume mode
+    RESUME_MODE=true
+  done
+
+  log "ERROR: Maximum restart count ($max_restarts) reached. Giving up."
+  exit 1
+}
+
+# Run based on mode (with watchdog wrapper for automatic restart)
+run_with_watchdog
