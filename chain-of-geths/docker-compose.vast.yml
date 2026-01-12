@@ -1,0 +1,283 @@
+# Vast.ai variant of chain-of-geths using host networking.
+# This avoids iptables/NAT issues in containerized Vast environments.
+#
+# Key differences from docker-compose.yml:
+# - All services use network_mode: host (no bridge network)
+# - Inter-service references use localhost instead of container names
+# - Each service binds to different HTTP ports directly
+#
+# Usage: docker compose -f docker-compose.vast.yml up -d
+
+services:
+  # Modern top node: follows current mainnet and is paired with a consensus client (Lighthouse below).
+  geth-v1-16-7:
+    image: ethereum/client-go:v1.16.7
+    container_name: geth-v1-16-7
+    restart: unless-stopped
+    network_mode: host
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      SAMPLE_INTERVAL_SECONDS: ${WATCHDOG_SAMPLE_INTERVAL_SECONDS:-600}
+    command: |
+      --config /data/config.toml
+      --datadir /data
+      --cache 4096
+      --nodekey /data/geth/nodekey
+      --http
+      --http.addr 0.0.0.0
+      --http.port 8545
+      --http.vhosts *
+      --http.api eth,net,web3
+      --authrpc.addr 0.0.0.0
+      --authrpc.port 8551
+      --authrpc.vhosts *
+      --authrpc.jwtsecret /data/geth/jwtsecret
+      --syncmode ${GETH_V1_16_7_SYNCMODE:-full}
+      --networkid 1
+      --port 30306
+    volumes:
+      - ./generated-files/data/v1.16.7:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
+
+  geth-v1-11-6:
+    image: ethereumtimemachine/geth:v1.11.6
+    container_name: geth-v1-11-6
+    restart: unless-stopped
+    network_mode: host
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      FIXED_TARGET_BLOCK: "1919999"
+      SAMPLE_INTERVAL_SECONDS: ${LEGACY_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-300}
+    command: |
+      --config /data/config.toml
+      --datadir /data
+      --cache 2048
+      --nodekey /data/geth/nodekey
+      --http
+      --http.addr 0.0.0.0
+      --http.port 8546
+      --http.vhosts *
+      --http.api eth,net,web3
+      --syncmode full
+      --networkid 1
+      --port 30308
+      --nodiscover
+    volumes:
+      - ./generated-files/data/v1.11.6:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
+
+  geth-v1-10-8:
+    image: ethereumtimemachine/geth:v1.10.8
+    container_name: geth-v1-10-8
+    restart: unless-stopped
+    network_mode: host
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      FIXED_TARGET_BLOCK: "1919999"
+      SAMPLE_INTERVAL_SECONDS: ${LEGACY_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-300}
+    command: |
+      --datadir /data
+      --nodekey /data/nodekey
+      --cache 2048
+      --snapshot=false
+      --http
+      --http.addr 0.0.0.0
+      --http.port 8547
+      --http.vhosts *
+      --http.api eth,net,web3
+      --syncmode full
+      --networkid 1
+      --port 30309
+      --nodiscover
+    volumes:
+      - ./generated-files/data/v1.10.8:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
+    depends_on:
+      - geth-v1-11-6
+
+  geth-v1-9-25:
+    image: ethereumtimemachine/geth:v1.9.25
+    container_name: geth-v1-9-25
+    restart: unless-stopped
+    network_mode: host
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      FIXED_TARGET_BLOCK: "1919999"
+      SAMPLE_INTERVAL_SECONDS: ${LEGACY_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-300}
+    command: |
+      --datadir /data
+      --nodekey /data/nodekey
+      --cache 2048
+      --rpc
+      --rpcaddr 0.0.0.0
+      --rpcport 8548
+      --rpcvhosts *
+      --rpcapi eth,net,web3
+      --networkid 1
+      --syncmode full
+      --port 30310
+      --nodiscover
+      --snapshot=false
+      --nousb
+    volumes:
+      - ./generated-files/data/v1.9.25:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
+    depends_on:
+      - geth-v1-10-8
+
+  geth-v1-3-6:
+    image: ethereumtimemachine/geth:v1.3.6
+    container_name: geth-v1-3-6
+    restart: unless-stopped
+    network_mode: host
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      FIXED_TARGET_BLOCK: "1919999"
+      SAMPLE_INTERVAL_SECONDS: ${LEGACY_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-300}
+    command: |
+      --datadir /data
+      --nodekey /data/nodekey
+      --cache 4096
+      --fast=false
+      --rpc
+      --rpcaddr 0.0.0.0
+      --rpcport 8549
+      --rpcapi eth,net,web3
+      --networkid 1
+      --port 30311
+      --nodiscover
+    volumes:
+      - ./generated-files/data/v1.3.6:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
+    depends_on:
+      - geth-v1-9-25
+
+  geth-v1-0-2:
+    image: ethereumtimemachine/geth:v1.0.2
+    container_name: geth-v1-0-2
+    restart: unless-stopped
+    network_mode: host
+    entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
+    environment:
+      FIXED_TARGET_BLOCK: "1149999"
+      SAMPLE_INTERVAL_SECONDS: ${V1_0_3_WATCHDOG_SAMPLE_INTERVAL_SECONDS:-120}
+      STALL_REQUIRED_SAMPLES: "1"
+      REQUIRE_PEERS_FOR_RESTART: "0"
+    command: |
+      --datadir /data
+      --nodekey /data/nodekey
+      --cache 2048
+      --rpc
+      --rpcaddr 0.0.0.0
+      --rpcport 8550
+      --rpcapi eth,net,web3
+      --networkid 1
+      --port 30312
+      --nodiscover
+    volumes:
+      - ./generated-files/data/v1.0.2:/data
+      - ./monitoring/self-watchdog:/watchdog:ro
+    depends_on:
+      - geth-v1-3-6
+
+  # Consensus client (beacon node)
+  lighthouse-v8-0-1:
+    image: sigp/lighthouse:v8.0.1
+    container_name: lighthouse-v8-0-1
+    network_mode: host
+    command: |
+      lighthouse beacon_node
+      --datadir /data
+      --execution-endpoint http://127.0.0.1:8551
+      --execution-jwt /jwt/jwtsecret
+      --checkpoint-sync-url https://mainnet.checkpoint.sigp.io
+      --http
+      --http-address 0.0.0.0
+      --http-port 5052
+      --metrics
+      --metrics-address 0.0.0.0
+      --metrics-port 8080
+      --port 9000
+      --discovery-port 9000
+      --quic-port 9001
+    volumes:
+      - lighthouse-data:/data
+      - ./generated-files/data/v1.16.7/geth/jwtsecret:/jwt/jwtsecret:ro
+
+  # --- Monitoring ---
+
+  geth-exporter:
+    build:
+      context: ./monitoring/exporter
+    container_name: geth-exporter
+    network_mode: host
+    environment:
+      # Use localhost since all services are on host network
+      NODE_URLS: >-
+        Geth v1.16.7=http://127.0.0.1:8545,
+        Geth v1.11.6=http://127.0.0.1:8546,
+        Geth v1.10.8=http://127.0.0.1:8547,
+        Geth v1.9.25=http://127.0.0.1:8548,
+        Geth v1.3.6=http://127.0.0.1:8549,
+        Geth v1.0.2=http://127.0.0.1:8550
+      LIGHTHOUSE_API_URL: http://127.0.0.1:5052
+      LIGHTHOUSE_DISPLAY_NAME: Lighthouse v8.0.1
+      LIGHTHOUSE_METRICS_URL: http://127.0.0.1:8080
+      HOST_OUTPUT_DIR: /host_output
+      CUTOFF_BLOCK: "1919999"
+      V1_0_3_TARGET_BLOCK: "1149999"
+      V1_0_X_TARGET_BLOCK: "1149999"
+      POLL_INTERVAL_SECONDS: "10"
+      HIDE_PROGRESS_NODES_REGEX: ${HIDE_PROGRESS_NODES_REGEX:-}
+      # Exporter listens on port 9100
+    volumes:
+      - ./generated-files:/host_output:ro
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: prometheus
+    network_mode: host
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.listen-address=0.0.0.0:9090
+    volumes:
+      - ./monitoring/prometheus/prometheus.vast.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - geth-exporter
+
+  sync-ui:
+    build:
+      context: ./monitoring/sync-ui
+    container_name: sync-ui
+    network_mode: host
+    environment:
+      PROMETHEUS_URL: http://127.0.0.1:9090
+      PORT: "8088"
+      V1_0_3_TARGET_BLOCK: "1149999"
+      V1_0_X_TARGET_BLOCK: "1149999"
+    depends_on:
+      - prometheus
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: grafana
+    network_mode: host
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_HTTP_PORT: "3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/datasources/vast:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  lighthouse-data:
