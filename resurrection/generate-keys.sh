@@ -259,11 +259,12 @@ enode://${HOMESTEAD_PUBKEY}@<IP>:30303
   SYNC_PUBKEY=$(derive_enode_pubkey "$SYNC_NODEKEY")
   create_file "$OUTPUT_DIR/nodes/sync-node/nodekey" "$SYNC_NODEKEY" "sync-node nodekey"
 
-  # Sync node static-nodes.json (peers with AWS chain-of-geths v1.3.6)
-  # AWS v1.3.6 nodekey: a4aa103ff40b291d23cba060e5cdd1819070ff39db88d9142d286737e92ea1d1
-  # AWS v1.3.6 enode: a45ce9d6d92327f093d05602b30966ab1e0bf8dd4ae63f4bab2a57db514990da54149d3c50bbf3d4004c0512b6629e49ae9a349de67e008d7e7c6f6626828f3f
-  AWS_ENODE="enode://a45ce9d6d92327f093d05602b30966ab1e0bf8dd4ae63f4bab2a57db514990da54149d3c50bbf3d4004c0512b6629e49ae9a349de67e008d7e7c6f6626828f3f@52.0.234.84:30311?discport=0"
-  create_file "$OUTPUT_DIR/nodes/sync-node/static-nodes.json" "[\"$AWS_ENODE\"]
+  # Sync node static-nodes.json (peers with Vast.ai sync node)
+  # Vast.ai sync node (instance 29980870): IP 1.208.108.242, TCP 46762, UDP 46742
+  # Vast.ai sync node nodekey: 91c01e9b759b0ebcebfdf873cadbe73505d9bf391661f3358f6e6a71445159bb
+  # Vast.ai sync node enode: ac449332fe8d9114ff453693360bebe11e4e58cb475735276b1ea60abe7d46c246cf2ec6de9d5cd24f613868a4d2328b9f230a3f797fa48e2c80791d3b24e6a7
+  SYNC_SOURCE_ENODE="enode://ac449332fe8d9114ff453693360bebe11e4e58cb475735276b1ea60abe7d46c246cf2ec6de9d5cd24f613868a4d2328b9f230a3f797fa48e2c80791d3b24e6a7@1.208.108.242:46762?discport=0"
+  create_file "$OUTPUT_DIR/nodes/sync-node/static-nodes.json" "[\"$SYNC_SOURCE_ENODE\"]
 " "sync-node static-nodes.json"
 
   # Sync node enode info documentation

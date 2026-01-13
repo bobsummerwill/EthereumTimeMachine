@@ -156,15 +156,13 @@ The mining script syncs chaindata from a chain-of-geths node before mining. If i
 
 2. **Check network connectivity from Vast.ai**:
    ```bash
-   # Test TCP connection to the P2P port
-   nc -zv 52.0.234.84 30311  # Homestead
-   nc -zv 52.0.234.84 30312  # Frontier
+   # Test TCP connection to the P2P port (Vast.ai sync node)
+   nc -zv 1.208.108.242 46762  # Sync node TCP port
    ```
 
-3. **Check firewall/security groups**:
-   - **AWS**: The Security Group must allow inbound TCP on port 30311 (Homestead) or 30312 (Frontier)
-   - Common mistake: Port is only open for internal traffic, not external
-   - Go to EC2 → Security Groups → Edit inbound rules → Add TCP port 30311/30312 from 0.0.0.0/0
+3. **Check sync node is running**:
+   - The sync node must be running geth with the correct chaindata
+   - Verify with: `curl -s http://<sync-node-ip>:8545 -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'`
 
 ### Frontier: "geth v1.0.2 binary not found"
 

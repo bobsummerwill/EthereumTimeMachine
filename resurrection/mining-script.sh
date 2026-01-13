@@ -81,7 +81,9 @@ case "$ERA" in
     ERA="homestead"
     GETH_VERSION="v1.3.6"
     GETH_URL="https://github.com/ethereum/go-ethereum/releases/download/v1.3.6/geth-Linux64-20160402135800-1.3.6-9e323d6.tar.bz2"
-    P2P_ENODE="${P2P_ENODE:-enode://a45ce9d6d92327f093d05602b30966ab1e0bf8dd4ae63f4bab2a57db514990da54149d3c50bbf3d4004c0512b6629e49ae9a349de67e008d7e7c6f6626828f3f@52.0.234.84:30311}"
+    # Vast.ai sync node with Homestead chaindata (block 1,919,999)
+    # Instance 29980870: IP 1.208.108.242, TCP port 46762, UDP port 46742
+    P2P_ENODE="${P2P_ENODE:-enode://ac449332fe8d9114ff453693360bebe11e4e58cb475735276b1ea60abe7d46c246cf2ec6de9d5cd24f613868a4d2328b9f230a3f797fa48e2c80791d3b24e6a7@1.208.108.242:46762}"
     TARGET_BLOCK="${TARGET_BLOCK:-1919999}"
     STOP_THRESHOLD="${STOP_THRESHOLD:-10000000}"  # 10 MH
     SYNC_TIME_EST="~1 hour"
@@ -90,7 +92,9 @@ case "$ERA" in
     ERA="frontier"
     GETH_VERSION="v1.0.2"
     GETH_URL="https://github.com/ethereum/go-ethereum/releases/download/v1.0.2/geth-Linux64-20150812231906-1.0.2-b1ec849.tar.bz2"
-    P2P_ENODE="${P2P_ENODE:-enode://bbb688b660e8359409f45e52ce24d8ed0afd476e34eedce46a4a50cd3dc6998a109568c479ca171254a46004f738115b52061dcb4a173435c1215568600676e3@52.0.234.84:30312}"
+    # Vast.ai sync node - Frontier v1.0.2 peers with v1.3.6 but stops at block 1,149,999
+    # Instance 29980870: IP 1.208.108.242, TCP port 46762, UDP port 46742
+    P2P_ENODE="${P2P_ENODE:-enode://ac449332fe8d9114ff453693360bebe11e4e58cb475735276b1ea60abe7d46c246cf2ec6de9d5cd24f613868a4d2328b9f230a3f797fa48e2c80791d3b24e6a7@1.208.108.242:46762}"
     TARGET_BLOCK="${TARGET_BLOCK:-1149999}"
     STOP_THRESHOLD="${STOP_THRESHOLD:-50000000}"  # 50 MH
     SYNC_TIME_EST="~40 minutes"
@@ -409,12 +413,11 @@ install_ethminer() {
   mkdir -p build
   cd build
 
-  log "Configuring ethminer (CUDA for RTX 3090, Compute 8.6)..."
+  log "Configuring ethminer (OpenCL)..."
   "${CMAKE_DIR}/bin/cmake" .. \
-    -DETHASHCUDA=ON \
-    -DETHASHCL=OFF \
+    -DETHASHCUDA=OFF \
+    -DETHASHCL=ON \
     -DETHASHCPU=OFF \
-    -DCUDA_ARCH="86" \
     -DCMAKE_BUILD_TYPE=Release
 
   log "Building ethminer (this may take several minutes)..."
@@ -651,12 +654,13 @@ start_ethminer() {
     return 1
   fi
 
-  log "Starting ethminer with $GPU_COUNT GPUs (CUDA)"
+  log "Starting ethminer with $GPU_COUNT GPUs (OpenCL)"
 
   # LC_ALL=C fixes "locale::facet::_S_create_c_locale name not valid" error
-  # -U = CUDA backend (faster DAG generation on multi-GPU NVIDIA systems)
-  LC_ALL=C LANG=C nohup "$ETHMINER_BIN" -U -P http://127.0.0.1:8545 \
-    --HWMON 1 --report-hr \
+  # -G = OpenCL backend
+  # --dag-load-mode 1 = sequential DAG generation (avoids multi-GPU serialization)
+  LC_ALL=C LANG=C nohup "$ETHMINER_BIN" -G -P http://127.0.0.1:8545 \
+    --HWMON 1 --report-hr --dag-load-mode 1 \
     >> "$ETHMINER_LOG" 2>&1 &
   log "ethminer PID: $!"
 }
