@@ -5,13 +5,12 @@
 # Automates GPU mining to crash difficulty on historical Ethereum chains.
 # Works on any Linux system with NVIDIA GPUs (Vast.ai, local, cloud, etc.)
 #
-# 1. Installs geth, ethminer, and dependencies (libfaketime)
-# 2. Syncs chaindata via P2P from chain-of-geths node
+# 1. Installs geth, ethminer, and dependencies
+# 2. Syncs chaindata via P2P from sync node
 # 3. Disconnects peer at target block (prevents source from following)
-# 4. Starts geth with faketime (1000s gaps to crash difficulty)
-# 5. Starts mining with GPUs
-# 6. Monitors and restarts after each block with updated faketime
-# 7. Auto-stops when difficulty drops below threshold (ready for CPU handoff)
+# 4. Starts geth for mining (ethminer handles GPU mining externally)
+# 5. Monitors mining progress and peers with sync node for block propagation
+# 6. Auto-stops when difficulty drops below threshold (ready for CPU handoff)
 #
 # USAGE:
 #   ./mining-script.sh --era homestead          # Full run (sync + mine)
@@ -347,25 +346,6 @@ install_geth() {
   log "geth $GETH_VERSION installed: $(/root/geth version 2>&1 | head -1)"
 }
 
-install_libfaketime() {
-  log "Installing libfaketime..."
-
-  if [ -f "/usr/local/lib/faketime/libfaketime.so.1" ]; then
-    log "libfaketime already installed."
-    return 0
-  fi
-
-  cd /root
-  if [ ! -d "libfaketime" ]; then
-    git clone -q https://github.com/wolfcw/libfaketime.git
-  fi
-  cd libfaketime
-  make -j"$(nproc)" >/dev/null 2>&1
-  make install >/dev/null 2>&1
-
-  log "libfaketime installed."
-}
-
 install_ethminer() {
   # Use CUDA for both Frontier and Homestead (faster DAG generation on multi-GPU NVIDIA)
   log "Installing ethminer (CUDA for RTX 3090)..."
@@ -611,19 +591,11 @@ disconnect_peer() {
 # Mining Functions
 # ============================================================================
 
-start_geth_with_faketime() {
-  local target_timestamp="$1"
-  local fake_date=$(date -d "@$target_timestamp" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)
-
-  log "Starting geth with faketime: $fake_date (ts: $target_timestamp)"
+start_geth_for_mining() {
+  log "Starting geth for mining"
 
   pkill -9 geth 2>/dev/null || true
   sleep 3
-
-  # Start geth with faketime (mining handled by external ethminer)
-  export LD_PRELOAD=/usr/local/lib/faketime/libfaketime.so.1
-  export FAKETIME="@$fake_date"
-  export FAKETIME_NO_CACHE=1
 
   # Keep static-nodes.json to maintain connection to sync node during mining
   echo "[\"$P2P_ENODE\"]" > "$DATA_DIR/static-nodes.json"
@@ -638,9 +610,6 @@ start_geth_with_faketime() {
     >> "$GETH_LOG" 2>&1 &
 
   echo $! > /root/geth.pid
-
-  # Unset faketime for this shell (geth already has it)
-  unset LD_PRELOAD FAKETIME FAKETIME_NO_CACHE
 
   if wait_for_rpc 120; then
     log "geth mining started. PID: $(cat /root/geth.pid)"
@@ -712,7 +681,7 @@ mining_loop() {
       fi
 
       if [ "$ts" -gt 0 ]; then
-        start_geth_with_faketime $((ts + 1000))
+        start_geth_for_mining
         start_ethminer
       else
         log "ERROR: Cannot determine block timestamp for restart"
@@ -781,7 +750,7 @@ mining_loop() {
       log "Restarting geth with new faketime (+1000s)..."
 
       stop_mining
-      start_geth_with_faketime "$new_ts"
+      start_geth_for_mining
       start_ethminer
 
       last_block=$current_block
@@ -842,7 +811,7 @@ resume() {
     log "Target faketime: $target_ts (+1000s)"
 
     # Kill temp geth, restart with faketime
-    start_geth_with_faketime "$target_ts"
+    start_geth_for_mining
   else
     log "geth is already running"
   fi
@@ -878,7 +847,6 @@ main() {
   log "=== Phase 1: Installation ==="
   install_dependencies
   install_geth
-  install_libfaketime
   install_ethminer
   setup_miner_key
 
@@ -905,7 +873,7 @@ main() {
   log "Target faketime: $target_ts (+1000s)"
 
   # Kill sync geth, restart with faketime
-  start_geth_with_faketime "$target_ts"
+  start_geth_for_mining
 
   # Start mining with all GPUs
   start_ethminer
