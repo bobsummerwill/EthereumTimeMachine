@@ -465,7 +465,7 @@ start_geth_for_sync() {
 
   # Start geth for sync
   nohup /root/geth --datadir "$DATA_DIR" \
-    --cache 4096 \
+    --cache 16384 \
     --rpc --rpcaddr 0.0.0.0 --rpcport 8545 \
     --rpcapi "eth,net,web3,admin" \
     --networkid 1 \
