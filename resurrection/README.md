@@ -38,11 +38,14 @@ Only reduces by 1/2048 (~0.049%) per block regardless of timestamp gap.
 
 ### Natural Difficulty Adjustment
 
-The difficulty algorithm adjusts based on block timestamps. When we mine blocks, the timestamp differences create natural difficulty adjustments:
-- **Homestead**: Larger timestamp gaps (>100s) reduce difficulty by up to 4.83% per block
-- **Frontier**: Any gap ≥13s reduces difficulty by 0.049% per block
+With 8x RTX 3090 GPUs (~2 GH/s) mining at 62 TH difficulty, blocks take **~8.6 hours** to find. This creates natural timestamp gaps of ~31,000 seconds between blocks.
 
-The mining rate naturally creates appropriate timestamp gaps without needing faketime manipulation.
+**Homestead**: The formula `max(1 - (timestamp_delta // 10), -99)` with 31,000s gaps gives:
+- `adjustment = max(1 - 3100, -99) = -99`
+- This is the **maximum possible reduction** of ~4.83% per block
+- No artificial timestamp manipulation needed - the natural mining rate maxes out the difficulty reduction
+
+**Frontier**: Any gap ≥13s gives the fixed 0.049% reduction per block, so the slow mining rate easily qualifies.
 
 ### Auto-Stop & P2P Handoff
 
