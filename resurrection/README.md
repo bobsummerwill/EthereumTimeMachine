@@ -36,9 +36,13 @@ if timestamp_delta >= 13:
 ```
 Only reduces by 1/2048 (~0.049%) per block regardless of timestamp gap.
 
-### Timestamp Manipulation
+### Natural Difficulty Adjustment
 
-We use `libfaketime` to make geth think the system time is 1000 seconds (~16.7 min) ahead. This is the **minimum gap that maxes out difficulty reduction** — the Homestead formula hits its -99 floor when `timestamp_delta >= 1000` (since `floor(1000/10) = 100`, and `1 - 100 = -99`). Larger gaps (20 min, 1 hour, etc.) have no additional effect.
+The difficulty algorithm adjusts based on block timestamps. When we mine blocks, the timestamp differences create natural difficulty adjustments:
+- **Homestead**: Larger timestamp gaps (>100s) reduce difficulty by up to 4.83% per block
+- **Frontier**: Any gap ≥13s reduces difficulty by 0.049% per block
+
+The mining rate naturally creates appropriate timestamp gaps without needing faketime manipulation.
 
 ### Auto-Stop & P2P Handoff
 
