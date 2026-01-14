@@ -625,10 +625,13 @@ start_geth_with_faketime() {
   export FAKETIME="@$fake_date"
   export FAKETIME_NO_CACHE=1
 
+  # Keep static-nodes.json to maintain connection to sync node during mining
+  echo "[\"$P2P_ENODE\"]" > "$DATA_DIR/static-nodes.json"
+
   nohup /root/geth --datadir "$DATA_DIR" \
     --rpc --rpcaddr 0.0.0.0 --rpcport 8545 \
     --rpcapi "eth,net,web3,miner,admin,debug" \
-    --nodiscover --maxpeers 0 --networkid 1 \
+    --nodiscover --maxpeers 5 --networkid 1 \
     --mine --minerthreads 0 \
     --etherbase "$MINER_ADDRESS" \
     --unlock "$MINER_ADDRESS" --password /root/miner-password.txt \
