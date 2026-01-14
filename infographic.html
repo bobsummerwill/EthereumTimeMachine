@@ -274,12 +274,15 @@
                         <div class="diagram large"><pre><span class="highlight-orange">adjustment = max(1 - (timestamp_delta // 10), -99)</span>
 <span class="highlight-orange">new_diff = parent_diff + (parent_diff // 2048) * adjustment</span>
 
-With 1000s timestamp gaps (minimum for max effect):
-  adjustment = max(1 - 100, -99) = <span class="highlight-yellow">-99</span>
+<span class="highlight-green">Natural mining with 8x RTX 3090 (~2 GH/s):</span>
+  At 62 TH difficulty, blocks take <span class="highlight-yellow">~8.6 hours</span> to find
+  This creates <span class="highlight-yellow">~31,000s</span> natural timestamp gaps
+
+  adjustment = max(1 - 3100, -99) = <span class="highlight-yellow">-99</span>
   Each block reduces difficulty by <span class="highlight-yellow">~4.83%</span>
 
-<span class="highlight-green">libfaketime</span> lies about system time so geth proposes
-blocks with 1000s gaps <span class="highlight-yellow">without waiting</span>
+  <span class="highlight-green">No timestamp manipulation needed</span> - the natural
+  mining rate maxes out the difficulty reduction!
 
 Difficulty
     ^
