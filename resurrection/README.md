@@ -14,7 +14,7 @@ GPU mining to extend historical chains beyond their original blocks, reducing di
 | Blocks needed | ~320 | ~26,500 |
 | GPUs | 8x RTX 3090 | 8x RTX 3090 |
 | Time | ~8 days | **~19 months** |
-| Cost | ~$180 | **~$14,000** |
+| Cost | ~$216 | **~$14,000** |
 
 **Recommendation**: Start with Homestead. Frontier requires ~80x more blocks due to its simpler difficulty algorithm that only reduces by 1/2048 per block regardless of timestamp gap.
 
