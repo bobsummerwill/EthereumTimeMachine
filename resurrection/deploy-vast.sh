@@ -77,11 +77,12 @@ cmd_create() {
   log "Creating instance from offer ${offer_id}..."
 
   local result
-  # Use proxy SSH (works universally) - don't use --direct
+  # Use direct ports for more reliable SSH (bypasses Vast.ai proxy)
   result=$(vastai create instance "$offer_id" \
     --image "nvidia/cuda:11.8.0-devel-ubuntu22.04" \
     --disk 100 \
     --ssh \
+    --direct \
     2>&1)
 
   echo "$result"
@@ -125,9 +126,20 @@ get_ssh_info() {
   local info
   info=$(vastai show instance "$instance_id" --raw 2>/dev/null)
 
-  local host port
-  host=$(echo "$info" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ssh_host',''))" 2>/dev/null)
-  port=$(echo "$info" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ssh_port',''))" 2>/dev/null)
+  # Prefer direct IP/port over proxy (more reliable)
+  local host port direct_port public_ip
+  public_ip=$(echo "$info" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('public_ipaddr',''))" 2>/dev/null)
+  direct_port=$(echo "$info" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('direct_port_start',-1); print('' if p<=0 else p)" 2>/dev/null)
+
+  if [ -n "$public_ip" ] && [ -n "$direct_port" ]; then
+    # Use direct connection (bypasses Vast.ai proxy)
+    host="$public_ip"
+    port="$direct_port"
+  else
+    # Fall back to proxy
+    host=$(echo "$info" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ssh_host',''))" 2>/dev/null)
+    port=$(echo "$info" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ssh_port',''))" 2>/dev/null)
+  fi
 
   if [ -z "$host" ] || [ -z "$port" ]; then
     error "Could not get SSH info for instance ${instance_id}"
@@ -409,12 +421,13 @@ for offer in data[:10]:  # Try up to 10 offers
     log "Trying offer $offer_id (${gpus}x GPU in $location @ \$${price}/hr)..."
     log "============================================"
 
-    # Create instance
+    # Create instance with direct ports (bypasses unreliable Vast.ai proxy)
     local result
     result=$(vastai create instance "$offer_id" \
       --image "nvidia/cuda:11.8.0-devel-ubuntu22.04" \
       --disk 100 \
       --ssh \
+      --direct \
       2>&1)
 
     local instance_id
@@ -449,12 +462,17 @@ for offer in data[:10]:  # Try up to 10 offers
       continue
     fi
 
-    # Get SSH info
+    # Get SSH info (prefer direct IP over proxy, but only if port > 0)
     local ssh_info host port
     ssh_info=$(vastai show instance "$instance_id" --raw 2>/dev/null | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
-print(f\"{d.get('ssh_host','')}:{d.get('ssh_port','')}\")
+ip = d.get('public_ipaddr','')
+direct_port = d.get('direct_port_start', -1)
+if ip and direct_port > 0:
+    print(f'{ip}:{direct_port}')
+else:
+    print(f\"{d.get('ssh_host','')}:{d.get('ssh_port','')}\")
 " 2>/dev/null)
     host=$(echo "$ssh_info" | cut -d: -f1)
     port=$(echo "$ssh_info" | cut -d: -f2)
