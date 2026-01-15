@@ -19,11 +19,21 @@ set -uo pipefail
 # ============================================================================
 
 ERA=""
+SKIP_INSTALL=false
+SKIP_SYNC=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --era|-e) ERA="$2"; shift 2 ;;
+    --skip-install) SKIP_INSTALL=true; shift ;;
+    --skip-sync) SKIP_SYNC=true; shift ;;
+    --mine-only) SKIP_INSTALL=true; SKIP_SYNC=true; shift ;;
     --help|-h)
-      echo "Usage: $0 --era <homestead|frontier>"
+      echo "Usage: $0 --era <homestead|frontier> [OPTIONS]"
+      echo ""
+      echo "Options:"
+      echo "  --skip-install  Skip dependency/binary installation"
+      echo "  --skip-sync     Skip waiting for sync (assume already synced)"
+      echo "  --mine-only     Skip both install and sync (just start mining)"
       exit 0
       ;;
     *) echo "Unknown option: $1"; exit 1 ;;
@@ -361,17 +371,30 @@ main() {
   log "============================================"
   log "Target: Block $TARGET_BLOCK"
   log "Stop at: $(format_difficulty $STOP_DIFFICULTY)"
+  [ "$SKIP_INSTALL" = true ] && log "Mode: --skip-install"
+  [ "$SKIP_SYNC" = true ] && log "Mode: --skip-sync"
   log "============================================"
 
-  # Install
-  install_dependencies
-  install_geth
-  install_ethminer
-  setup_miner_key
+  # Install (unless skipped)
+  if [ "$SKIP_INSTALL" = false ]; then
+    install_dependencies
+    install_geth
+    install_ethminer
+    setup_miner_key
+  else
+    log "Skipping installation (--skip-install)"
+  fi
 
-  # Start geth and sync
+  # Start geth
   start_geth
-  wait_for_sync
+
+  # Sync (unless skipped)
+  if [ "$SKIP_SYNC" = false ]; then
+    wait_for_sync
+  else
+    log "Skipping sync wait (--skip-sync)"
+    log "Current block: $(get_block_number)"
+  fi
 
   # Start mining
   start_ethminer
