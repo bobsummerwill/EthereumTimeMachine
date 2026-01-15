@@ -13,13 +13,14 @@
 #   vastai set api-key YOUR_API_KEY
 #
 # Usage:
-#   ./deploy.sh search              # Find available instances
-#   ./deploy.sh create <offer_id>   # Create instance from offer
-#   ./deploy.sh deploy <instance_id> [homestead|frontier]
-#   ./deploy.sh ssh <instance_id>   # SSH into instance
-#   ./deploy.sh status <instance_id> # Check mining status
-#   ./deploy.sh logs <instance_id>  # Tail mining logs
-#   ./deploy.sh destroy <instance_id> # Destroy instance
+#   ./deploy-vast.sh search              # Find available instances
+#   ./deploy-vast.sh create <offer_id>   # Create instance from offer
+#   ./deploy-vast.sh deploy <instance_id> [homestead|frontier]
+#   ./deploy-vast.sh restart <instance_id> [era]  # Restart with new script (keeps data)
+#   ./deploy-vast.sh ssh <instance_id>   # SSH into instance
+#   ./deploy-vast.sh status <instance_id> # Check mining status
+#   ./deploy-vast.sh logs <instance_id>  # Tail mining logs
+#   ./deploy-vast.sh destroy <instance_id> # Destroy instance
 
 set -euo pipefail
 
@@ -317,7 +318,7 @@ cmd_status() {
 
   ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s << 'EOF'
 echo "=== Process Status ==="
-ps aux | grep -E "geth|ethminer|vast-mining" | grep -v grep || echo "No mining processes found"
+ps aux | grep -E "geth|ethminer|mining-script" | grep -v grep || echo "No mining processes found"
 
 echo ""
 echo "=== Current Block ==="
@@ -369,6 +370,54 @@ cmd_destroy() {
   else
     log "Cancelled."
   fi
+}
+
+# Restart mining with new script (non-destructive - keeps chaindata)
+cmd_restart() {
+  local instance_id="$1"
+  local era="${2:-homestead}"
+
+  if [ "$era" != "homestead" ] && [ "$era" != "frontier" ]; then
+    error "ERA must be 'homestead' or 'frontier'"
+    exit 1
+  fi
+
+  log "Getting SSH info for instance ${instance_id}..."
+  local ssh_info
+  ssh_info=$(get_ssh_info "$instance_id")
+
+  local host port
+  host=$(echo "$ssh_info" | cut -d: -f1)
+  port=$(echo "$ssh_info" | cut -d: -f2)
+
+  log "Restarting ${era} mining on ${host}:${port} (non-destructive)..."
+
+  # Stop existing processes
+  log "Stopping existing mining processes..."
+  ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" "pkill -9 -f ethminer || true; pkill -9 geth || true; sleep 2"
+
+  # Upload new script
+  log "Uploading mining-script.sh..."
+  scp -o StrictHostKeyChecking=no -P "$port" "${SCRIPT_DIR}/mining-script.sh" "root@${host}:/root/"
+
+  # Start with --mine-only (skips install and sync, preserves chaindata)
+  log "Starting ${era} mining with --mine-only..."
+  ssh -o StrictHostKeyChecking=no -p "$port" "root@${host}" bash -s "$era" << 'EOF'
+ERA="$1"
+chmod +x /root/mining-script.sh
+
+# Ensure OpenCL ICD exists
+mkdir -p /etc/OpenCL/vendors
+echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
+
+# Start with --mine-only (keeps chaindata, skips install/sync)
+setsid /root/mining-script.sh --era "$ERA" --mine-only >> /root/mining.log 2>&1 &
+disown
+echo "Mining script restarted with PID: $!"
+EOF
+
+  log "Restart complete! Mining will resume shortly."
+  log "Monitor with: ./deploy-vast.sh logs ${instance_id}"
 }
 
 # Auto-deploy: systematically try 8x 3090 instances until one works
@@ -596,18 +645,23 @@ case "${1:-help}" in
     [ -z "${2:-}" ] && { error "Usage: ./deploy-vast.sh destroy <instance_id>"; exit 1; }
     cmd_destroy "$2"
     ;;
+  restart)
+    [ -z "${2:-}" ] && { error "Usage: ./deploy-vast.sh restart <instance_id> [homestead|frontier]"; exit 1; }
+    cmd_restart "$2" "${3:-homestead}"
+    ;;
   help|--help|-h|*)
     echo "Vast.ai Ethereum Mining Deployment"
     echo ""
     echo "Usage:"
-    echo "  ./deploy-vast.sh search                      # Find available GPU instances"
-    echo "  ./deploy-vast.sh create <offer_id>           # Create instance from offer"
-    echo "  ./deploy-vast.sh deploy <instance_id> [era]  # Deploy mining (era: homestead|frontier)"
-    echo "  ./deploy-vast.sh auto-deploy [era]           # Auto-find and deploy (tries until success)"
-    echo "  ./deploy-vast.sh ssh <instance_id>           # SSH into instance"
-    echo "  ./deploy-vast.sh status <instance_id>        # Check mining status"
-    echo "  ./deploy-vast.sh logs <instance_id>          # Tail mining logs"
-    echo "  ./deploy-vast.sh destroy <instance_id>       # Destroy instance"
+    echo "  ./deploy-vast.sh search                       # Find available GPU instances"
+    echo "  ./deploy-vast.sh create <offer_id>            # Create instance from offer"
+    echo "  ./deploy-vast.sh deploy <instance_id> [era]   # Deploy mining (era: homestead|frontier)"
+    echo "  ./deploy-vast.sh auto-deploy [era]            # Auto-find and deploy (tries until success)"
+    echo "  ./deploy-vast.sh restart <instance_id> [era]  # Restart with new script (keeps chaindata)"
+    echo "  ./deploy-vast.sh ssh <instance_id>            # SSH into instance"
+    echo "  ./deploy-vast.sh status <instance_id>         # Check mining status"
+    echo "  ./deploy-vast.sh logs <instance_id>           # Tail mining logs"
+    echo "  ./deploy-vast.sh destroy <instance_id>        # Destroy instance"
     echo ""
     echo "Examples:"
     echo "  ./deploy-vast.sh auto-deploy homestead       # Auto-deploy Homestead mining"
