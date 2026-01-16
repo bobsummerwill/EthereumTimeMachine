@@ -11,6 +11,45 @@
 # USAGE:
 #   ./mining-script.sh --era homestead
 #   ./mining-script.sh --era frontier
+#
+# ============================================================================
+# IMPORTANT: Work Expiration Fix (geth 1.0.2 and 1.3.6 Remote Mining Bug)
+# ============================================================================
+#
+# APPLIES TO: Both Frontier (geth 1.0.2) and Homestead (geth 1.3.6) mining
+#
+# PROBLEM:
+#   Both geth 1.0.2 and 1.3.6 have identical remote_agent.go code that expires
+#   work after 84 seconds (7 * 12s block time). In 2015-2016, this was fine:
+#   - Thousands of miners were on the network
+#   - New blocks appeared every ~15 seconds
+#   - Each new block triggered commitNewWork() with fresh timestamps
+#   - Work never sat idle long enough to expire
+#
+#   In our resurrection scenario, WE ARE THE ONLY MINERS. No new blocks are being
+#   mined, so the work never refreshes. At high difficulty (56.5 TH Homestead,
+#   20.5 TH Frontier) with ~2.5 GH/s hashrate, it takes hours to find a solution.
+#   By then, geth has long deleted the work from its internal map, and rejects
+#   the solution with: "Work was submitted for <hash> but no pending work found"
+#
+# SOLUTION:
+#   The start_work_refresher() function runs a background loop that cycles
+#   miner_stop/miner_start via RPC every 60 seconds. This triggers geth's
+#   commitNewWork() which creates a NEW Work struct with a fresh createdAt
+#   timestamp, preventing the 84-second expiration.
+#
+#   The work hash changes each cycle (includes timestamp in header), but ethminer
+#   handles this gracefully - it receives the new job and continues mining without
+#   losing significant progress since the nonce space is random anyway.
+#
+# RELEVANT CODE IN GETH 1.0.2 AND 1.3.6:
+#   miner/remote_agent.go - maintainLoop() deletes work where:
+#     time.Since(work.createdAt) > 7*(12*time.Second)  // 84 seconds
+#
+#   miner/worker.go - commitNewWork() creates Work with:
+#     createdAt: time.Now()
+#
+# ============================================================================
 
 set -uo pipefail
 
@@ -264,10 +303,35 @@ start_ethminer() {
   sleep 1
 
   log "Starting ethminer..."
-  LC_ALL=C LANG=C nohup "$ETHMINER_BIN" -G -P http://127.0.0.1:8545 \
-    --HWMON 1 --report-hr \
+  LC_ALL=C LANG=C nohup "$ETHMINER_BIN" -G -P getwork://127.0.0.1:8545 \
+    --HWMON 1 --report-hr --work-timeout 99999 --farm-recheck 5000 \
     >> "$ETHMINER_LOG" 2>&1 &
   log "ethminer started (PID: $!)"
+}
+
+# Work refresher: geth 1.0.2 and 1.3.6 both expire work after 84 seconds, but at
+# high difficulty it takes hours to find a solution. This function cycles
+# miner_stop/start every 60 seconds to create fresh work with a new createdAt timestamp.
+start_work_refresher() {
+  pkill -9 -f work-refresher 2>/dev/null || true
+
+  log "Starting work refresher..."
+  cat > /root/work-refresher.sh << 'REFRESHER'
+#!/bin/bash
+while true; do
+  sleep 60
+  curl -s -X POST -H "Content-Type: application/json" \
+    --data '{"jsonrpc":"2.0","method":"miner_stop","params":[],"id":1}' \
+    http://127.0.0.1:8545 >/dev/null 2>&1
+  sleep 1
+  curl -s -X POST -H "Content-Type: application/json" \
+    --data '{"jsonrpc":"2.0","method":"miner_start","params":[0],"id":2}' \
+    http://127.0.0.1:8545 >/dev/null 2>&1
+done
+REFRESHER
+  chmod +x /root/work-refresher.sh
+  nohup /root/work-refresher.sh >> /root/work-refresher.log 2>&1 &
+  log "work refresher started (PID: $!)"
 }
 
 # ============================================================================
@@ -398,6 +462,9 @@ main() {
 
   # Start mining
   start_ethminer
+
+  # Start work refresher (keeps geth work fresh at high difficulty)
+  start_work_refresher
 
   # Monitor until complete
   mining_monitor

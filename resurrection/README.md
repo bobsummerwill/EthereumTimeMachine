@@ -151,6 +151,65 @@ Expected hashrates:
 
 ## Troubleshooting
 
+### Work Expiration Bug (geth 1.0.2 and 1.3.6 Remote Mining)
+
+**Applies to**: Both Frontier (geth 1.0.2) and Homestead (geth 1.3.6) mining
+
+**Symptom**: ethminer runs for hours with `A0` (zero accepted solutions), even though hashrate is normal. Geth logs show:
+```
+Work was submitted for <hash> but no pending work found
+```
+
+**Root Cause**: Both geth 1.0.2 and 1.3.6 have identical `remote_agent.go` code that expires pending work after 84 seconds (7 × 12s block time). This was fine in 2015-2016 when thousands of miners produced new blocks every ~15 seconds, constantly refreshing work. In our resurrection scenario, **we are the only miners** - no new blocks means no work refresh.
+
+At high difficulty (e.g., 56.5 TH for Homestead, 20.5 TH for Frontier) with ~2.5 GH/s hashrate, finding a solution takes hours. By then, geth has deleted the work from its internal map and rejects valid solutions.
+
+**Technical Details**:
+```go
+// miner/remote_agent.go - maintainLoop() deletes work older than 84 seconds:
+if time.Since(work.createdAt) > 7*(12*time.Second) {
+    delete(a.work, hash)
+}
+
+// miner/worker.go - commitNewWork() sets createdAt:
+work := &Work{
+    createdAt: time.Now(),  // Only set when NEW work is created
+    ...
+}
+```
+
+The key insight: `createdAt` is only set when `commitNewWork()` is called, which happens when:
+1. A new block is added to the chain (ChainHeadEvent)
+2. Mining completes successfully
+3. Miner starts
+
+Since we're stuck waiting for a block with no external blocks arriving, `commitNewWork()` is never called again.
+
+**Solution**: The `start_work_refresher()` function in `mining-script.sh` runs a background loop that cycles `miner_stop`/`miner_start` via RPC every 60 seconds:
+
+```bash
+while true; do
+  sleep 60
+  curl -X POST --data '{"method":"miner_stop",...}' http://127.0.0.1:8545
+  sleep 1
+  curl -X POST --data '{"method":"miner_start",...}' http://127.0.0.1:8545
+done
+```
+
+This triggers `commitNewWork()` which creates a fresh Work struct with a new `createdAt` timestamp, preventing the 84-second expiration. The work hash changes each cycle, but ethminer handles this gracefully since nonce search is random anyway.
+
+**Verification**:
+```bash
+# Check work-refresher is running
+pgrep -f work-refresher
+
+# Check work-refresher log
+tail /root/work-refresher.log
+
+# Verify work hash changes after miner restart
+curl -X POST --data '{"method":"eth_getWork",...}' http://127.0.0.1:8545
+```
+
 ### P2P Sync: "No peers connected"
 
 The mining script syncs chaindata from a chain-of-geths node before mining. If it reports no peers:
