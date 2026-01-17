@@ -250,19 +250,19 @@
                                 <td><span class="highlight-orange">~26,500</span></td>
                             </tr>
                             <tr>
-                                <td>GPUs needed</td>
-                                <td><span class="highlight-green">8x RTX 3090</span></td>
-                                <td><span class="highlight-orange">8x RTX 3090</span></td>
+                                <td>GPUs</td>
+                                <td><span class="highlight-green">8x RTX 3090 (~846 MH/s)</span></td>
+                                <td><span class="highlight-orange">8x RTX 3090 (~846 MH/s)</span></td>
                             </tr>
                             <tr>
                                 <td>Time</td>
-                                <td><span class="highlight-green">~8 days</span></td>
+                                <td><span class="highlight-green">~18 days</span></td>
                                 <td><span class="highlight-orange">~19 months</span></td>
                             </tr>
                             <tr>
                                 <td>Cost</td>
-                                <td><span class="highlight-green">~$216</span></td>
-                                <td><span class="highlight-orange">~$14,000</span></td>
+                                <td><span class="highlight-green">~$525</span></td>
+                                <td><span class="highlight-orange">~$17,000</span></td>
                             </tr>
                         </table>
                         <p style="color: #888; margin-top: 6px;">
@@ -274,11 +274,11 @@
                         <div class="diagram large"><pre><span class="highlight-orange">adjustment = max(1 - (timestamp_delta // 10), -99)</span>
 <span class="highlight-orange">new_diff = parent_diff + (parent_diff // 2048) * adjustment</span>
 
-<span class="highlight-green">With 8x RTX 3090 GPUs (~2 GH/s):</span>
-  At 62 TH difficulty, blocks take <span class="highlight-yellow">~8.6 hours</span> to find
-  This creates <span class="highlight-yellow">~31,000s</span> timestamp gaps between blocks
+<span class="highlight-green">With 8x RTX 3090 GPUs (~846 MH/s):</span>
+  At 62 TH difficulty, blocks take <span class="highlight-yellow">~20 hours</span> to find
+  This creates <span class="highlight-yellow">~72,000s</span> timestamp gaps between blocks
 
-  adjustment = max(1 - 3100, -99) = <span class="highlight-yellow">-99</span>
+  adjustment = max(1 - 7200, -99) = <span class="highlight-yellow">-99</span>
   Each block reduces difficulty by <span class="highlight-yellow">~4.83%</span>
 
   The long mining time automatically maxes out the
@@ -293,7 +293,7 @@ Difficulty
     |         #####
 10M |             ###########___
     +---------------------------&gt;
-        ~320 blocks (~8 days)</pre></div>
+        ~316 blocks (~18 days)</pre></div>
                     </div>
                 </div>
 
@@ -323,8 +323,8 @@ Difficulty
                          =
                               <span class="highlight-purple">COMPLETE TIME MACHINE</span>
 
-<span class="highlight-yellow">Homestead resurrection:</span> ~8 days with 8x RTX 3090 (~$216 on Vast.ai)
-<span class="highlight-yellow">Frontier resurrection:</span> ~19 months (~$14,000 on Vast.ai)</pre></div>
+<span class="highlight-yellow">Homestead resurrection:</span> ~18 days with 8x RTX 3090 (~$525 on Vast.ai)
+<span class="highlight-yellow">Frontier resurrection:</span> ~19 months with 8x RTX 3090 (~$17,000 on Vast.ai)</pre></div>
                 <div style="flex: 1; display: flex; justify-content: center;">
                     <div style="text-align: center;">
                         <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://github.com/bobsummerwill/EthereumTimeMachine&bgcolor=1a1a2e&color=00d4ff" alt="QR Code" style="border: 2px solid #00d4ff; border-radius: 4px;">

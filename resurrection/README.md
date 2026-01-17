@@ -11,10 +11,10 @@ GPU mining to extend historical chains beyond their original blocks, reducing di
 | Start difficulty | ~62 TH | ~20.5 TH |
 | Target difficulty | ~10 MH | ~50 MH |
 | Reduction/block | ~4.83% | ~0.049% |
-| Blocks needed | ~320 | ~26,500 |
-| GPUs | 8x RTX 3090 | 8x RTX 3090 |
-| Time | ~8 days | **~19 months** |
-| Cost | ~$216 | **~$14,000** |
+| Blocks needed | ~316 | ~26,500 |
+| GPUs | 8x RTX 3090 (~846 MH/s) | 8x RTX 3090 (~846 MH/s) |
+| Time | ~18 days | **~19 months** |
+| Cost | ~$525 | **~$17,000** |
 
 **Recommendation**: Start with Homestead. Frontier requires ~80x more blocks due to its simpler difficulty algorithm that only reduces by 1/2048 per block regardless of timestamp gap.
 
@@ -38,10 +38,10 @@ Only reduces by 1/2048 (~0.049%) per block regardless of timestamp gap.
 
 ### Natural Difficulty Adjustment
 
-With 8x RTX 3090 GPUs (~2 GH/s) mining at 62 TH difficulty, blocks take **~8.6 hours** to find. This creates natural timestamp gaps of ~31,000 seconds between blocks.
+With 8x RTX 3090 GPUs (~846 MH/s) mining at 62 TH difficulty, blocks take **~20 hours** to find. This creates natural timestamp gaps of ~72,000 seconds between blocks.
 
-**Homestead**: The formula `max(1 - (timestamp_delta // 10), -99)` with 31,000s gaps gives:
-- `adjustment = max(1 - 3100, -99) = -99`
+**Homestead**: The formula `max(1 - (timestamp_delta // 10), -99)` with 72,000s gaps gives:
+- `adjustment = max(1 - 7200, -99) = -99`
 - This is the **maximum possible reduction** of ~4.83% per block
 - No artificial timestamp manipulation needed - the natural mining rate maxes out the difficulty reduction
 
@@ -108,34 +108,36 @@ ssh -p PORT root@sshX.vast.ai "tail -f /root/mining.log"
 
 ## Homestead Difficulty Progression
 
+With 1 machine (8x RTX 3090 @ 846 MH/s):
+
 | Block | Difficulty | Block Time | Cumulative |
 |-------|------------|------------|------------|
 | 1 | 62.4 TH | 20.5 hours | 20.5 hours |
-| 50 | 5.5 TH | 1.8 hours | 89 hours |
-| 100 | 490 GH | 9.7 min | 155 hours |
-| 150 | 43 GH | 51 sec | 171 hours |
-| 200 | 3.8 GH | 4.5 sec | 175 hours |
-| ~320 | 10 MH | instant | ~176 hours |
+| 50 | 5.5 TH | 1.8 hours | 210 hours |
+| 100 | 490 GH | 9.7 min | 366 hours |
+| 150 | 43 GH | 51 sec | 404 hours |
+| 200 | 3.8 GH | 4.5 sec | 414 hours |
+| ~316 | 10 MH | instant | ~421 hours |
 
-Total: ~180 hours (~7.5 days) including overhead.
+Total: ~421 hours (~18 days). Scale linearly with more machines.
 
 ## Frontier Difficulty Progression
 
-With 8x RTX 3090 @ 845 MH/s (actual starting difficulty: 20.5 TH):
+With 1 machine (8x RTX 3090 @ 846 MH/s):
 
 | Block | Difficulty | Block Time | Cumulative |
 |-------|------------|------------|------------|
-| 1 | 20.5 TH | 6.7 hours | 0.3 days |
+| 1 | 20.5 TH | 6.7 hours | 0 days |
 | 100 | 19.5 TH | 6.4 hours | 27 days |
 | 500 | 16.1 TH | 5.3 hours | 124 days |
-| 1,000 | 12.6 TH | 4.1 hours | 223 days |
+| 1,000 | 12.6 TH | 4.1 hours | 222 days |
 | 2,000 | 7.7 TH | 2.5 hours | 358 days |
-| 5,000 | 1.8 TH | 36 min | 525 days |
-| 10,000 | 158 GH | 3.1 min | 570 days |
-| 20,000 | 1.2 GH | 1.4 sec | 575 days |
-| ~26,500 | 50 MH | instant | ~575 days |
+| 5,000 | 1.8 TH | 35 min | 524 days |
+| 10,000 | 155 GH | 3.1 min | 570 days |
+| 20,000 | 1.2 GH | 1.4 sec | 574 days |
+| ~26,500 | 50 MH | instant | ~574 days |
 
-Total: ~575 days (~19 months) at $1/hr = ~$14,000.
+Total: ~574 days (~19 months) at ~$1.25/hr = ~$17,000. Scale linearly with more machines.
 
 **Why so slow?** Frontier's difficulty only drops by 1/2048 (~0.049%) per block, regardless of timestamp gap. The first 5,000 blocks consume 91% of total mining time.
 
@@ -147,7 +149,7 @@ The mining script uses **ethminer with CUDA** for NVIDIA GPUs. CUDA provides:
 - Optimized for RTX 3090 (Compute 8.6)
 
 Expected hashrates:
-- 8x RTX 3090: ~845 MH/s total (~105 MH/s per GPU)
+- 8x RTX 3090: ~846 MH/s total (~106 MH/s per GPU)
 
 ## Troubleshooting
 
