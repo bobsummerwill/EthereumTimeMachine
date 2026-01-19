@@ -18,7 +18,7 @@ See [`chain-of-geths/README.md`](chain-of-geths/README.md)
 
 ## Resurrection
 
-GPU mining to crash difficulty from ~62 TH to CPU-mineable levels.
+GPU mining to crash difficulty from 62.38 TH to CPU-mineable levels.
 
 | Option | Time | Cost | Blocks |
 |--------|------|------|--------|

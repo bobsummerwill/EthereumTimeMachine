@@ -1,21 +1,21 @@
 # Homestead Resurrection Status
 
-GPU mining operation to extend the historical Ethereum Homestead chain beyond block 1,919,999, reducing difficulty from ~62 TH to CPU-mineable levels (~10 MH).
+GPU mining operation to extend the historical Ethereum Homestead chain beyond block 1,919,999, reducing difficulty from 62.38 TH to CPU-mineable levels (~10 MH).
 
-**For Claude:** When user asks about vast.ai instances, mining status, current block, difficulty, or resurrection progress, use this file as the reference. Run the status check commands below to get current data, then generate the table and/or chart as needed.
+**For Claude:** When user asks about vast.ai instances, mining status, current block, difficulty, or resurrection progress, use this file as the reference. Run the status check commands below to get current data, then generate the table and/or chart as needed. **ALWAYS fetch actual block data from the chain** - don't rely on formula estimates which can drift from actual values.
 
 ---
 
 ## Current Status
 
-**Last Updated:** 2026-01-18
+**Last Updated:** 2026-01-19
 
 | Metric | Value |
 |--------|-------|
 | Current Block | 1920008 (mining) |
 | Target Block | 1920316 |
 | Blocks Remaining | ~308 |
-| Current Difficulty | ~41.7 TH |
+| Current Difficulty | ~39.9 TH |
 | Target Difficulty | 10 MH (CPU-mineable) |
 | Est. Completion | ~2026-01-24 |
 
@@ -33,17 +33,17 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 
 ## Block History (Mined)
 
-| Block | Status | Date/Time | Difficulty | Est. Time | Actual Time |
-|-------|--------|-----------|------------|-----------|-------------|
-| 1919999 | SYNCED | 2016-07-20 13:20 | 65.1 TH | - | ~14s |
-| 1920000 | MINED | 2026-01-16 05:39 | 62.0 TH | 10.2h | 9.5y |
-| 1920001 | MINED | 2026-01-16 08:39 | 59.0 TH | 9.7h | 3.0h |
-| 1920002 | MINED | 2026-01-16 22:33 | 56.2 TH | 9.2h | 13.9h |
-| 1920003 | MINED | 2026-01-17 10:15 | 53.5 TH | 8.8h | 11.7h |
-| 1920004 | MINED | 2026-01-18 05:16 | 50.9 TH | 8.4h | 19.0h |
-| 1920005 | MINED | 2026-01-18 10:18 | 48.4 TH | 7.9h | 5.0h |
-| 1920006 | MINED | 2026-01-18 15:31 | 46.1 TH | 7.6h | 5.2h |
-| 1920007 | MINED | 2026-01-18 16:05 | 43.8 TH | 7.2h | 34m |
+| Block | Status | Date/Time (UTC) | Difficulty | Est. Time | Actual Time |
+|-------|--------|-----------------|------------|-----------|-------------|
+| 1919999 | SYNCED | 2016-07-20 13:20 | 62.38 TH | - | ~14s |
+| 1920000 | MINED | 2026-01-15 07:38 | 59.36 TH | 9.7h | 9.5y |
+| 1920001 | MINED | 2026-01-16 18:29 | 56.49 TH | 9.3h | 34.9h |
+| 1920002 | MINED | 2026-01-17 08:22 | 53.76 TH | 8.8h | 13.9h |
+| 1920003 | MINED | 2026-01-17 20:03 | 51.16 TH | 8.4h | 11.7h |
+| 1920004 | MINED | 2026-01-18 05:17 | 48.69 TH | 8.0h | 9.2h |
+| 1920005 | MINED | 2026-01-18 10:19 | 46.34 TH | 7.6h | 5.0h |
+| 1920006 | MINED | 2026-01-18 15:32 | 44.10 TH | 7.2h | 5.2h |
+| 1920007 | MINED | 2026-01-18 16:06 | 41.96 TH | 6.9h | 34m |
 
 ## Key Constants
 
@@ -55,7 +55,7 @@ TOTAL_HASHRATE = 1692e6            # 1692 MH/s combined
 
 # Difficulty algorithm (Homestead EIP-2)
 DIFFICULTY_REDUCTION = 0.0483      # ~4.83% reduction per block
-START_DIFFICULTY = 62.0e12         # 62 TH at block 1920000
+START_DIFFICULTY = 59.36e12        # 59.36 TH at block 1920000 (actual)
 TARGET_DIFFICULTY = 10e6           # 10 MH = CPU-mineable
 
 # Block numbers
@@ -83,26 +83,39 @@ ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p 34180 root@ssh1.vast.ai 
    http://127.0.0.1:8545" | python3 -c 'import sys,json; print(int(json.load(sys.stdin)["result"], 16))'
 ```
 
-### 3. Get Block Timestamps (for newly mined blocks)
+### 3. Get Block Data (timestamp AND difficulty) for Mined Blocks
+
+**CRITICAL:** Always fetch actual difficulty values from the chain, not formula estimates. The actual reduction rate varies slightly from the theoretical 4.83%.
+
+**IMPORTANT:** Also fetch block 1919999 (the last mainnet block) to get the correct pre-resurrection difficulty. Don't assume values like "65 TH" - verify from chain.
 
 ```bash
-ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p 34180 root@ssh1.vast.ai '
-for block in 1920004 1920005 1920006 1920007; do
+# Fetch actual timestamp and difficulty for all mined blocks (including 1919999)
+for block in 1919999 1920000 1920001 1920002 1920003 1920004 1920005 1920006 1920007; do
   hex=$(printf "0x%x" $block)
-  result=$(curl -s -X POST -H "Content-Type: application/json" \
-    --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"$hex\", false],\"id\":1}" \
-    http://127.0.0.1:8545)
-  timestamp=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[\"result\"][\"timestamp\"] if d.get(\"result\") else \"null\")" 2>/dev/null)
-  if [ "$timestamp" != "null" ] && [ -n "$timestamp" ]; then
-    ts_dec=$(python3 -c "print(int(\"$timestamp\", 16))")
-    date=$(date -d @$ts_dec "+%Y-%m-%d %H:%M:%S")
-    echo "$block: $date (ts: $ts_dec)"
-  else
-    echo "$block: not yet mined"
-  fi
+  result=$(ssh root@ssh1.vast.ai -p 34180 "curl -s -X POST -H 'Content-Type: application/json' \
+    --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"$hex\",false],\"id\":1}' \
+    http://localhost:8545" 2>/dev/null)
+  diff_hex=$(echo "$result" | jq -r '.result.difficulty')
+  ts_hex=$(echo "$result" | jq -r '.result.timestamp')
+  diff_dec=$(printf "%d" $diff_hex)
+  ts_dec=$(printf "%d" $ts_hex)
+  diff_th=$(echo "scale=2; $diff_dec / 1000000000000" | bc)
+  dt=$(date -u -d "@$ts_dec" '+%Y-%m-%d %H:%M:%S')
+  echo "$block: diff=$diff_th TH, timestamp=$dt UTC"
 done
-'
 ```
+
+Example output (actual values, not estimates):
+```
+1919999: diff=62.38 TH, timestamp=2016-07-20 13:20:38 UTC  <-- Last mainnet block
+1920000: diff=59.36 TH, timestamp=2026-01-15 07:38:16 UTC  <-- First resurrection block (-4.8%)
+1920001: diff=56.49 TH, timestamp=2026-01-16 18:29:23 UTC
+1920002: diff=53.76 TH, timestamp=2026-01-17 08:22:25 UTC
+...
+```
+
+**Note:** The drop from 62.38 TH (1919999) to 59.36 TH (1920000) is a normal ~4.8% reduction per EIP-2, triggered by the 9.5 year timestamp gap which maxes out the -99 adjustment.
 
 ### 4. Check GPU Utilization
 
@@ -140,7 +153,8 @@ ssh -p 34180 root@ssh1.vast.ai "tail -50 /root/ethminer.log"
 ### Calculate Current Difficulty from Block Number
 
 ```python
-START_DIFFICULTY = 62.0e12
+# Note: Use actual chain values when available, formula is approximate
+START_DIFFICULTY = 59.36e12  # Actual difficulty at block 1920000
 REDUCTION = 0.0483
 blocks_mined = current_block - 1920000
 current_difficulty = START_DIFFICULTY * ((1 - REDUCTION) ** blocks_mined)
@@ -184,13 +198,13 @@ def calc_estimated_date(target_block, from_block, from_date):
 
 | Block | Difficulty | Significance |
 |-------|------------|--------------|
-| 1919999 | 65.1 TH | Last mainnet Homestead block |
-| 1920000 | 62.0 TH | **RESURRECTION** - First new block |
-| 1920050 | ~5.2 TH | 10x reduction |
-| 1920100 | ~439 GH | 100x reduction |
-| 1920150 | ~37 GH | 1000x reduction |
-| 1920200 | ~3.1 GH | GPU-easy |
-| 1920250 | ~262 MH | Single GPU feasible |
+| 1919999 | 62.38 TH | Last mainnet Homestead block |
+| 1920000 | 59.36 TH | **RESURRECTION** - First new block |
+| 1920050 | ~5.0 TH | 10x reduction |
+| 1920100 | ~418 GH | 100x reduction |
+| 1920150 | ~35 GH | 1000x reduction |
+| 1920200 | ~3.0 GH | GPU-easy |
+| 1920250 | ~250 MH | Single GPU feasible |
 | 1920316 | ~10 MH | **CPU-MINEABLE** |
 
 ---
@@ -244,7 +258,7 @@ from datetime import datetime, timedelta
 HASHRATE = 1692e6
 REDUCTION = 0.0483
 TARGET = 10e6
-START_DIFF = 62.0e12
+START_DIFF = 59.36e12
 
 # Color scheme
 CYAN = '#00F0FF'
@@ -254,17 +268,17 @@ BG_DARK = '#1a1a2e'
 BG_CELL = '#16213e'
 GRAY = '#888888'
 
-# UPDATE THIS: Historical mined blocks with actual timestamps
+# UPDATE THIS: Historical mined blocks with actual timestamps (from chain)
 actual_blocks = {
-    1919999: {"diff": 65.1e12, "date": datetime(2016, 7, 20, 13, 20, 39)},
-    1920000: {"diff": 62.0e12, "date": datetime(2026, 1, 16, 5, 39, 0)},
-    1920001: {"diff": 59.0e12, "date": datetime(2026, 1, 16, 8, 39, 0)},
-    1920002: {"diff": 56.2e12, "date": datetime(2026, 1, 16, 22, 33, 0)},
-    1920003: {"diff": 53.5e12, "date": datetime(2026, 1, 17, 10, 15, 0)},
-    1920004: {"diff": 50.9e12, "date": datetime(2026, 1, 18, 5, 16, 57)},
-    1920005: {"diff": 48.4e12, "date": datetime(2026, 1, 18, 10, 18, 41)},
-    1920006: {"diff": 46.1e12, "date": datetime(2026, 1, 18, 15, 31, 58)},
-    1920007: {"diff": 43.8e12, "date": datetime(2026, 1, 18, 16, 5, 32)},
+    1919999: {"diff": 62.38e12, "date": datetime(2016, 7, 20, 13, 20, 39)},
+    1920000: {"diff": 59.36e12, "date": datetime(2026, 1, 15, 7, 38, 16)},
+    1920001: {"diff": 56.49e12, "date": datetime(2026, 1, 16, 18, 29, 23)},
+    1920002: {"diff": 53.76e12, "date": datetime(2026, 1, 17, 8, 22, 25)},
+    1920003: {"diff": 51.16e12, "date": datetime(2026, 1, 17, 20, 2, 37)},
+    1920004: {"diff": 48.69e12, "date": datetime(2026, 1, 18, 5, 16, 57)},
+    1920005: {"diff": 46.34e12, "date": datetime(2026, 1, 18, 10, 18, 41)},
+    1920006: {"diff": 44.10e12, "date": datetime(2026, 1, 18, 15, 31, 58)},
+    1920007: {"diff": 41.96e12, "date": datetime(2026, 1, 18, 16, 5, 32)},
 }
 
 # UPDATE THIS: Current block being mined
@@ -302,10 +316,10 @@ headers = ['Block', 'Status', 'Date/Time', 'Difficulty', 'Est. Time', 'Actual Ti
 rows = []
 
 # Block 1919999 (synced from mainnet)
-rows.append(['1919999', 'SYNCED', '2016-07-20 13:20', '65.1 TH', '-', '~14s'])
+rows.append(['1919999', 'SYNCED', '2016-07-20 13:20', '62.38 TH', '-', '~14s'])
 
-# Block 1920000 (resurrection)
-rows.append(['1920000', 'MINED', '2026-01-16 05:39', '62.0 TH', '10.2h', '9.5y'])
+# Block 1920000 (resurrection) - uses actual chain values
+rows.append(['1920000', 'MINED', '2026-01-15 07:38', '59.36 TH', '9.7h', '9.5y'])
 
 # Mined blocks with actual times
 prev_date = actual_blocks[1920000]["date"]
@@ -400,7 +414,7 @@ TABLE_EOF
 
 ## Chart Generation
 
-Generate a difficulty curve chart showing the exponential reduction from 62 TH to 10 MH.
+Generate a difficulty curve chart showing the exponential reduction from ~59 TH to 10 MH.
 
 **Output files:**
 - `~/Downloads/ethereum_resurrection_chart.png`
@@ -452,22 +466,22 @@ from datetime import datetime, timedelta
 HASHRATE = 1692e6  # 2x 8x RTX 3090
 REDUCTION = 0.0483
 TARGET = 10e6
-START_DIFF = 62.0e12
+START_DIFF = 59.36e12
 
 # Color scheme (matches infographic)
 CYAN, MAGENTA, YELLOW = '#00F0FF', '#FF55CC', '#FFE739'
 BG_DARK = '#1a1a2e'
 
-# UPDATE THIS: Historical mined blocks
+# UPDATE THIS: Historical mined blocks (actual values from chain)
 actual_blocks = {
-    1920000: {"diff": 62.0e12, "date": datetime(2026, 1, 16, 5, 39), "label": "RESURRECTION!"},
-    1920001: {"diff": 59.0e12, "date": datetime(2026, 1, 16, 8, 39)},
-    1920002: {"diff": 56.2e12, "date": datetime(2026, 1, 16, 22, 33)},
-    1920003: {"diff": 53.5e12, "date": datetime(2026, 1, 17, 10, 15)},
-    1920004: {"diff": 50.9e12, "date": datetime(2026, 1, 18, 5, 16)},
-    1920005: {"diff": 48.4e12, "date": datetime(2026, 1, 18, 10, 18)},
-    1920006: {"diff": 46.1e12, "date": datetime(2026, 1, 18, 15, 31)},
-    1920007: {"diff": 43.8e12, "date": datetime(2026, 1, 18, 16, 5)},
+    1920000: {"diff": 59.36e12, "date": datetime(2026, 1, 15, 7, 38), "label": "RESURRECTION!"},
+    1920001: {"diff": 56.49e12, "date": datetime(2026, 1, 16, 18, 29)},
+    1920002: {"diff": 53.76e12, "date": datetime(2026, 1, 17, 8, 22)},
+    1920003: {"diff": 51.16e12, "date": datetime(2026, 1, 17, 20, 3)},
+    1920004: {"diff": 48.69e12, "date": datetime(2026, 1, 18, 5, 17)},
+    1920005: {"diff": 46.34e12, "date": datetime(2026, 1, 18, 10, 19)},
+    1920006: {"diff": 44.10e12, "date": datetime(2026, 1, 18, 15, 32)},
+    1920007: {"diff": 41.96e12, "date": datetime(2026, 1, 18, 16, 6)},
 }
 
 # UPDATE THIS: Current block being mined
@@ -499,8 +513,8 @@ mined = [b for b in blocks if b in actual_blocks]
 ax1.scatter(mined, [actual_blocks[b]["diff"] for b in mined], color=MAGENTA, s=120, zorder=5, edgecolors='white')
 
 # Add annotations
-ax1.annotate('RESURRECTION!\nBlock 1920000', xy=(1920000, 62.0e12),
-             xytext=(1920030, 62.0e12), fontsize=10, color=MAGENTA, fontweight='bold',
+ax1.annotate('RESURRECTION!\nBlock 1920000', xy=(1920000, 59.36e12),
+             xytext=(1920030, 59.36e12), fontsize=10, color=MAGENTA, fontweight='bold',
              arrowprops=dict(arrowstyle='->', color=MAGENTA, lw=1.5),
              bbox=dict(boxstyle='round,pad=0.3', facecolor='#16213e', edgecolor=MAGENTA, alpha=0.9))
 
@@ -588,20 +602,20 @@ CHART_EOF
 When reporting status to the user, use this markdown format:
 
 ```markdown
-| Block | Status | Date/Time | Difficulty | Est. Time | Actual Time |
-|-------|--------|-----------|------------|-----------|-------------|
-| 1919999 | SYNCED | 2016-07-20 13:20 | 65.1 TH | - | ~14s |
-| 1920000 | MINED | 2026-01-16 05:39 | 62.0 TH | 10.2h | 9.5y |
-| ... (mined blocks) ... |
-| 1920008 | MINING | - | 41.7 TH | 6.8h | - |
-| 1920009 | pending | ~2026-01-18 22:56 | 39.7 TH | 6.5h | - |
-| 1920010 | pending | ~2026-01-19 05:27 | 37.8 TH | 6.2h | - |
+| Block | Status | Date/Time (UTC) | Difficulty | Est. Time | Actual Time |
+|-------|--------|-----------------|------------|-----------|-------------|
+| 1919999 | SYNCED | 2016-07-20 13:20 | 62.38 TH | - | ~14s |
+| 1920000 | MINED | 2026-01-15 07:38 | 59.36 TH | 9.7h | 9.5y |
+| ... (mined blocks with actual chain data) ... |
+| 1920008 | MINING | - | 39.9 TH | 6.6h | - |
+| 1920009 | pending | ~2026-01-18 22:58 | 38.0 TH | 6.2h | - |
+| 1920010 | pending | ~2026-01-19 05:12 | 36.1 TH | 5.9h | - |
 | ... |
-| 1920316 | pending | ~2026-01-24 13:54 | 10 MH | instant | - | **<<< CPU!**
+| 1920316 | CPU! | ~2026-01-24 | 10 MH | instant | - |
 
-**Current:** Block 1920008 | Difficulty: 41.7 TH
+**Current:** Block 1920008 | Difficulty: ~39.9 TH
 **Target:** Block 1920316 (~10 MH = CPU-mineable)
-**Remaining:** ~308 blocks | ~142h (5.9 days)
+**Remaining:** ~308 blocks | ~135h (5.6 days)
 ```
 
 **Important formatting rules:**
@@ -616,8 +630,55 @@ When reporting status to the user, use this markdown format:
 
 - **Table image:** `~/Downloads/ethereum_resurrection_table.png` and `.svg`
 - **Chart image:** `~/Downloads/ethereum_resurrection_chart.png` and `.svg`
+- **Infographic:** `infographic.html` (open in browser) - **UPDATE when chart/table updated**
 - **Logs:** SSH to instances, see `/root/geth.log` and `/root/ethminer.log`
 - **Deploy script:** `resurrection/deploy-vast.sh`
 - **Mining script:** `resurrection/mining-script.sh`
-- **Infographic:** `infographic.html` (open in browser)
 - **Full docs:** `resurrection/README.md`
+
+---
+
+## Infographic Maintenance
+
+**IMPORTANT:** When updating the table or chart, also update `infographic.html` to keep values consistent.
+
+### Values to Keep in Sync
+
+| Location | Value | Description |
+|----------|-------|-------------|
+| infographic.html line ~239 | Start Diff | Homestead starting difficulty (~62 TH, rounded from 62.38 TH) |
+| infographic.html line ~278 | "At X TH difficulty" | Same as Start Diff (62 TH) |
+| infographic.html line ~279 | "~Xs timestamp gaps" | difficulty / hashrate (~72,000s) |
+| infographic.html line ~289 | "62T \|###" | ASCII chart Y-axis label |
+
+### Key Constants in Infographic
+
+```html
+<!-- TWO RESURRECTION OPTIONS table -->
+<td>Start Diff</td>
+<td>~62 TH</td>  <!-- Block 1919999 difficulty (62.38 TH), rounded -->
+
+<!-- DIFFICULTY ALGORITHM diagram -->
+At 62 TH difficulty, blocks take ~20 hours to find
+This creates ~72,000s timestamp gaps between blocks
+
+<!-- ASCII difficulty chart -->
+62T |###
+```
+
+### Key Difficulty Values
+
+| Block | Difficulty | Description |
+|-------|------------|-------------|
+| 1919999 | 62.38 TH | Last mainnet Homestead block (July 2016) |
+| 1920000 | 59.36 TH | First resurrection block (Jan 2026) - "Start Diff" |
+
+The ~4.8% drop from 62.38 → 59.36 TH is the normal EIP-2 reduction triggered by the 9.5 year timestamp gap. The infographic "Start Diff" refers to block 1920000 (first new block we mine), not 1919999.
+
+### Update Checklist
+
+When generating new table/chart images, also:
+1. Fetch actual difficulty from chain for BOTH 1919999 and 1920000 - don't assume values
+2. Update infographic.html "Start Diff" to match block 1920000's actual difficulty
+3. Update infographic.html difficulty algorithm section (~lines 278-289)
+4. Verify ASCII chart Y-axis matches the Start Diff value

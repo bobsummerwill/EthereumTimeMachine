@@ -8,7 +8,7 @@ GPU mining to extend historical chains beyond their original blocks, reducing di
 |--|-----------|----------|
 | Geth | v1.3.6 | v1.0.2 |
 | Block | 1,919,999+ | 1,149,999+ |
-| Start difficulty | ~62 TH | ~20.5 TH |
+| Start difficulty | 62.38 TH | ~20.5 TH |
 | Target difficulty | ~10 MH | ~50 MH |
 | Reduction/block | ~4.83% | ~0.049% |
 | Blocks needed | ~316 | ~26,500 |
@@ -38,7 +38,7 @@ Only reduces by 1/2048 (~0.049%) per block regardless of timestamp gap.
 
 ### Natural Difficulty Adjustment
 
-With 8x RTX 3090 GPUs (~846 MH/s) mining at 62 TH difficulty, blocks take **~20 hours** to find. This creates natural timestamp gaps of ~72,000 seconds between blocks.
+With 8x RTX 3090 GPUs (~846 MH/s) mining at 62.38 TH difficulty, blocks take **~20 hours** to find. This creates natural timestamp gaps of ~72,000 seconds between blocks.
 
 **Homestead**: The formula `max(1 - (timestamp_delta // 10), -99)` with 72,000s gaps gives:
 - `adjustment = max(1 - 7200, -99) = -99`
