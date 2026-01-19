@@ -265,3 +265,68 @@ tail -100 /root/geth.log
 Common issues:
 - **GPU memory errors**: Check GPU health with `nvidia-smi`
 - **CUDA errors**: Ensure CUDA toolkit is installed (the nvidia/cuda Docker image includes it)
+
+## Key Configuration (Important for AI Assistants)
+
+This section documents critical configuration values that must stay synchronized across files. **If you modify any of these, update all related locations.**
+
+### Sync Node Identity (Vast.ai)
+
+The sync node on Vast.ai has a fixed identity that client bundles must connect to. This was deployed separately from the deterministic key generation.
+
+| Value | Location | Description |
+|-------|----------|-------------|
+| Nodekey | `91c01e9b759b0ebcebfdf873cadbe73505d9bf391661f3358f6e6a71445159bb` | Private P2P identity |
+| Enode pubkey | `ac449332fe8d9114ff453693360bebe11e4e58cb475735276b1ea60abe7d46c246cf2ec6de9d5cd24f613868a4d2328b9f230a3f797fa48e2c80791d3b24e6a7` | Public key derived from nodekey |
+| IP:Port | `1.208.108.242:46762` | Vast.ai instance 29980870 |
+| Full enode | `enode://ac449332...@1.208.108.242:46762` | For static-nodes.json |
+
+**Files that must use this enode:**
+- `generate-keys.sh` - Hardcodes the nodekey and pubkey (lines ~260-262)
+- `generated-files/nodes/sync-node/nodekey` - Must contain the nodekey
+- `generate-geth-*.sh` scripts - Read nodekey and derive pubkey via Docker
+
+**Why hardcoded?** The sync node was deployed before `generate-keys.sh` added deterministic key generation. The deployed node's identity cannot change without redeploying. Client bundles must connect to this specific enode.
+
+### Miner Account
+
+The miner address is embedded in existing chaindata and cannot be changed:
+
+| Value | Description |
+|-------|-------------|
+| Private key | `1ef4d35813260e866883e70025a91a81d9c0f4b476868a5adcd80868a39363f5` |
+| Address | `0x3ca943ef871bea7d0dfa34bff047b0e82be441ef` |
+| Password | `dev` |
+
+**Files:** `generate-keys.sh` (lines ~210-212), `generated-files/miner-account/`
+
+### Bundle Generator Scripts
+
+The client bundle generators (`generate-geth-*.sh`) share common logic:
+
+1. Read nodekey from `generated-files/nodes/sync-node/nodekey`
+2. Derive enode pubkey using Docker (ethereum/client-go:v1.16.7)
+3. Create static-nodes.json with the full enode URL
+4. Package with appropriate geth binary
+
+**Common issues:**
+- **Wrong pubkey**: If the nodekey file contains wrong value, bundles will have wrong enode
+- **Duplicate pubkey**: The Docker derivation can output twice; use `tail -1` to get last match
+- **IP/Port mismatch**: Must use Vast.ai's mapped port (46762), not internal port (30303)
+
+### Checking Configuration Consistency
+
+```bash
+# Verify nodekey file matches expected value
+cat generated-files/nodes/sync-node/nodekey
+# Should output: 91c01e9b759b0ebcebfdf873cadbe73505d9bf391661f3358f6e6a71445159bb
+
+# Regenerate bundles after any key changes
+./generate-geth-1.4.0-macos.sh
+./generate-geth-1.4.18-macos.sh
+./generate-geth-1.3.6-windows.sh
+
+# Verify enode in generated bundle
+tar -xzf generated-files/geth-macos-v1.4.18.tar.gz -O geth-v1.4.18-macos-resurrection/data/static-nodes.json
+# Should contain: enode://ac449332fe8d9114...@1.208.108.242:46762
+```

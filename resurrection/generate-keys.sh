@@ -256,9 +256,11 @@ enode://${HOMESTEAD_PUBKEY}@<IP>:30303
   create_file "$OUTPUT_DIR/nodes/homestead-miner/enode-info.txt" "$HOMESTEAD_ENODE_INFO" "homestead-miner enode-info.txt"
 
   # Sync node (geth v1.3.6)
-  SYNC_SEED="EthereumTimeMachine-resurrection-sync-node-v1"
-  SYNC_NODEKEY=$(generate_key_from_seed "$SYNC_SEED")
-  SYNC_PUBKEY=$(derive_enode_pubkey "$SYNC_NODEKEY")
+  # NOTE: This nodekey is hardcoded to match the actual Vast.ai sync node deployment.
+  # It was generated separately and is already deployed on instance 29980870.
+  # Do NOT regenerate from seed - the deployed node's identity must match!
+  SYNC_NODEKEY="91c01e9b759b0ebcebfdf873cadbe73505d9bf391661f3358f6e6a71445159bb"
+  SYNC_PUBKEY="ac449332fe8d9114ff453693360bebe11e4e58cb475735276b1ea60abe7d46c246cf2ec6de9d5cd24f613868a4d2328b9f230a3f797fa48e2c80791d3b24e6a7"
   create_file "$OUTPUT_DIR/nodes/sync-node/nodekey" "$SYNC_NODEKEY" "sync-node nodekey"
 
   # Sync node static-nodes.json (peers with Vast.ai sync node)
@@ -271,12 +273,14 @@ enode://${HOMESTEAD_PUBKEY}@<IP>:30303
 
   # Sync node enode info documentation
   SYNC_ENODE_INFO="# Resurrection Sync Node - Fixed Enode Configuration
-# This nodekey is deterministic and can be regenerated with: ./generate-keys.sh
+# This nodekey is hardcoded to match the deployed Vast.ai sync node.
 # Geth version: v1.3.6
 
-Seed phrase: $SYNC_SEED
 Nodekey (private): $SYNC_NODEKEY
 Enode ID (public): $SYNC_PUBKEY
+
+# Enode URL for Vast.ai (instance 29980870):
+enode://${SYNC_PUBKEY}@1.208.108.242:46762
 
 # Enode URL template (replace <IP> with actual public IP):
 enode://${SYNC_PUBKEY}@<IP>:30303
