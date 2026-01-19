@@ -24,11 +24,12 @@ if [ ! -f "$NODEKEY_PATH" ]; then
 fi
 
 # Derive pubkey from nodekey using Docker (same as chain-of-geths)
+# Use tail -1 to get only the last match (the actual result, not the log line)
 echo "Deriving enode pubkey from nodekey..."
 pubkey=$(docker run --rm -v "$PWD/$NODEKEY_PATH:/nodekey:ro" ethereum/client-go:v1.16.7 \
   --datadir /tmp --nodekey /nodekey --port 30303 --nodiscover --ipcdisable \
   --http --http.api admin console --exec "admin.nodeInfo.enode" 2>&1 | \
-  grep -Eo 'enode://[0-9a-fA-F]+@' | sed 's/@$//' | sed 's/enode:\/\///')
+  grep -Eo 'enode://[0-9a-fA-F]+@' | tail -1 | sed 's/@$//' | sed 's/enode:\/\///')
 
 if [ -z "$pubkey" ]; then
   echo "ERROR: Failed to derive pubkey from nodekey" >&2

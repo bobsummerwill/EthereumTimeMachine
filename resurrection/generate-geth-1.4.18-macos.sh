@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# Generate a macOS bundle for Geth v1.4.0 with static peering to Vast.ai sync node.
+# Generate a macOS bundle for Geth v1.4.18 with static peering to Vast.ai sync node.
 #
-# Output: resurrection/generated-files/geth-macos-v1.4.0.tar.gz
+# Output: resurrection/generated-files/geth-macos-v1.4.18.tar.gz
 #
-# Unlike chain-of-geths which peers to v1.3.6 on AWS, this bundle peers to the
-# Homestead sync node running on Vast.ai (the resurrected chain).
+# v1.4.18 (Nov 2016) is the last Homestead-era release before Spurious Dragon.
+# It was built with a newer Go compiler than v1.4.0, so it may work better
+# on modern macOS (High Sierra+).
 
 set -euo pipefail
 
@@ -41,49 +42,55 @@ fi
 # Sync node enode URL (Vast.ai host:port)
 ENODE="enode://$pubkey@$SYNC_NODE_IP:$SYNC_NODE_PORT"
 
-# Download official Geth v1.4.0 macOS binary (64-bit)
-GETH_URL="https://github.com/ethereum/go-ethereum/releases/download/v1.4.0/geth-1.4.0-rc-8241fa5-darwin-10.6-amd64.tar.bz2"
-OUT_TAR="generated-files/geth-macos-v1.4.0.tar.gz"
+# Download official Geth v1.4.18 macOS binary (64-bit)
+# This is the last Homestead release, built Nov 2016
+GETH_URL="https://github.com/ethereum/go-ethereum/releases/download/v1.4.18/geth-darwin-amd64-1.4.18-ef9265d0.tar.gz"
+OUT_TAR="generated-files/geth-macos-v1.4.18.tar.gz"
 
 tmp=$(mktemp -d)
 trap "rm -rf $tmp" EXIT
 
-echo "Downloading Geth v1.4.0 macOS binary..."
-curl -L --fail -o "$tmp/geth.tar.bz2" "$GETH_URL"
+echo "Downloading Geth v1.4.18 macOS binary..."
+curl -L --fail -o "$tmp/geth.tar.gz" "$GETH_URL"
 
 echo "Extracting..."
-tar -xjf "$tmp/geth.tar.bz2" -C "$tmp"
+tar -xzf "$tmp/geth.tar.gz" -C "$tmp"
 
-# Find where the files actually extracted to
-geth_dir=$(find "$tmp" -type d -name "geth-*" -o -type d -name "Geth-*" | head -n 1)
-if [ -z "$geth_dir" ]; then
-  geth_dir="$tmp"
+# Find the geth binary
+geth_binary=$(find "$tmp" -type f -name "geth" | head -n 1)
+if [ -z "$geth_binary" ]; then
+  echo "ERROR: Could not find geth binary in archive" >&2
+  exit 1
 fi
 
-# Rename the geth binary to just 'geth' for convenience
-geth_binary=$(find "$geth_dir" -type f -name "geth-*" | head -n 1)
-if [ -n "$geth_binary" ]; then
-  mv "$geth_binary" "$geth_dir/geth"
-fi
+# Create bundle directory
+bundle_name="geth-v1.4.18-macos-resurrection"
+bundle_dir="$tmp/$bundle_name"
+mkdir -p "$bundle_dir/data"
+
+# Move geth binary
+mv "$geth_binary" "$bundle_dir/geth"
+chmod +x "$bundle_dir/geth"
 
 # Create static-nodes.json
-mkdir -p "$geth_dir/data"
-echo "[\"$ENODE\"]" > "$geth_dir/data/static-nodes.json"
+echo "[\"$ENODE\"]" > "$bundle_dir/data/static-nodes.json"
 
 # Create simple run script
-cat > "$geth_dir/run.sh" <<'SCRIPT'
+# --oppose-dao-fork: Follow the non-DAO-fork chain (our resurrection extends Homestead without the DAO refund)
+cat > "$bundle_dir/run.sh" <<'SCRIPT'
 #!/bin/bash
 cd "$(dirname "$0")"
-./geth --datadir data --networkid 1 --nodiscover --maxpeers 1
+./geth --datadir data --networkid 1 --nodiscover --maxpeers 1 --oppose-dao-fork
 SCRIPT
-chmod +x "$geth_dir/run.sh"
+chmod +x "$bundle_dir/run.sh"
 
 # Create README
-cat > "$geth_dir/README.txt" <<EOF
-Geth v1.4.0 macOS Bundle (Resurrection)
-=======================================
+cat > "$bundle_dir/README.txt" <<EOF
+Geth v1.4.18 macOS Bundle (Resurrection)
+========================================
 
-This is the first Geth version with official macOS binaries.
+This is Geth v1.4.18 (Nov 2016), the last Homestead-era release
+before Spurious Dragon. It supports eth/61-63 protocol.
 It will sync with the resurrected Homestead chain (block 1920000+).
 
 To run: ./run.sh
@@ -92,21 +99,13 @@ This will connect only to: $ENODE
 
 The sync node is running on Vast.ai and has the extended Homestead
 chaindata with reduced difficulty (CPU-mineable once complete).
-EOF
 
-# Rename the directory to a clean name
-bundle_name="geth-v1.4.0-macos-resurrection"
-if [ "$geth_dir" = "$tmp" ]; then
-  # Files extracted directly into tmp, create subdirectory
-  mkdir -p "$tmp/$bundle_name"
-  mv "$tmp/geth" "$tmp/$bundle_name/" 2>/dev/null || true
-  mv "$tmp/data" "$tmp/$bundle_name/" 2>/dev/null || true
-  mv "$tmp/run.sh" "$tmp/$bundle_name/" 2>/dev/null || true
-  mv "$tmp/README.txt" "$tmp/$bundle_name/" 2>/dev/null || true
-else
-  # Rename the extracted directory
-  mv "$geth_dir" "$tmp/$bundle_name"
-fi
+Note: v1.4.18 was built with a newer Go compiler than v1.4.0,
+so it may be more compatible with modern macOS.
+
+The --oppose-dao-fork flag is used because the resurrection chain
+extends Homestead without the DAO fork state change.
+EOF
 
 # Tar it up
 echo "Creating $OUT_TAR..."
@@ -120,6 +119,6 @@ echo ""
 echo "Enode: $ENODE"
 echo ""
 echo "Transfer to Mac and extract:"
-echo "  tar -xzf geth-macos-v1.4.0.tar.gz"
+echo "  tar -xzf geth-macos-v1.4.18.tar.gz"
 echo "  cd geth-*"
 echo "  ./run.sh"

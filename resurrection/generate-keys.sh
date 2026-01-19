@@ -332,6 +332,12 @@ enode://${SYNC_PUBKEY}@<IP>:30303
     warn "generate-geth-1.4.0-macos.sh not found or not executable"
   fi
 
+  if [ -x "$SCRIPT_DIR/generate-geth-1.4.18-macos.sh" ]; then
+    "$SCRIPT_DIR/generate-geth-1.4.18-macos.sh"
+  else
+    warn "generate-geth-1.4.18-macos.sh not found or not executable"
+  fi
+
   if [ -x "$SCRIPT_DIR/generate-geth-1.3.6-windows.sh" ]; then
     "$SCRIPT_DIR/generate-geth-1.3.6-windows.sh"
   else
