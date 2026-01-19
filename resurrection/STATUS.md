@@ -12,10 +12,10 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 
 | Metric | Value |
 |--------|-------|
-| Current Block | 1920008 (mining) |
+| Current Block | 1920009 (mining) |
 | Target Block | 1920316 |
-| Blocks Remaining | ~308 |
-| Current Difficulty | ~39.9 TH |
+| Blocks Remaining | ~307 |
+| Current Difficulty | ~38.0 TH |
 | Target Difficulty | 10 MH (CPU-mineable) |
 | Est. Completion | ~2026-01-24 |
 
@@ -44,6 +44,7 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 | 1920005 | MINED | 2026-01-18 10:19 | 46.34 TH | 7.6h | 5.0h |
 | 1920006 | MINED | 2026-01-18 15:32 | 44.10 TH | 7.2h | 5.2h |
 | 1920007 | MINED | 2026-01-18 16:06 | 41.96 TH | 6.9h | 34m |
+| 1920008 | MINED | 2026-01-19 06:57 | 39.93 TH | 6.6h | 14.9h |
 
 ## Key Constants
 
@@ -91,7 +92,7 @@ ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p 34180 root@ssh1.vast.ai 
 
 ```bash
 # Fetch actual timestamp and difficulty for all mined blocks (including 1919999)
-for block in 1919999 1920000 1920001 1920002 1920003 1920004 1920005 1920006 1920007; do
+for block in 1919999 1920000 1920001 1920002 1920003 1920004 1920005 1920006 1920007 1920008; do
   hex=$(printf "0x%x" $block)
   result=$(ssh root@ssh1.vast.ai -p 34180 "curl -s -X POST -H 'Content-Type: application/json' \
     --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"$hex\",false],\"id\":1}' \
@@ -279,11 +280,12 @@ actual_blocks = {
     1920005: {"diff": 46.34e12, "date": datetime(2026, 1, 18, 10, 18, 41)},
     1920006: {"diff": 44.10e12, "date": datetime(2026, 1, 18, 15, 31, 58)},
     1920007: {"diff": 41.96e12, "date": datetime(2026, 1, 18, 16, 5, 32)},
+    1920008: {"diff": 39.93e12, "date": datetime(2026, 1, 19, 6, 56, 58)},
 }
 
 # UPDATE THIS: Current block being mined
-current_mining_block = 1920008
-last_mined_block = 1920007
+current_mining_block = 1920009
+last_mined_block = 1920008
 last_mined_date = actual_blocks[last_mined_block]["date"]
 
 def calc_difficulty(block):
@@ -482,10 +484,11 @@ actual_blocks = {
     1920005: {"diff": 46.34e12, "date": datetime(2026, 1, 18, 10, 19)},
     1920006: {"diff": 44.10e12, "date": datetime(2026, 1, 18, 15, 32)},
     1920007: {"diff": 41.96e12, "date": datetime(2026, 1, 18, 16, 6)},
+    1920008: {"diff": 39.93e12, "date": datetime(2026, 1, 19, 6, 57)},
 }
 
 # UPDATE THIS: Current block being mined
-current_mining_block = 1920008
+current_mining_block = 1920009
 
 # Generate difficulty curve
 blocks, difficulties = [], []
@@ -607,15 +610,15 @@ When reporting status to the user, use this markdown format:
 | 1919999 | SYNCED | 2016-07-20 13:20 | 62.38 TH | - | ~14s |
 | 1920000 | MINED | 2026-01-15 07:38 | 59.36 TH | 9.7h | 9.5y |
 | ... (mined blocks with actual chain data) ... |
-| 1920008 | MINING | - | 39.9 TH | 6.6h | - |
-| 1920009 | pending | ~2026-01-18 22:58 | 38.0 TH | 6.2h | - |
-| 1920010 | pending | ~2026-01-19 05:12 | 36.1 TH | 5.9h | - |
+| 1920008 | MINED | 2026-01-19 06:57 | 39.9 TH | 6.6h | 14.9h |
+| 1920009 | MINING | - | 38.0 TH | 6.2h | - |
+| 1920010 | pending | ~2026-01-19 13:12 | 36.1 TH | 5.9h | - |
 | ... |
 | 1920316 | CPU! | ~2026-01-24 | 10 MH | instant | - |
 
-**Current:** Block 1920008 | Difficulty: ~39.9 TH
+**Current:** Block 1920009 | Difficulty: ~38.0 TH
 **Target:** Block 1920316 (~10 MH = CPU-mineable)
-**Remaining:** ~308 blocks | ~135h (5.6 days)
+**Remaining:** ~307 blocks | ~130h (5.4 days)
 ```
 
 **Important formatting rules:**
