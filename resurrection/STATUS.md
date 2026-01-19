@@ -339,7 +339,7 @@ diff = calc_difficulty(current_mining_block)
 est_time = diff / HASHRATE / 3600
 rows.append([str(current_mining_block), 'MINING', '-', format_diff(diff), format_time(est_time), '-'])
 
-# Near-term pending blocks
+# Near-term pending blocks - ALWAYS include year in date format (%Y-%m-%d %H:%M)
 for b in [current_mining_block + 1, current_mining_block + 2]:
     diff = calc_difficulty(b)
     est_time = diff / HASHRATE / 3600
@@ -349,7 +349,7 @@ for b in [current_mining_block + 1, current_mining_block + 2]:
 # Separator
 rows.append(['...', '', '', '', '', ''])
 
-# Future milestones
+# Future milestones - ALWAYS include year in date format (%Y-%m-%d %H:%M)
 milestones = [1920020, 1920030, 1920040, 1920050, 1920100, 1920150, 1920200, 1920250, 1920316]
 for b in milestones:
     diff = calc_difficulty(b)
@@ -622,6 +622,7 @@ When reporting status to the user, use this markdown format:
 - Est. Time column comes BEFORE Actual Time column
 - MINING row has `-` for Date/Time and Actual Time (not yet complete)
 - Pending dates are prefixed with `~` to indicate estimates
+- **ALL dates MUST include the year** (format: `YYYY-MM-DD HH:MM`) - never use `MM-DD` alone
 - Include `...` separator between near-term and milestone blocks
 
 ---
