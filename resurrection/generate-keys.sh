@@ -22,6 +22,8 @@
 #   generated-files/nodes/sync-node/enode-info.txt     - Documentation
 #   generated-files/geth-binaries/geth-linux-amd64-v1.0.2 - Geth v1.0.2 binary
 #   generated-files/geth-binaries/geth-linux-amd64-v1.3.6 - Geth v1.3.6 binary
+#   generated-files/geth-macos-v1.4.0.tar.gz       - macOS client bundle (peers to sync node)
+#   generated-files/geth-windows-v1.3.6.zip        - Windows client bundle (peers to sync node)
 
 set -euo pipefail
 
@@ -318,6 +320,26 @@ enode://${SYNC_PUBKEY}@<IP>:30303
   echo "  Frontier miner:  $FRONTIER_PUBKEY"
   echo "  Homestead miner: $HOMESTEAD_PUBKEY"
   echo "  Sync node:       $SYNC_PUBKEY"
+
+  # === Client Bundles ===
+  # Generate downloadable client bundles with static peering to Vast.ai sync node
+  echo ""
+  log "Generating client bundles..."
+
+  if [ -x "$SCRIPT_DIR/generate-geth-1.4.0-macos.sh" ]; then
+    "$SCRIPT_DIR/generate-geth-1.4.0-macos.sh"
+  else
+    warn "generate-geth-1.4.0-macos.sh not found or not executable"
+  fi
+
+  if [ -x "$SCRIPT_DIR/generate-geth-1.3.6-windows.sh" ]; then
+    "$SCRIPT_DIR/generate-geth-1.3.6-windows.sh"
+  else
+    warn "generate-geth-1.3.6-windows.sh not found or not executable"
+  fi
+
+  echo ""
+  log "All done!"
 }
 
 main "$@"
