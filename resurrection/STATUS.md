@@ -8,14 +8,14 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 
 ## Current Status
 
-**Last Updated:** 2026-01-19
+**Last Updated:** 2026-01-20
 
 | Metric | Value |
 |--------|-------|
-| Current Block | 1920009 (mining) |
+| Current Block | 1920014 (mining) |
 | Target Block | 1920316 |
-| Blocks Remaining | ~307 |
-| Current Difficulty | ~38.0 TH |
+| Blocks Remaining | ~302 |
+| Current Difficulty | ~29.7 TH |
 | Target Difficulty | 10 MH (CPU-mineable) |
 | Est. Completion | ~2026-01-24 |
 
@@ -45,6 +45,11 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 | 1920006 | MINED | 2026-01-18 15:32 | 44.10 TH | 7.2h | 5.2h |
 | 1920007 | MINED | 2026-01-18 16:06 | 41.96 TH | 6.9h | 34m |
 | 1920008 | MINED | 2026-01-19 06:57 | 39.93 TH | 6.6h | 14.9h |
+| 1920009 | MINED | 2026-01-19 18:17 | 38.00 TH | 6.2h | 11.3h |
+| 1920010 | MINED | 2026-01-19 22:57 | 36.17 TH | 5.9h | 4.7h |
+| 1920011 | MINED | 2026-01-20 02:11 | 34.42 TH | 5.6h | 3.2h |
+| 1920012 | MINED | 2026-01-20 05:44 | 32.75 TH | 5.4h | 3.5h |
+| 1920013 | MINED | 2026-01-20 08:08 | 31.17 TH | 5.1h | 2.4h |
 
 ## Key Constants
 
@@ -92,7 +97,7 @@ ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p 34180 root@ssh1.vast.ai 
 
 ```bash
 # Fetch actual timestamp and difficulty for all mined blocks (including 1919999)
-for block in 1919999 1920000 1920001 1920002 1920003 1920004 1920005 1920006 1920007 1920008; do
+for block in 1919999 1920000 1920001 1920002 1920003 1920004 1920005 1920006 1920007 1920008 1920009 1920010 1920011 1920012 1920013; do
   hex=$(printf "0x%x" $block)
   result=$(ssh root@ssh1.vast.ai -p 34180 "curl -s -X POST -H 'Content-Type: application/json' \
     --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"$hex\",false],\"id\":1}' \
@@ -281,11 +286,16 @@ actual_blocks = {
     1920006: {"diff": 44.10e12, "date": datetime(2026, 1, 18, 15, 31, 58)},
     1920007: {"diff": 41.96e12, "date": datetime(2026, 1, 18, 16, 5, 32)},
     1920008: {"diff": 39.93e12, "date": datetime(2026, 1, 19, 6, 56, 58)},
+    1920009: {"diff": 38.00e12, "date": datetime(2026, 1, 19, 18, 17, 26)},
+    1920010: {"diff": 36.17e12, "date": datetime(2026, 1, 19, 22, 57, 8)},
+    1920011: {"diff": 34.42e12, "date": datetime(2026, 1, 20, 2, 11, 24)},
+    1920012: {"diff": 32.75e12, "date": datetime(2026, 1, 20, 5, 43, 36)},
+    1920013: {"diff": 31.17e12, "date": datetime(2026, 1, 20, 8, 8, 2)},
 }
 
 # UPDATE THIS: Current block being mined
-current_mining_block = 1920009
-last_mined_block = 1920008
+current_mining_block = 1920014
+last_mined_block = 1920013
 last_mined_date = actual_blocks[last_mined_block]["date"]
 
 def calc_difficulty(block):
@@ -485,10 +495,15 @@ actual_blocks = {
     1920006: {"diff": 44.10e12, "date": datetime(2026, 1, 18, 15, 32)},
     1920007: {"diff": 41.96e12, "date": datetime(2026, 1, 18, 16, 6)},
     1920008: {"diff": 39.93e12, "date": datetime(2026, 1, 19, 6, 57)},
+    1920009: {"diff": 38.00e12, "date": datetime(2026, 1, 19, 18, 17)},
+    1920010: {"diff": 36.17e12, "date": datetime(2026, 1, 19, 22, 57)},
+    1920011: {"diff": 34.42e12, "date": datetime(2026, 1, 20, 2, 11)},
+    1920012: {"diff": 32.75e12, "date": datetime(2026, 1, 20, 5, 44)},
+    1920013: {"diff": 31.17e12, "date": datetime(2026, 1, 20, 8, 8)},
 }
 
 # UPDATE THIS: Current block being mined
-current_mining_block = 1920009
+current_mining_block = 1920014
 
 # Generate difficulty curve
 blocks, difficulties = [], []
@@ -610,15 +625,15 @@ When reporting status to the user, use this markdown format:
 | 1919999 | SYNCED | 2016-07-20 13:20 | 62.38 TH | - | ~14s |
 | 1920000 | MINED | 2026-01-15 07:38 | 59.36 TH | 9.7h | 9.5y |
 | ... (mined blocks with actual chain data) ... |
-| 1920008 | MINED | 2026-01-19 06:57 | 39.9 TH | 6.6h | 14.9h |
-| 1920009 | MINING | - | 38.0 TH | 6.2h | - |
-| 1920010 | pending | ~2026-01-19 13:12 | 36.1 TH | 5.9h | - |
+| 1920013 | MINED | 2026-01-20 08:08 | 31.2 TH | 5.1h | 2.4h |
+| 1920014 | MINING | - | 29.7 TH | 4.9h | - |
+| 1920015 | pending | ~2026-01-20 13:00 | 28.2 TH | 4.6h | - |
 | ... |
 | 1920316 | CPU! | ~2026-01-24 | 10 MH | instant | - |
 
-**Current:** Block 1920009 | Difficulty: ~38.0 TH
+**Current:** Block 1920014 | Difficulty: ~29.7 TH
 **Target:** Block 1920316 (~10 MH = CPU-mineable)
-**Remaining:** ~307 blocks | ~130h (5.4 days)
+**Remaining:** ~302 blocks | ~105h (4.4 days)
 ```
 
 **Important formatting rules:**
