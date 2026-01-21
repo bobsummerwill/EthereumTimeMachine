@@ -12,10 +12,10 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 
 | Metric | Value |
 |--------|-------|
-| Current Block | 1920014 (mining) |
+| Current Block | 1920016 (mining) |
 | Target Block | 1920316 |
-| Blocks Remaining | ~302 |
-| Current Difficulty | ~29.7 TH |
+| Blocks Remaining | ~300 |
+| Current Difficulty | ~28.0 TH |
 | Target Difficulty | 10 MH (CPU-mineable) |
 | Est. Completion | ~2026-01-24 |
 
@@ -50,6 +50,8 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 | 1920011 | MINED | 2026-01-20 02:11 | 34.42 TH | 5.6h | 3.2h |
 | 1920012 | MINED | 2026-01-20 05:44 | 32.75 TH | 5.4h | 3.5h |
 | 1920013 | MINED | 2026-01-20 08:08 | 31.17 TH | 5.1h | 2.4h |
+| 1920014 | MINED | 2026-01-20 08:11 | 30.88 TH | 5.1h | 3.4m |
+| 1920015 | MINED | 2026-01-20 19:27 | 29.39 TH | 4.8h | 11.3h |
 
 ## Key Constants
 
@@ -97,7 +99,7 @@ ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p 34180 root@ssh1.vast.ai 
 
 ```bash
 # Fetch actual timestamp and difficulty for all mined blocks (including 1919999)
-for block in 1919999 1920000 1920001 1920002 1920003 1920004 1920005 1920006 1920007 1920008 1920009 1920010 1920011 1920012 1920013; do
+for block in 1919999 1920000 1920001 1920002 1920003 1920004 1920005 1920006 1920007 1920008 1920009 1920010 1920011 1920012 1920013 1920014 1920015; do
   hex=$(printf "0x%x" $block)
   result=$(ssh root@ssh1.vast.ai -p 34180 "curl -s -X POST -H 'Content-Type: application/json' \
     --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"$hex\",false],\"id\":1}' \
@@ -276,7 +278,7 @@ GRAY = '#888888'
 
 # UPDATE THIS: Historical mined blocks with actual timestamps (from chain)
 actual_blocks = {
-    1919999: {"diff": 62.38e12, "date": datetime(2016, 7, 20, 13, 20, 39)},
+    1919999: {"diff": 62.38e12, "date": datetime(2016, 7, 20, 13, 20, 38)},
     1920000: {"diff": 59.36e12, "date": datetime(2026, 1, 15, 7, 38, 16)},
     1920001: {"diff": 56.49e12, "date": datetime(2026, 1, 16, 18, 29, 23)},
     1920002: {"diff": 53.76e12, "date": datetime(2026, 1, 17, 8, 22, 25)},
@@ -291,11 +293,13 @@ actual_blocks = {
     1920011: {"diff": 34.42e12, "date": datetime(2026, 1, 20, 2, 11, 24)},
     1920012: {"diff": 32.75e12, "date": datetime(2026, 1, 20, 5, 43, 36)},
     1920013: {"diff": 31.17e12, "date": datetime(2026, 1, 20, 8, 8, 2)},
+    1920014: {"diff": 30.88e12, "date": datetime(2026, 1, 20, 8, 11, 28)},
+    1920015: {"diff": 29.39e12, "date": datetime(2026, 1, 20, 19, 27, 29)},
 }
 
 # UPDATE THIS: Current block being mined
-current_mining_block = 1920014
-last_mined_block = 1920013
+current_mining_block = 1920016
+last_mined_block = 1920015
 last_mined_date = actual_blocks[last_mined_block]["date"]
 
 def calc_difficulty(block):
@@ -500,10 +504,12 @@ actual_blocks = {
     1920011: {"diff": 34.42e12, "date": datetime(2026, 1, 20, 2, 11)},
     1920012: {"diff": 32.75e12, "date": datetime(2026, 1, 20, 5, 44)},
     1920013: {"diff": 31.17e12, "date": datetime(2026, 1, 20, 8, 8)},
+    1920014: {"diff": 30.88e12, "date": datetime(2026, 1, 20, 8, 11)},
+    1920015: {"diff": 29.39e12, "date": datetime(2026, 1, 20, 19, 27)},
 }
 
 # UPDATE THIS: Current block being mined
-current_mining_block = 1920014
+current_mining_block = 1920016
 
 # Generate difficulty curve
 blocks, difficulties = [], []
@@ -689,15 +695,17 @@ This creates ~72,000s timestamp gaps between blocks
 
 | Block | Difficulty | Description |
 |-------|------------|-------------|
-| 1919999 | 62.38 TH | Last mainnet Homestead block (July 2016) |
-| 1920000 | 59.36 TH | First resurrection block (Jan 2026) - "Start Diff" |
+| 1919999 | 62.38 TH | Last mainnet Homestead block (July 2016) - **"Start Diff"** |
+| 1920000 | 59.36 TH | First resurrection block (Jan 2026) - already reduced by EIP-2 |
 
-The ~4.8% drop from 62.38 → 59.36 TH is the normal EIP-2 reduction triggered by the 9.5 year timestamp gap. The infographic "Start Diff" refers to block 1920000 (first new block we mine), not 1919999.
+The ~4.8% drop from 62.38 → 59.36 TH is the normal EIP-2 reduction triggered by the 9.5 year timestamp gap.
+
+**CRITICAL:** The infographic "Start Diff" refers to block **1919999** (62.38 TH), NOT block 1920000. This is the difficulty we START FROM before mining block 1920000. The difficulty algorithm then reduces it to 59.36 TH for block 1920000.
 
 ### Update Checklist
 
 When generating new table/chart images, also:
 1. Fetch actual difficulty from chain for BOTH 1919999 and 1920000 - don't assume values
-2. Update infographic.html "Start Diff" to match block 1920000's actual difficulty
-3. Update infographic.html difficulty algorithm section (~lines 278-289)
-4. Verify ASCII chart Y-axis matches the Start Diff value
+2. Keep infographic.html "Start Diff" at ~62 TH (block 1919999's difficulty, rounded)
+3. Keep infographic.html difficulty algorithm section showing "At 62 TH difficulty" (~lines 278-289)
+4. Keep ASCII chart Y-axis at 62T (matches block 1919999 start difficulty)
