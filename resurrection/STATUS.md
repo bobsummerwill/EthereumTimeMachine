@@ -586,41 +586,33 @@ legend_elements = [
 ax1.legend(handles=legend_elements, loc='upper right', facecolor='#16213e', edgecolor=CYAN,
            labelcolor='white', fontsize=9)
 
-# Bottom: Time per block bars - SAME BLOCKS AS TABLE
+# Bottom: Time per block line graph
 ax2.set_facecolor('#16213e')
 times = [d / HASHRATE / 3600 for d in difficulties]
 
-# Exact same blocks as table: mined (0-7), mining (8), near-term (9,10), milestones (20,30,40,50,100,150,200,250,316)
-num_mined = len(actual_blocks)
-mined_indices = list(range(num_mined))
-mining_idx = current_mining_block - 1920000
-near_term_indices = [mining_idx + 1, mining_idx + 2]
-milestone_blocks = [1920020, 1920030, 1920040, 1920050, 1920100, 1920150, 1920200, 1920250, 1920316]
-milestone_indices = [b - 1920000 for b in milestone_blocks]
+# Plot continuous line for all blocks
+ax2.plot(blocks, times, color=CYAN, linewidth=2, label='Est. Mining Time')
 
-show_idx = mined_indices + [mining_idx] + near_term_indices + milestone_indices
+# Mark mined blocks
+mined_blocks_list = [b for b in blocks if b in actual_blocks]
+mined_times = [times[b - 1920000] for b in mined_blocks_list]
+ax2.scatter(mined_blocks_list, mined_times, color=MAGENTA, s=60, zorder=5, edgecolors='white', label='Mined')
 
-# Colors: mined=magenta, mining=yellow, pending=cyan, target=yellow
-colors = []
-for i in show_idx:
-    block = blocks[i]
-    if block in actual_blocks:
-        colors.append(MAGENTA)
-    elif block == current_mining_block:
-        colors.append(YELLOW)
-    elif block == target_block:
-        colors.append(YELLOW)
-    else:
-        colors.append(CYAN)
+# Mark current mining block
+ax2.scatter([current_mining_block], [times[current_mining_block - 1920000]],
+            color=YELLOW, s=120, marker='*', zorder=6, edgecolors='white', label='Mining Now')
 
-ax2.bar(range(len(show_idx)), [times[i] for i in show_idx], color=colors, alpha=0.8)
-ax2.set_xticks(range(len(show_idx)))
-ax2.set_xticklabels([str(blocks[i]) for i in show_idx], rotation=45, ha='right', fontsize=8)
+# Mark target block
+ax2.scatter([target_block], [times[target_block - 1920000]],
+            color=YELLOW, s=120, marker='D', zorder=6, edgecolors='white', label='CPU Target')
+
 ax2.set_xlabel('Block Number', fontsize=12, color='white')
 ax2.set_ylabel('Hours to Mine', fontsize=12, color='white')
 ax2.set_title('Estimated Mining Time per Block (2x 8x RTX 3090 = 1692 MH/s)', fontsize=12, color=CYAN)
 ax2.tick_params(colors='white')
-ax2.grid(True, alpha=0.3, axis='y')
+ax2.grid(True, alpha=0.3)
+ax2.set_xlim(1919995, 1920325)
+ax2.legend(loc='upper right', facecolor='#16213e', edgecolor=CYAN, labelcolor='white', fontsize=9)
 for spine in ax2.spines.values(): spine.set_color(CYAN)
 
 # Summary stats at bottom
