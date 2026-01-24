@@ -12,10 +12,10 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 
 | Metric | Value |
 |--------|-------|
-| Current Block | 1920024 (mining) |
+| Current Block | 1920028 (mining) |
 | Target Block | 1920316 |
-| Blocks Remaining | ~292 |
-| Current Difficulty | ~18.8 TH |
+| Blocks Remaining | ~288 |
+| Current Difficulty | ~15.5 TH |
 | Target Difficulty | 10 MH (CPU-mineable) |
 | Est. Completion | ~2026-01-24 |
 
@@ -60,6 +60,10 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 | 1920021 | MINED | 2026-01-22 01:08 | 21.87 TH | 3.6h | 16m |
 | 1920022 | MINED | 2026-01-22 20:21 | 20.81 TH | 3.4h | 19.2h |
 | 1920023 | MINED | 2026-01-23 02:49 | 19.80 TH | 3.3h | 6.5h |
+| 1920024 | MINED | 2026-01-23 14:03 | 18.85 TH | 3.1h | 11.2h |
+| 1920025 | MINED | 2026-01-23 17:00 | 17.94 TH | 2.9h | 3.0h |
+| 1920026 | MINED | 2026-01-23 17:20 | 17.07 TH | 2.8h | 20.3m |
+| 1920027 | MINED | 2026-01-23 21:59 | 16.24 TH | 2.7h | 4.7h |
 
 ## Key Constants
 
@@ -311,11 +315,15 @@ actual_blocks = {
     1920021: {"diff": 21.87e12, "date": datetime(2026, 1, 22, 1, 7, 49)},
     1920022: {"diff": 20.81e12, "date": datetime(2026, 1, 22, 20, 20, 54)},
     1920023: {"diff": 19.80e12, "date": datetime(2026, 1, 23, 2, 49, 26)},
+    1920024: {"diff": 18.85e12, "date": datetime(2026, 1, 23, 14, 3, 9)},
+    1920025: {"diff": 17.94e12, "date": datetime(2026, 1, 23, 17, 0, 7)},
+    1920026: {"diff": 17.07e12, "date": datetime(2026, 1, 23, 17, 20, 27)},
+    1920027: {"diff": 16.24e12, "date": datetime(2026, 1, 23, 21, 59, 49)},
 }
 
 # UPDATE THIS: Current block being mined
-current_mining_block = 1920024
-last_mined_block = 1920023
+current_mining_block = 1920028
+last_mined_block = 1920027
 last_mined_date = actual_blocks[last_mined_block]["date"]
 
 def calc_difficulty(block):
@@ -530,10 +538,14 @@ actual_blocks = {
     1920021: {"diff": 21.87e12, "date": datetime(2026, 1, 22, 1, 8)},
     1920022: {"diff": 20.81e12, "date": datetime(2026, 1, 22, 20, 21)},
     1920023: {"diff": 19.80e12, "date": datetime(2026, 1, 23, 2, 49)},
+    1920024: {"diff": 18.85e12, "date": datetime(2026, 1, 23, 14, 3)},
+    1920025: {"diff": 17.94e12, "date": datetime(2026, 1, 23, 17, 0)},
+    1920026: {"diff": 17.07e12, "date": datetime(2026, 1, 23, 17, 20)},
+    1920027: {"diff": 16.24e12, "date": datetime(2026, 1, 23, 21, 59)},
 }
 
 # UPDATE THIS: Current block being mined
-current_mining_block = 1920024
+current_mining_block = 1920028
 
 # Generate difficulty curve
 blocks, difficulties = [], []
