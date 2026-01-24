@@ -168,6 +168,47 @@ ssh -p 34180 root@ssh1.vast.ai "tail -50 /root/ethminer.log"
 
 ---
 
+## Restart Procedures
+
+### Restart Sync Node (Instance 29980870)
+
+**IMPORTANT:** If mining instances are on different blocks, restart the sync node first to reconnect them.
+
+```bash
+# Restart geth on sync node
+ssh -p 20870 root@ssh6.vast.ai 'pkill -f "geth --datadir"; sleep 3; nohup /root/geth --datadir /root/data --networkid 1 --rpc --rpcaddr 0.0.0.0 --rpcapi eth,net,web3,admin --port 30303 > /root/geth.log 2>&1 &'
+```
+
+### Restart Mining Instances
+
+**CRITICAL:** Always use `LC_ALL=C` when starting ethminer to avoid locale errors.
+
+```bash
+# Instance 1 (30034181)
+ssh -p 34180 root@ssh1.vast.ai 'pkill -9 geth; pkill -9 ethminer; sleep 5; cd /root && nohup ./geth --datadir /root/geth-data --cache 16384 --rpc --rpcaddr 0.0.0.0 --rpcport 8545 --rpcapi eth,net,web3,miner,admin,debug --networkid 1 --port 30303 --mine --minerthreads 0 --etherbase 0x3ca943ef871bea7d0dfa34bff047b0e82be441ef --unlock 0x3ca943ef871bea7d0dfa34bff047b0e82be441ef --password /root/miner-password.txt --verbosity 4 > /root/geth-new.log 2>&1 & sleep 5; nohup env LC_ALL=C /root/ethminer-src/build/ethminer/ethminer -G -P getwork://127.0.0.1:8545 --HWMON 1 --report-hr --work-timeout 99999 --farm-recheck 5000 > /root/ethminer.log 2>&1 &'
+
+# Instance 2 (30034372)
+ssh -p 34372 root@ssh2.vast.ai 'pkill -9 geth; pkill -9 ethminer; sleep 5; cd /root && nohup ./geth --datadir /root/geth-data --cache 16384 --rpc --rpcaddr 0.0.0.0 --rpcport 8545 --rpcapi eth,net,web3,miner,admin --networkid 1 --port 30303 --mine --minerthreads 0 --etherbase 0x3ca943ef871bea7d0dfa34bff047b0e82be441ef --unlock 0x3ca943ef871bea7d0dfa34bff047b0e82be441ef --password /root/miner-password.txt --verbosity 3 > /root/geth-new.log 2>&1 & sleep 5; nohup env LC_ALL=C /root/ethminer-src/build/ethminer/ethminer -G -P getwork://127.0.0.1:8545 --HWMON 1 --report-hr --work-timeout 99999 --farm-recheck 5000 > /root/ethminer.log 2>&1 &'
+```
+
+### Verify All Instances Are Synced
+
+```bash
+# Check block numbers on all instances
+for port in 34180 34372 20870; do
+  name="Instance 1"; [ "$port" = "34372" ] && name="Instance 2"; [ "$port" = "20870" ] && name="Sync"
+  ssh_host="ssh1.vast.ai"; [ "$port" = "34372" ] && ssh_host="ssh2.vast.ai"; [ "$port" = "20870" ] && ssh_host="ssh6.vast.ai"
+  result=$(ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p $port root@$ssh_host 'curl -s http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}"' 2>&1 | grep '^{')
+  block_hex=$(echo "$result" | grep -o '"result":"[^"]*"' | cut -d'"' -f4)
+  block_num=$(printf "%d" $block_hex 2>/dev/null)
+  echo "$name: Block $block_num"
+done
+```
+
+All instances should be on the same block number. If not, wait a few minutes for sync or restart the lagging instance.
+
+---
+
 ## Difficulty Calculations
 
 ### Calculate Current Difficulty from Block Number
