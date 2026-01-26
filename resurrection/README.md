@@ -2,6 +2,21 @@
 
 GPU mining to extend historical chains beyond their original blocks, reducing difficulty to CPU-mineable levels.
 
+## Current Status (Live)
+
+**Block 1920070** | Difficulty: **2.36 TH** | Progress: **22%** (70/316 blocks) | ETA: **~8 hours**
+
+| Block | Difficulty | Date (UTC) |
+|-------|------------|------------|
+| 1920000 | 59.37 TH | 2026-01-15 |
+| 1920020 | 22.94 TH | 2026-01-22 |
+| 1920040 | 8.53 TH | 2026-01-25 |
+| 1920060 | 3.34 TH | 2026-01-26 |
+| **1920070** | **2.36 TH** | **2026-01-26** |
+| ~1920320 | 10 MH | ~2026-01-27 (CPU-mineable) |
+
+Mining is accelerating rapidly as difficulty drops. See `generated-files/resurrection_chart.png` for visualization.
+
 ## Revival Options
 
 |  | Homestead | Frontier |
@@ -55,13 +70,18 @@ Scripts auto-stop when difficulty reaches target threshold, then restart geth wi
 
 ```
 resurrection/
-├── mining-script.sh   # GPU mining script (--era homestead|frontier)
-├── deploy-vast.sh     # Vast.ai deployment CLI (search, create, deploy, ssh, logs)
-└── generated-files/
+├── mining-script.sh       # GPU mining script (--era homestead|frontier)
+├── deploy-vast.sh         # Vast.ai deployment CLI (search, create, deploy, ssh, logs)
+├── STATUS.md              # Detailed mining status and commands
+├── requirements.txt       # Python dependencies (vastai)
+├── .venv/                 # Python virtual environment
+└── generated-files/       # (gitignored)
+    ├── resurrection_chart.png/svg  # Difficulty curve visualization
+    ├── resurrection_table.png/svg  # Mining progress table
     ├── miner-address.txt
     ├── miner-private-key.hex
     ├── miner-password.txt
-    └── data/          # Nodekeys for P2P identity
+    └── data/              # Nodekeys for P2P identity
 ```
 
 ## Deployment

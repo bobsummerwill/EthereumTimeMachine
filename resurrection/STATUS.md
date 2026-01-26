@@ -8,28 +8,31 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 
 ## Current Status
 
-**Last Updated:** 2026-01-23
+**Last Updated:** 2026-01-26 21:40 UTC
 
 | Metric | Value |
 |--------|-------|
-| Current Block | 1920032 (mining) |
-| Target Block | 1920316 |
-| Blocks Remaining | ~284 |
-| Current Difficulty | ~12.7 TH |
+| Current Block | 1920070 (mining 1920071) |
+| Target Block | ~1920320 |
+| Blocks Remaining | ~250 |
+| Current Difficulty | 2.36 TH |
 | Target Difficulty | 10 MH (CPU-mineable) |
-| Est. Completion | ~2026-01-24 |
+| Progress | 22% (70/316 blocks) |
+| ETA to CPU-mineable | ~8 hours (Tue 2026-01-27 ~05:30 UTC) |
 
 ## Mining Instances (Vast.ai)
 
 | ID | GPU | Status | Utilization | Role | SSH |
 |----|-----|--------|-------------|------|-----|
-| 30034181 | 8x RTX 3090 | Running | 100% | Mining | `ssh -p 34180 root@ssh1.vast.ai` |
-| 30034372 | 8x RTX 3090 | Running | 100% | Mining | `ssh -p 34372 root@ssh2.vast.ai` |
-| 29980870 | 1x GTX 1080 | Running | 0% | Idle sync | `ssh -p 20870 root@ssh6.vast.ai` |
+| 30034181 | 8x RTX 3090 | Running | 100% | Mining | `ssh -p 19693 root@175.155.64.142` |
+| 30034372 | 8x RTX 3090 | Running | 100% | Mining | `ssh -p 19034 root@175.155.64.234` |
+| 29980870 | 1x GTX 1080 | Running | 0% | Idle sync | `ssh -p 46761 root@1.208.108.242` |
 
 **Combined Hashrate:** ~1692 MH/s (2 × 846 MH/s)
 
-**Vastai CLI:** `/home/icetiger/Projects/EthereumTimeMachine/resurrection/.venv/bin/vastai`
+**Vastai CLI:** `resurrection/.venv/bin/vastai`
+
+**Note:** SSH addresses are direct IPs. Use `vastai ssh-url <instance_id>` to get current addresses if they change.
 
 ## Block History (Mined)
 
@@ -68,6 +71,12 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 | 1920029 | MINED | 2026-01-24 03:41 | 14.71 TH | 2.4h | 3.5h |
 | 1920030 | MINED | 2026-01-24 12:23 | 14.00 TH | 2.3h | 8.7h |
 | 1920031 | MINED | 2026-01-24 15:58 | 13.32 TH | 2.2h | 3.6h |
+| ... | ... | ... | ... | ... | ... |
+| 1920040 | MINED | 2026-01-25 08:00 | 8.53 TH | 1.4h | - |
+| 1920050 | MINED | 2026-01-26 02:37 | 5.20 TH | 51m | - |
+| 1920060 | MINED | 2026-01-26 11:02 | 3.34 TH | 33m | - |
+| 1920067 | MINED | 2026-01-26 19:14 | 2.58 TH | 25m | - |
+| 1920070 | MINED | 2026-01-26 19:46 | 2.36 TH | 23m | - |
 
 ## Key Constants
 
@@ -95,13 +104,17 @@ TARGET_BLOCK = 1920316             # When difficulty reaches 10 MH
 ### 1. List All Vast.ai Instances
 
 ```bash
-/home/icetiger/Projects/EthereumTimeMachine/resurrection/.venv/bin/vastai show instances
+resurrection/.venv/bin/vastai show instances
 ```
 
 ### 2. Get Current Block Number
 
 ```bash
-ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p 34180 root@ssh1.vast.ai \
+# Get SSH URL for instance (addresses change!)
+resurrection/.venv/bin/vastai ssh-url 30034181
+
+# Then query RPC (replace HOST:PORT with output above)
+ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p PORT root@HOST \
   "curl -s -X POST -H 'Content-Type: application/json' \
    --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \
    http://127.0.0.1:8545" | python3 -c 'import sys,json; print(int(json.load(sys.stdin)["result"], 16))'
@@ -279,10 +292,10 @@ def calc_estimated_date(target_block, from_block, from_date):
 Generate a mining progress table image showing mined blocks, current mining block, and future estimates.
 
 **Output files:**
-- `~/Downloads/ethereum_resurrection_table.png`
-- `~/Downloads/ethereum_resurrection_table.svg`
+- `resurrection/generated-files/resurrection_table.png`
+- `resurrection/generated-files/resurrection_table.svg`
 
-**Python environment:** `~/Downloads/chart_venv` (matplotlib installed)
+**Python environment:** `resurrection/.venv/` (matplotlib installed via requirements.txt)
 
 ### Table Structure
 
@@ -315,7 +328,7 @@ Generate a mining progress table image showing mined blocks, current mining bloc
 ### To Generate the Table
 
 ```bash
-source ~/Downloads/chart_venv/bin/activate && python3 << 'TABLE_EOF'
+source resurrection/.venv/bin/activate && python3 << 'TABLE_EOF'
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 
@@ -493,9 +506,9 @@ summary = f"Current: Block {current_mining_block} | Difficulty: {format_diff(dif
 fig.text(0.5, 0.04, summary, ha='center', fontsize=12, color=YELLOW, fontweight='bold')
 
 plt.tight_layout(rect=[0, 0.06, 1, 0.95])
-plt.savefig('/home/icetiger/Downloads/ethereum_resurrection_table.png', dpi=150, facecolor=BG_DARK, bbox_inches='tight')
-plt.savefig('/home/icetiger/Downloads/ethereum_resurrection_table.svg', facecolor=BG_DARK, bbox_inches='tight')
-print("Table saved to ~/Downloads/ethereum_resurrection_table.png and .svg")
+plt.savefig('resurrection/generated-files/resurrection_table.png', dpi=150, facecolor=BG_DARK, bbox_inches='tight')
+plt.savefig('resurrection/generated-files/resurrection_table.svg', facecolor=BG_DARK, bbox_inches='tight')
+print("Table saved to resurrection/generated-files/resurrection_table.png and .svg")
 TABLE_EOF
 ```
 
@@ -506,10 +519,10 @@ TABLE_EOF
 Generate a difficulty curve chart showing the exponential reduction from ~59 TH to 10 MH.
 
 **Output files:**
-- `~/Downloads/ethereum_resurrection_chart.png`
-- `~/Downloads/ethereum_resurrection_chart.svg`
+- `resurrection/generated-files/resurrection_chart.png`
+- `resurrection/generated-files/resurrection_chart.svg`
 
-**Python environment:** `~/Downloads/chart_venv` (matplotlib installed)
+**Python environment:** `resurrection/.venv/` (matplotlib installed via requirements.txt)
 
 ### Color Scheme (matches infographic.html)
 
@@ -530,9 +543,10 @@ GRAY = '#888888'      # Grid lines, separator rows
   - Y-axis: Difficulty (log scale, 1 MH to 100 TH)
   - Markers: Pink dots for mined, yellow star for current, yellow diamond for target
 
-- **Bottom chart:** Time per block (bar chart)
+- **Bottom chart:** Time per block (LINE GRAPH, not bar chart)
   - Show subset of blocks (every 20th + key blocks)
-  - Pink bars: mined, Yellow: current/target, Cyan: pending
+  - Pink line/dots: mined, Yellow: current/target, Cyan: pending
+  - Use `plt.plot()` with markers, not `plt.bar()`
 
 ### Key Annotations
 
@@ -546,7 +560,7 @@ GRAY = '#888888'      # Grid lines, separator rows
 ### To Generate the Chart
 
 ```bash
-source ~/Downloads/chart_venv/bin/activate && python3 << 'CHART_EOF'
+source resurrection/.venv/bin/activate && python3 << 'CHART_EOF'
 import matplotlib.pyplot as plt
 import numpy as np
 from datetime import datetime, timedelta
@@ -694,8 +708,8 @@ fig.text(0.5, 0.02, stats_text, ha='center', fontsize=11, color=YELLOW,
          fontweight='bold', bbox=dict(boxstyle='round,pad=0.5', facecolor='#16213e', edgecolor=YELLOW))
 
 plt.tight_layout(rect=[0, 0.05, 1, 1])
-plt.savefig('/home/icetiger/Downloads/ethereum_resurrection_chart.png', dpi=150, facecolor=BG_DARK, bbox_inches='tight')
-plt.savefig('/home/icetiger/Downloads/ethereum_resurrection_chart.svg', facecolor=BG_DARK, bbox_inches='tight')
+plt.savefig('resurrection/generated-files/resurrection_chart.png', dpi=150, facecolor=BG_DARK, bbox_inches='tight')
+plt.savefig('resurrection/generated-files/resurrection_chart.svg', facecolor=BG_DARK, bbox_inches='tight')
 print(f"Chart saved. Target: block {target_block}")
 CHART_EOF
 ```
@@ -730,17 +744,45 @@ When reporting status to the user, use this markdown format:
 - **ALL dates MUST include the year** (format: `YYYY-MM-DD HH:MM`) - never use `MM-DD` alone
 - Include `...` separator between near-term and milestone blocks
 
+### CRITICAL: Calculating "Actual Time" for Sampled Blocks
+
+When generating the progress table with sampled milestone blocks (e.g., 1920010, 1920020, 1920030...):
+
+**WRONG:** Using `timestamp(block N) - timestamp(previous_row_block)` gives time spanning multiple blocks
+**RIGHT:** Using `timestamp(block N) - timestamp(block N-1)` gives per-block actual time
+
+For sampled blocks like 1920010, 1920020, etc., you must:
+1. Fetch the timestamp for block N (e.g., 1920010)
+2. ALSO fetch the timestamp for block N-1 (e.g., 1920009)
+3. Calculate: `actual_time = timestamp(N) - timestamp(N-1)`
+
+This ensures "Est. Time" (single block estimate) and "Actual Time" (single block actual) are comparable.
+
+Example:
+```python
+# For block 1920010, fetch both 1920010 and 1920009 timestamps
+blocks_to_fetch = [1920009, 1920010, 1920019, 1920020, ...]  # Include N-1 for each sampled N
+actual_time_for_1920010 = timestamp[1920010] - timestamp[1920009]
+```
+
 ---
 
 ## Files
 
-- **Table image:** `~/Downloads/ethereum_resurrection_table.png` and `.svg`
-- **Chart image:** `~/Downloads/ethereum_resurrection_chart.png` and `.svg`
+- **Table image:** `resurrection/generated-files/resurrection_table.png` and `.svg`
+- **Chart image:** `resurrection/generated-files/resurrection_chart.png` and `.svg`
 - **Infographic:** `infographic.html` (open in browser) - **UPDATE when chart/table updated**
 - **Logs:** SSH to instances, see `/root/geth.log` and `/root/ethminer.log`
 - **Deploy script:** `resurrection/deploy-vast.sh`
 - **Mining script:** `resurrection/mining-script.sh`
 - **Full docs:** `resurrection/README.md`
+
+### Output Directory
+
+All generated files go into `resurrection/generated-files/` (gitignored). Create if needed:
+```bash
+mkdir -p resurrection/generated-files
+```
 
 ---
 

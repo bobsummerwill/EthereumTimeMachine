@@ -36,3 +36,6 @@ resurrection/vast-homestead/.env.*
 
 # Resurrection generated files (binaries, keys, etc.)
 resurrection/generated-files/
+
+# Claude Code local settings (machine-specific permissions)
+.claude/settings.local.json
