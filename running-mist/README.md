@@ -95,16 +95,18 @@ runtime: MSpanList_Insert
 
 ### Recommended macOS Versions for Old Geth
 
-| macOS Version | Codename | Release Date | Old Geth Compatibility |
-|---------------|----------|--------------|------------------------|
-| 10.6 | Snow Leopard | Aug 2009 | Unknown - very old |
-| 10.7 | Lion | Jul 2011 | Best bet for geth 1.3.x |
-| 10.8 | Mountain Lion | Jul 2012 | Good candidate |
-| 10.9 | Mavericks | Oct 2013 | Good candidate |
-| 10.10 | Yosemite | Oct 2014 | Good candidate |
-| 10.11 | El Capitan | Sep 2015 | Good candidate |
-| 10.12 | Sierra | Sep 2016 | **Sweet spot** - usable browsers, likely works |
-| 10.13 | High Sierra | Sep 2017 | Go runtime issues begin |
+| macOS Version | Codename | Release Date | Old Geth Compatibility | Mist Compatibility |
+|---------------|----------|--------------|------------------------|-------------------|
+| 10.6 | Snow Leopard | Aug 2009 | Unknown - very old | None |
+| 10.7 | Lion | Jul 2011 | Best bet for geth 1.3.x | **None** - Mist requires 10.8+ |
+| 10.8 | Mountain Lion | Jul 2012 | Good candidate | 0.2.6, 0.3.6, 0.3.7 |
+| 10.9 | Mavericks | Oct 2013 | Good candidate | All versions |
+| 10.10 | Yosemite | Oct 2014 | Good candidate | All versions |
+| 10.11 | El Capitan | Sep 2015 | Good candidate | All versions |
+| 10.12 | Sierra | Sep 2016 | **Sweet spot** - usable browsers, likely works | All versions |
+| 10.13 | High Sierra | Sep 2017 | Go runtime issues begin | All versions |
+
+**Note**: Mist/Ethereum Wallet requires at least macOS 10.8 (Mountain Lion). Users on Lion (10.7) must use geth console instead.
 
 ### macOS Internet Recovery
 
@@ -112,6 +114,22 @@ runtime: MSpanList_Insert
 - **Cmd+Shift+Option+R**: Installs original macOS the Mac shipped with
 
 To downgrade from a newer version, you must erase the disk first.
+
+### macOS Installer Downloads
+
+For installing macOS 10.12 Sierra (recommended for old geth), download the installer from Apple:
+
+- **macOS Sierra**: https://support.apple.com/en-us/102662
+
+The DMG is ~5GB. For FAT32 USB drives (4GB limit), split with:
+```bash
+split -b 3G InstallOS.dmg InstallOS.dmg.part.
+```
+
+Reassemble on the Mac with:
+```bash
+cat InstallOS.dmg.part.* > InstallOS.dmg
+```
 
 ### Browser/TLS Issues on Old macOS
 
@@ -164,6 +182,25 @@ Since old macOS versions can't browse modern websites:
 | 0.7.5 | `Ethereum-Wallet-win64-0-7-5.zip` | 102 MB | [Download](https://github.com/ethereum/mist/releases/download/0.7.5/Ethereum-Wallet-win64-0-7-5.zip) |
 | 0.7.6 | `Ethereum-Wallet-win64-0-7-6.zip` | 106 MB | [Download](https://github.com/ethereum/mist/releases/download/0.7.6/Ethereum-Wallet-win64-0-7-6.zip) |
 | 0.8.0 | `Ethereum-Wallet-win64-0-8-0.zip` | 103 MB | [Download](https://github.com/ethereum/mist/releases/download/0.8.0/Ethereum-Wallet-win64-0-8-0.zip) |
+
+## macOS Binary Downloads
+
+### Frontier Era (Geth 1.1.0)
+
+| Version | Filename | Size | Min macOS | Link |
+|---------|----------|------|-----------|------|
+| **0.2.6** | `Ethereum-Wallet-darwin-x64-0-2-6.zip` | 53 MB | 10.8 (Mountain Lion) | [Download](https://github.com/ethereum/mist/releases/download/0.2.6/Ethereum-Wallet-darwin-x64-0-2-6.zip) |
+| 0.3.6 | `Mist-macosx-0-3-6.zip` | 87 MB | 10.8 (Mountain Lion) | [Download](https://github.com/ethereum/mist/releases/download/0.3.6/Mist-macosx-0-3-6.zip) |
+| 0.3.7 | `Ethereum-Wallet-macosx-0-3-7.zip` | 92 MB | 10.8 (Mountain Lion) | [Download](https://github.com/ethereum/mist/releases/download/0.3.7/Ethereum-Wallet-macosx-0-3-7.zip) |
+
+### Homestead Era (Geth 1.3.6)
+
+| Version | Filename | Size | Min macOS | Link |
+|---------|----------|------|-----------|------|
+| **0.7.4** | `Ethereum-Wallet-macosx-0-7-4.zip` | 79 MB | 10.9 (Mavericks) | [Download](https://github.com/ethereum/mist/releases/download/0.7.4/Ethereum-Wallet-macosx-0-7-4.zip) |
+| 0.7.5 | `Ethereum-Wallet-macosx-0-7-5.zip` | 69 MB | 10.9 (Mavericks) | [Download](https://github.com/ethereum/mist/releases/download/0.7.5/Ethereum-Wallet-macosx-0-7-5.zip) |
+| 0.7.6 | `Ethereum-Wallet-macosx-0-7-6.zip` | 73 MB | 10.9 (Mavericks) | [Download](https://github.com/ethereum/mist/releases/download/0.7.6/Ethereum-Wallet-macosx-0-7-6.zip) |
+| 0.8.0 | `Ethereum-Wallet-macosx-0-8-0.zip` | 69 MB | 10.9 (Mavericks) | [Download](https://github.com/ethereum/mist/releases/download/0.8.0/Ethereum-Wallet-macosx-0-8-0.zip) |
 
 ### Geth Win64 Binaries
 
