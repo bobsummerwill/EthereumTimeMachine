@@ -4,7 +4,7 @@ GPU mining to extend historical chains beyond their original blocks, reducing di
 
 ## Current Status (Live)
 
-**Block 1920070** | Difficulty: **2.36 TH** | Progress: **22%** (70/316 blocks) | ETA: **~8 hours**
+**Block 1920237** | Difficulty: **192 GH** | Progress: **75%** (237/316 blocks) | ETA: **~20 min**
 
 | Block | Difficulty | Date (UTC) |
 |-------|------------|------------|
@@ -12,7 +12,10 @@ GPU mining to extend historical chains beyond their original blocks, reducing di
 | 1920020 | 22.94 TH | 2026-01-22 |
 | 1920040 | 8.53 TH | 2026-01-25 |
 | 1920060 | 3.34 TH | 2026-01-26 |
-| **1920070** | **2.36 TH** | **2026-01-26** |
+| 1920100 | 799 GH | 2026-01-27 |
+| 1920150 | 439 GH | 2026-01-27 |
+| 1920200 | 244 GH | 2026-01-27 |
+| **1920237** | **192 GH** | **2026-01-27** |
 | ~1920320 | 10 MH | ~2026-01-27 (CPU-mineable) |
 
 Mining is accelerating rapidly as difficulty drops. See `generated-files/resurrection_chart.png` for visualization.

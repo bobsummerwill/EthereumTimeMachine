@@ -8,17 +8,17 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 
 ## Current Status
 
-**Last Updated:** 2026-01-26 21:40 UTC
+**Last Updated:** 2026-01-27 06:15 UTC
 
 | Metric | Value |
 |--------|-------|
-| Current Block | 1920070 (mining 1920071) |
+| Current Block | 1920188 (mining 1920189) |
 | Target Block | ~1920320 |
-| Blocks Remaining | ~250 |
-| Current Difficulty | 2.36 TH |
+| Blocks Remaining | ~128 |
+| Current Difficulty | 261 GH |
 | Target Difficulty | 10 MH (CPU-mineable) |
-| Progress | 22% (70/316 blocks) |
-| ETA to CPU-mineable | ~8 hours (Tue 2026-01-27 ~05:30 UTC) |
+| Progress | 59% (188/316 blocks) |
+| ETA to CPU-mineable | ~53 min (Mon 2026-01-27 ~07:10 UTC) |
 
 ## Mining Instances (Vast.ai)
 
@@ -75,8 +75,12 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 | 1920040 | MINED | 2026-01-25 08:00 | 8.53 TH | 1.4h | - |
 | 1920050 | MINED | 2026-01-26 02:37 | 5.20 TH | 51m | - |
 | 1920060 | MINED | 2026-01-26 11:02 | 3.34 TH | 33m | - |
-| 1920067 | MINED | 2026-01-26 19:14 | 2.58 TH | 25m | - |
 | 1920070 | MINED | 2026-01-26 19:46 | 2.36 TH | 23m | - |
+| 1920080 | MINED | 2026-01-27 01:29 | 1.61 TH | 16m | - |
+| 1920090 | MINED | 2026-01-27 03:07 | 1.31 TH | 13m | - |
+| 1920100 | MINED | 2026-01-27 04:20 | 799 GH | 8m | - |
+| 1920150 | MINED | 2026-01-27 05:30 | 439 GH | 4m | - |
+| 1920188 | MINED | 2026-01-27 06:10 | 261 GH | 2.6m | - |
 
 ## Key Constants
 
@@ -541,12 +545,15 @@ GRAY = '#888888'      # Grid lines, separator rows
 - **Top chart:** Difficulty vs Block (log scale)
   - X-axis: Block number (1919995 to 1920325)
   - Y-axis: Difficulty (log scale, 1 MH to 100 TH)
-  - Markers: Pink dots for mined, yellow star for current, yellow diamond for target
+  - Cyan line for projected difficulty curve
+  - **Magenta scatter dots for each mined block**
+  - Yellow star for current block, green line for target
 
 - **Bottom chart:** Time per block (LINE GRAPH, not bar chart)
-  - Show subset of blocks (every 20th + key blocks)
-  - Pink line/dots: mined, Yellow: current/target, Cyan: pending
-  - Use `plt.plot()` with markers, not `plt.bar()`
+  - Cyan line with fill for projected block times
+  - **Magenta scatter dots for each mined block** (same as top chart)
+  - Yellow vertical line for current position
+  - Use `ax.scatter()` for mined blocks in BOTH panels
 
 ### Key Annotations
 
