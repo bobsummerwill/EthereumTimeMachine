@@ -57,9 +57,9 @@ function computeStageStatus(current, target) {
 }
 
 function statusText(status) {
-  if (status === 2) return "Done";
-  if (status === 1) return "In Progress";
-  return "Todo";
+  if (status === 2) return "DONE";
+  if (status === 1) return "IN PROGRESS";
+  return "TODO";
 }
 
 function isBridgeNodeRow(node) {
@@ -656,9 +656,9 @@ app.get("/", async (req, res) => {
       }
 
       function statusText(s) {
-        if (s === 2) return 'Done';
-        if (s === 1) return 'In Progress';
-        return 'Todo';
+        if (s === 2) return 'DONE';
+        if (s === 1) return 'IN PROGRESS';
+        return 'TODO';
       }
 
       function statusClass(s) {
