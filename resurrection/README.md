@@ -4,21 +4,59 @@ GPU mining to extend historical chains beyond their original blocks, reducing di
 
 ## Current Status (Live)
 
-**Block 1920237** | Difficulty: **192 GH** | Progress: **75%** (237/316 blocks) | ETA: **~20 min**
+**Block 1920810** | Difficulty: **1.8 GH** | Reduction: **99.997%** | ETA to 1 GH: **~4 hours**
 
-| Block | Difficulty | Date (UTC) |
-|-------|------------|------------|
-| 1920000 | 59.37 TH | 2026-01-15 |
-| 1920020 | 22.94 TH | 2026-01-22 |
-| 1920040 | 8.53 TH | 2026-01-25 |
-| 1920060 | 3.34 TH | 2026-01-26 |
-| 1920100 | 799 GH | 2026-01-27 |
-| 1920150 | 439 GH | 2026-01-27 |
-| 1920200 | 244 GH | 2026-01-27 |
-| **1920237** | **192 GH** | **2026-01-27** |
-| ~1920320 | 10 MH | ~2026-01-27 (CPU-mineable) |
+| Date | Block | Difficulty | Reduction |
+|------|-------|------------|-----------|
+| Jan 15 | 1,920,000 | 59.4 TH | 0% |
+| Jan 16 | 1,920,001 | 56.5 TH | 4.8% |
+| Jan 17 | 1,920,003 | 51.2 TH | 13.8% |
+| Jan 18 | 1,920,007 | 42.0 TH | 29.3% |
+| Jan 19 | 1,920,010 | 36.2 TH | 39.1% |
+| Jan 20 | 1,920,015 | 29.4 TH | 50.5% |
+| Jan 21 | 1,920,019 | 24.1 TH | 59.4% |
+| Jan 22 | 1,920,022 | 20.8 TH | 65.0% |
+| Jan 23 | 1,920,027 | 16.2 TH | 72.6% |
+| Jan 24 | 1,920,031 | 13.3 TH | 77.6% |
+| Jan 25 | 1,920,044 | 7.0 TH | 88.2% |
+| Jan 26 | 1,920,074 | 2.0 TH | 96.6% |
+| Jan 27 | 1,920,538 | 58.8 GH | 99.90% |
+| Jan 28 | 1,920,581 | 19.0 GH | 99.97% |
+| **Jan 29** | **1,920,810** | **1.8 GH** | **99.997%** |
 
 Mining is accelerating rapidly as difficulty drops. See `generated-files/resurrection_chart.png` for visualization.
+
+## Generated Charts
+
+The `generated-files/` directory contains visualizations updated via Python/matplotlib:
+
+| File | Description |
+|------|-------------|
+| `resurrection_chart.png/svg` | Difficulty vs time (log scale), shows progression from 59.4 TH to current |
+| `resurrection_table.png/svg` | Daily progress table showing last block mined each day |
+
+### Regenerating Charts
+
+Charts can be regenerated with current data using Python:
+
+```bash
+cd resurrection
+source .venv/bin/activate
+
+# Fetch latest data from sync node and regenerate
+python3 << 'EOF'
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from datetime import datetime
+# ... (see full script in generated-files/ or ask Claude to regenerate)
+EOF
+```
+
+The charts use:
+- **Time on X-axis**: Dates formatted as "15\nJan" (day over month)
+- **Log scale Y-axis**: Difficulty in TH/GH/MH
+- **Dark theme**: Background #1a1a2e, cyan (#00F0FF) accents
+- **Target lines**: 1 GH (GPU target), 46 MH (CPU equilibrium)
 
 ## Revival Options
 

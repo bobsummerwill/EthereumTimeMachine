@@ -15,12 +15,14 @@
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             color: #e8e8e8;
             min-height: 100vh;
+            min-width: max-content;
             padding: 20px;
             line-height: 1.3;
         }
         .container {
-            max-width: 1600px;
+            min-width: max-content;
             margin: 0 auto;
+            padding: 0 20px;
         }
         .header {
             text-align: center;
@@ -91,9 +93,10 @@
             background: rgba(0, 0, 0, 0.4);
             padding: 10px;
             border-radius: 4px;
-            overflow-x: auto;
+            overflow: visible;
             font-size: 1.2em;
             margin: 6px 0;
+            white-space: nowrap;
         }
         .diagram.large {
             font-size: 1.3em;
