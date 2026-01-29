@@ -4,27 +4,27 @@ GPU mining to extend historical chains beyond their original blocks, reducing di
 
 ## Current Status (Live)
 
-**Block 1920810** | Difficulty: **1.8 GH** | Reduction: **99.997%** | ETA to 1 GH: **~4 hours**
+**Block 1,920,944** | Difficulty: **1.26 GH** | Reduction: **99.998%** | **BELOW 1 GH TARGET!**
 
 | Date | Block | Difficulty | Reduction |
 |------|-------|------------|-----------|
 | Jan 15 | 1,920,000 | 59.4 TH | 0% |
-| Jan 16 | 1,920,001 | 56.5 TH | 4.8% |
-| Jan 17 | 1,920,003 | 51.2 TH | 13.8% |
+| Jan 16 | 1,920,001 | 56.5 TH | 4.9% |
+| Jan 17 | 1,920,003 | 51.2 TH | 13.9% |
 | Jan 18 | 1,920,007 | 42.0 TH | 29.3% |
 | Jan 19 | 1,920,010 | 36.2 TH | 39.1% |
 | Jan 20 | 1,920,015 | 29.4 TH | 50.5% |
 | Jan 21 | 1,920,019 | 24.1 TH | 59.4% |
 | Jan 22 | 1,920,022 | 20.8 TH | 65.0% |
-| Jan 23 | 1,920,027 | 16.2 TH | 72.6% |
+| Jan 23 | 1,920,027 | 16.2 TH | 72.7% |
 | Jan 24 | 1,920,031 | 13.3 TH | 77.6% |
 | Jan 25 | 1,920,044 | 7.0 TH | 88.2% |
 | Jan 26 | 1,920,074 | 2.0 TH | 96.6% |
 | Jan 27 | 1,920,538 | 58.8 GH | 99.90% |
 | Jan 28 | 1,920,581 | 19.0 GH | 99.97% |
-| **Jan 29** | **1,920,810** | **1.8 GH** | **99.997%** |
+| **Jan 29** | **1,920,944** | **1.26 GH** | **99.998%** |
 
-Mining is accelerating rapidly as difficulty drops. See `generated-files/resurrection_chart.png` for visualization.
+Mining is now below 1 GH! Difficulty will continue dropping toward CPU-mineable levels (~46 MH). See `generated-files/resurrection_chart.png` for visualization.
 
 ## Generated Charts
 
@@ -37,26 +37,38 @@ The `generated-files/` directory contains visualizations updated via Python/matp
 
 ### Regenerating Charts
 
-Charts can be regenerated with current data using Python:
+Regenerate both chart and table with current data:
 
 ```bash
 cd resurrection
 source .venv/bin/activate
-
-# Fetch latest data from sync node and regenerate
-python3 << 'EOF'
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from datetime import datetime
-# ... (see full script in generated-files/ or ask Claude to regenerate)
-EOF
+./regenerate-charts.sh
 ```
 
-The charts use:
+Or run the Python script directly:
+
+```bash
+python3 regenerate-charts.py
+```
+
+### Color Palette
+
+| Color | Hex | Usage |
+|-------|-----|-------|
+| Cyan | `#00F0FF` | Data line, TODO status |
+| Yellow | `#FFE739` | Current point star, IN PROGRESS status, 1 GH target line |
+| Pink | `#FF55CC` | 46 MH target line, DONE status |
+| Purple | `#6245EB` | Headers/accents |
+| Background | `#1a1a2e` | Dark theme |
+| Text | `#e8e8e8` | Light gray |
+
+### Chart Features
+
 - **Time on X-axis**: Dates formatted as "15\nJan" (day over month)
 - **Log scale Y-axis**: Difficulty in TH/GH/MH
-- **Dark theme**: Background #1a1a2e, cyan (#00F0FF) accents
-- **Target lines**: 1 GH (GPU target), 46 MH (CPU equilibrium)
+- **Yellow star**: Marks current/latest data point
+- **Target lines**: 1 GH (yellow), 46 MH (pink)
+- **Font**: DejaVu Sans (matches matplotlib default)
 
 ## Revival Options
 

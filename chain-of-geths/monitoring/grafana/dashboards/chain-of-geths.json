@@ -9,7 +9,7 @@
         },
         "enable": true,
         "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
+        "iconColor": "#00F0FF",
         "name": "Annotations & Alerts",
         "type": "dashboard"
       }
@@ -68,11 +68,11 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#FF55CC",
                 "value": null
               },
               {
-                "color": "red",
+                "color": "#00F0FF",
                 "value": 80
               }
             ]
@@ -146,15 +146,15 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#00F0FF",
                 "value": null
               },
               {
-                "color": "yellow",
+                "color": "#FFE739",
                 "value": 1
               },
               {
-                "color": "green",
+                "color": "#FF55CC",
                 "value": 5
               }
             ]
@@ -221,11 +221,11 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#00F0FF",
                 "value": null
               },
               {
-                "color": "green",
+                "color": "#FF55CC",
                 "value": 1
               }
             ]
@@ -305,11 +305,11 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#00F0FF",
                 "value": null
               },
               {
-                "color": "green",
+                "color": "#FF55CC",
                 "value": 1
               }
             ]
@@ -455,15 +455,15 @@
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "red",
+                      "color": "#00F0FF",
                       "value": null
                     },
                     {
-                      "color": "yellow",
+                      "color": "#FFE739",
                       "value": 1
                     },
                     {
-                      "color": "green",
+                      "color": "#FF55CC",
                       "value": 2
                     }
                   ]

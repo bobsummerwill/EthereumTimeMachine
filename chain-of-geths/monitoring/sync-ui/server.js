@@ -57,9 +57,9 @@ function computeStageStatus(current, target) {
 }
 
 function statusText(status) {
-  if (status === 2) return "DONE";
-  if (status === 1) return "IN PROGRESS";
-  return "TODO";
+  if (status === 2) return "Done";
+  if (status === 1) return "In Progress";
+  return "Todo";
 }
 
 function isBridgeNodeRow(node) {
@@ -275,7 +275,7 @@ app.get("/", async (req, res) => {
       const pctRaw = r.pct ?? (tgt > 0 ? (cur * 100.0) / tgt : 0);
       const pct = Math.max(0, Math.min(100, Number(pctRaw) || 0));
       const s = computeStageStatus(cur, tgt);
-      const color = s === 2 ? "#69db7c" : s === 1 ? "#ffd166" : "#ff5b5b";
+      const color = s === 2 ? "#FF55CC" : s === 1 ? "#FFE739" : "#00F0FF";
       const meta = nodeMeta(r.node);
       const releasedLine = meta ? `<div class=\"released\">released ${escapeHtml(meta.date)}</div>` : "";
       const protoLine = meta ? `<div class=\"proto\">supports ${escapeHtml(meta.proto)}</div>` : "";
@@ -309,7 +309,7 @@ app.get("/", async (req, res) => {
       if (i < rows.length - 1) {
         const next = rows[i + 1];
         const ns = computeStageStatus(next.current ?? 0, next.target ?? 0);
-        const arrowColor = ns === 2 ? "#69db7c" : ns === 1 ? "#ffd166" : "#ff5b5b";
+        const arrowColor = ns === 2 ? "#FF55CC" : ns === 1 ? "#FFE739" : "#00F0FF";
         const lbl = edgeLabel(r.node, next.node);
         const labelHtml = lbl ? '<div class="arrow-label">' + escapeHtml(lbl) + '</div>' : '';
         parts.push('<div class="arrow status-' + ns + '" style="color:' + arrowColor + '">' + labelHtml + '</div>');
@@ -328,28 +328,62 @@ app.get("/", async (req, res) => {
       :root { color-scheme: dark; }
       body {
         margin: 24px;
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-        background: #0f1116;
-        color: #e6e8ef;
+        font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Liberation Sans', Arial, sans-serif;
+        background: #1a1a2e;
+        color: #e8e8e8;
+        font-size: 13px;
       }
-      h1 { margin: 0 0 12px; font-size: 20px; }
-      .meta { opacity: 0.8; font-size: 12px; margin-bottom: 12px; }
-      .err { background: #3a0d0d; border: 1px solid #7a1a1a; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+      /* Subtle CRT scanline effect */
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.1) 0px,
+          rgba(0, 0, 0, 0.1) 1px,
+          transparent 1px,
+          transparent 2px
+        );
+        z-index: 9999;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 18px;
+        color: #6245EB;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 0 0 10px rgba(98, 69, 235, 0.5);
+      }
+      .meta { opacity: 0.8; font-size: 11px; margin-bottom: 12px; }
+      .err { background: #3a0d0d; border: 1px solid #7a1a1a; padding: 10px 12px; border-radius: 4px; margin-bottom: 12px; }
       table { width: 100%; border-collapse: collapse; }
-      th, td { padding: 10px 8px; border-bottom: 1px solid #2a2a2a; }
-      th { text-align: left; opacity: 0.8; font-weight: 600; }
+      th, td { padding: 10px 8px; border-bottom: 1px solid #2a2a4a; }
+      th { text-align: left; opacity: 0.9; font-weight: 600; color: #6245EB; font-size: 11px; letter-spacing: 1px; }
       th.num { text-align: right; }
       td.num { text-align: right; font-variant-numeric: tabular-nums; }
       td.node { font-weight: 600; }
-      td.status { font-weight: 700; letter-spacing: 0.2px; }
-      .status-0 { color: #ff5b5b; }
-      .status-1 { color: #ffd166; }
-      .status-2 { color: #69db7c; }
-      .links a { margin-left: 8px; }
+      td.status { font-weight: 700; letter-spacing: 1px; font-size: 11px; }
+      .status-0 { color: #00F0FF; text-shadow: 0 0 8px rgba(0, 240, 255, 0.4); }
+      .status-1 { color: #FFE739; text-shadow: 0 0 8px rgba(255, 231, 57, 0.4); }
+      .status-2 { color: #FF55CC; text-shadow: 0 0 8px rgba(255, 85, 204, 0.4); }
+      .links a { margin-left: 8px; color: #6245EB; text-decoration: none; }
+      .links a:hover { text-decoration: underline; }
 
       /* --- Diagram --- */
       .diagram-wrap { margin-top: 18px; }
-      .diagram-title { margin: 0 0 10px; font-size: 14px; opacity: 0.9; }
+      .diagram-title {
+        margin: 0 0 10px;
+        font-size: 11px;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #6245EB;
+      }
       .diagram {
         /* Use a simple nowrap layout to avoid any flexbox edge cases on minimal browsers. */
         display: block;
@@ -360,46 +394,51 @@ app.get("/", async (req, res) => {
         gap: 10px;
         padding: 12px;
         padding-bottom: 34px; /* room for arrow labels below */
-        border: 1px solid #2a2a2a;
-        border-radius: 10px;
-        background: rgba(255,255,255,0.02);
+        border: 1px solid #2a2a4a;
+        border-radius: 2px;
+        background: rgba(0,240,255,0.02);
         min-height: 270px;
       }
 
       .node-card {
         width: 132px;
         padding: 10px;
-        border-radius: 10px;
+        border-radius: 2px;
         border: 2px solid currentColor;
-        background: rgba(0,0,0,0.35);
+        background: rgba(0,0,0,0.5);
         display: inline-block;
         vertical-align: top;
         white-space: normal;
         margin-right: 10px;
         /* User request: center-align all text within each card. */
         text-align: center;
+        box-shadow: 0 0 12px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.3);
       }
+      .node-card.status-1 { box-shadow: 0 0 15px rgba(255, 231, 57, 0.25), inset 0 0 20px rgba(0,0,0,0.3); }
+      .node-card.status-2 { box-shadow: 0 0 15px rgba(255, 85, 204, 0.25), inset 0 0 20px rgba(0,0,0,0.3); }
+      .node-card.status-0 { box-shadow: 0 0 15px rgba(0, 240, 255, 0.2), inset 0 0 20px rgba(0,0,0,0.3); }
       .node-card .header {
         margin-bottom: 6px;
         /* Keep tank top aligned across cards even when titles wrap. */
         min-height: 58px;
       }
       .node-card .label {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
         line-height: 1.2;
         margin: 0;
+        letter-spacing: 0.5px;
       }
       .node-card .released {
         margin-top: 4px;
-        font-size: 11px;
-        opacity: 0.85;
+        font-size: 9px;
+        opacity: 0.7;
         line-height: 1.2;
       }
       .node-card .proto {
         margin-top: 4px;
-        font-size: 11px;
-        opacity: 0.85;
+        font-size: 9px;
+        opacity: 0.7;
         line-height: 1.2;
       }
 
@@ -419,12 +458,12 @@ app.get("/", async (req, res) => {
         gap: 2px;
       }
       .node-card .progress .line { margin: 0; }
-      .node-card .progress .status { font-weight: 800; letter-spacing: 0.3px; }
+      .node-card .progress .status { font-weight: 800; letter-spacing: 1px; font-size: 10px; }
       .node-card .progress .pct { font-weight: 400; letter-spacing: 0; }
 
       /* Text block BELOW the tank (release/proto + forks). */
       .node-card .meta {
-        font-size: 11px;
+        font-size: 9px;
         opacity: 0.85;
         line-height: 1.25;
         margin-top: 8px;
@@ -432,15 +471,17 @@ app.get("/", async (req, res) => {
       .node-card .meta:empty { display: none; }
       .node-card .meta .line { margin: 2px 0; }
       .node-card .meta .meta-label { font-weight: 800; }
-      .node-card .meta .forks-label { font-weight: 800; }
+      .node-card .meta .forks-label { font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
       .tank {
         position: relative;
         height: 84px;
-        border-radius: 10px;
+        border-radius: 2px;
         border: 2px solid currentColor;
         overflow: hidden;
-        background: rgba(255,255,255,0.04);
+        background: rgba(0,0,0,0.4);
       }
+      .status-1 .tank { box-shadow: inset 0 0 15px rgba(255, 231, 57, 0.15); }
+      .status-2 .tank { box-shadow: inset 0 0 15px rgba(255, 85, 204, 0.15); }
 
       /* Status icon overlays inside the tank (Visual stage progress). */
       .tank::after {
@@ -615,9 +656,9 @@ app.get("/", async (req, res) => {
       }
 
       function statusText(s) {
-        if (s === 2) return 'DONE';
-        if (s === 1) return 'IN PROGRESS';
-        return 'TODO';
+        if (s === 2) return 'Done';
+        if (s === 1) return 'In Progress';
+        return 'Todo';
       }
 
       function statusClass(s) {
@@ -635,7 +676,7 @@ app.get("/", async (req, res) => {
           const pct = row.pct ?? (tgt > 0 ? (cur * 100.0) / tgt : 0);
           const s = stageStatus(cur, tgt);
           const pctClamped = Math.max(0, Math.min(100, Number(pct) || 0));
-          const color = (s === 2) ? '#69db7c' : (s === 1) ? '#ffd166' : '#ff5b5b';
+          const color = (s === 2) ? '#FF55CC' : (s === 1) ? '#FFE739' : '#00F0FF';
 
           // Extra descriptor lines (from chain-of-geths.md diagram).
           const metaMap = {
@@ -681,7 +722,7 @@ app.get("/", async (req, res) => {
             // Color arrow by the *next* stage status (downstream).
             const next = rows[i + 1];
             const ns = stageStatus(next.current ?? 0, next.target ?? 0);
-            const arrowColor = (ns === 2) ? '#69db7c' : (ns === 1) ? '#ffd166' : '#ff5b5b';
+            const arrowColor = (ns === 2) ? '#FF55CC' : (ns === 1) ? '#FFE739' : '#00F0FF';
 
             const isSynthetic = (n) => {
               const s = String(n || '');
