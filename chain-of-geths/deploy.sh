@@ -108,6 +108,7 @@ scp $SSH_OPTS -i "$SSH_KEY_PATH" -r \
   generated-files monitoring \
   docker-compose.yml \
   seed-v1.11.6-when-ready.sh start-legacy-staged.sh \
+  startup.sh chain-of-geths.service install-systemd-service.sh \
   "$VM_USER@$VM_IP:/home/$VM_USER/chain-of-geths/"
 
 echo "Running setup on Ubuntu VM..."
@@ -344,6 +345,15 @@ else
   nohup bash -lc "while [ ! -f '$SEED_FLAG' ]; do sleep 60; done; env CUTOFF_BLOCK='$BRIDGE_SEED_CUTOFF_BLOCK' bash /home/ubuntu/chain-of-geths/start-legacy-staged.sh" \
     >/home/ubuntu/chain-of-geths/generated-files/start-legacy-staged.nohup.log 2>&1 &
 fi
+
+# Install systemd service for automatic startup on boot
+echo "Installing systemd service for automatic startup..."
+chmod +x /home/ubuntu/chain-of-geths/startup.sh
+chmod +x /home/ubuntu/chain-of-geths/install-systemd-service.sh
+sudo cp /home/ubuntu/chain-of-geths/chain-of-geths.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable chain-of-geths.service
+echo "Systemd service installed and enabled (will auto-start on boot)"
 
 echo "Chain started. Check logs with: sudo docker compose logs -f"
 EOF

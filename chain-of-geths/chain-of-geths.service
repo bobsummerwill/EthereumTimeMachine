@@ -1,0 +1,16 @@
+[Unit]
+Description=Chain of Geths - Ethereum Protocol Bridge
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/ubuntu/chain-of-geths
+ExecStart=/home/ubuntu/chain-of-geths/startup.sh
+ExecStop=/usr/bin/docker compose down
+User=root
+Environment=CUTOFF_BLOCK=1919999
+
+[Install]
+WantedBy=multi-user.target
