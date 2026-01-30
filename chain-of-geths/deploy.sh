@@ -51,7 +51,7 @@ else
     exit 1
 fi
 
-VM_IP="${VM_IP:-52.0.234.84}"
+VM_IP="${VM_IP:-35.173.251.232}"
 VM_USER="${VM_USER:-ubuntu}"
 
 # Update this to your PEM key path. Note: don't quote ~ (tilde expansion doesn't happen in quotes).

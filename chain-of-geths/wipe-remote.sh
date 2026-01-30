@@ -42,7 +42,7 @@ fi
 # We store known_hosts under generated-files/ so it doesn't pollute the user's global ~/.ssh/known_hosts.
 SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$SCRIPT_DIR/generated-files/known_hosts"
 
-VM_IP="${VM_IP:-52.0.234.84}"
+VM_IP="${VM_IP:-35.173.251.232}"
 VM_USER="${VM_USER:-ubuntu}"
 
 # Update this to your PEM key path. Note: don't quote ~ (tilde expansion doesn't happen in quotes).
