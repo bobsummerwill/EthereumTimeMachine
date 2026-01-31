@@ -75,14 +75,25 @@ chmod +x "$bundle_dir/geth"
 # Create static-nodes.json
 echo "[\"$ENODE\"]" > "$bundle_dir/data/static-nodes.json"
 
-# Create simple run script
+# Resurrection mining address
+ETHERBASE="0x3ca943ef871bea7d0dfa34bff047b0e82be441ef"
+
+# Create simple run script (sync only)
 # --oppose-dao-fork: Follow the non-DAO-fork chain (our resurrection extends Homestead without the DAO refund)
 cat > "$bundle_dir/run.sh" <<'SCRIPT'
 #!/bin/bash
 cd "$(dirname "$0")"
-./geth --datadir data --networkid 1 --nodiscover --maxpeers 1 --oppose-dao-fork
+./geth --datadir data --networkid 1 --maxpeers 10 --oppose-dao-fork
 SCRIPT
 chmod +x "$bundle_dir/run.sh"
+
+# Create mining script
+cat > "$bundle_dir/run-mine.sh" <<SCRIPT
+#!/bin/bash
+cd "\$(dirname "\$0")"
+./geth --datadir data --networkid 1 --maxpeers 10 --oppose-dao-fork --mine --minerthreads 2 --etherbase $ETHERBASE
+SCRIPT
+chmod +x "$bundle_dir/run-mine.sh"
 
 # Create README
 cat > "$bundle_dir/README.txt" <<EOF
@@ -93,12 +104,15 @@ This is Geth v1.4.18 (Nov 2016), the last Homestead-era release
 before Spurious Dragon. It supports eth/61-63 protocol.
 It will sync with the resurrected Homestead chain (block 1920000+).
 
-To run: ./run.sh
+SCRIPTS:
+  ./run.sh       - Sync only (no mining)
+  ./run-mine.sh  - Sync AND mine to the resurrection address
 
-This will connect only to: $ENODE
+The static peer is: $ENODE
+Mining rewards go to: $ETHERBASE
 
 The sync node is running on Vast.ai and has the extended Homestead
-chaindata with reduced difficulty (CPU-mineable once complete).
+chaindata. Discovery is enabled so multiple miners can find each other.
 
 Note: v1.4.18 was built with a newer Go compiler than v1.4.0,
 so it may be more compatible with modern macOS.

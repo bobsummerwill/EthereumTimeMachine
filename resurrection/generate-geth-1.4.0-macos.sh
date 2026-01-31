@@ -70,13 +70,24 @@ fi
 mkdir -p "$geth_dir/data"
 echo "[\"$ENODE\"]" > "$geth_dir/data/static-nodes.json"
 
-# Create simple run script
+# Resurrection mining address
+ETHERBASE="0x3ca943ef871bea7d0dfa34bff047b0e82be441ef"
+
+# Create simple run script (sync only)
 cat > "$geth_dir/run.sh" <<'SCRIPT'
 #!/bin/bash
 cd "$(dirname "$0")"
-./geth --datadir data --networkid 1 --nodiscover --maxpeers 1
+./geth --datadir data --networkid 1 --maxpeers 10
 SCRIPT
 chmod +x "$geth_dir/run.sh"
+
+# Create mining script
+cat > "$geth_dir/run-mine.sh" <<SCRIPT
+#!/bin/bash
+cd "\$(dirname "\$0")"
+./geth --datadir data --networkid 1 --maxpeers 10 --mine --minerthreads 2 --etherbase $ETHERBASE
+SCRIPT
+chmod +x "$geth_dir/run-mine.sh"
 
 # Create README
 cat > "$geth_dir/README.txt" <<EOF
@@ -86,12 +97,15 @@ Geth v1.4.0 macOS Bundle (Resurrection)
 This is the first Geth version with official macOS binaries.
 It will sync with the resurrected Homestead chain (block 1920000+).
 
-To run: ./run.sh
+SCRIPTS:
+  ./run.sh       - Sync only (no mining)
+  ./run-mine.sh  - Sync AND mine to the resurrection address
 
-This will connect only to: $ENODE
+The static peer is: $ENODE
+Mining rewards go to: $ETHERBASE
 
 The sync node is running on Vast.ai and has the extended Homestead
-chaindata with reduced difficulty (CPU-mineable once complete).
+chaindata. Discovery is enabled so multiple miners can find each other.
 EOF
 
 # Rename the directory to a clean name

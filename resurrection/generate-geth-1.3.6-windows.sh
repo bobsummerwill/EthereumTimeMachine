@@ -69,11 +69,22 @@ mv "$geth_exe" "$bundle_dir/geth.exe"
 # Create static-nodes.json
 echo "[\"$ENODE\"]" > "$bundle_dir/data/static-nodes.json"
 
-# Create run.bat script
+# Resurrection mining address
+ETHERBASE="0x3ca943ef871bea7d0dfa34bff047b0e82be441ef"
+
+# Create run.bat script (sync only - no mining)
 cat > "$bundle_dir/run.bat" <<'SCRIPT'
 @echo off
 cd /d "%~dp0"
-geth.exe --datadir data --networkid 1 --nodiscover --maxpeers 1
+geth.exe --datadir data --networkid 1 --maxpeers 10
+pause
+SCRIPT
+
+# Create run-mine.bat script (mining enabled)
+cat > "$bundle_dir/run-mine.bat" <<SCRIPT
+@echo off
+cd /d "%~dp0"
+geth.exe --datadir data --networkid 1 --maxpeers 10 --mine --minerthreads 2 --etherbase $ETHERBASE
 pause
 SCRIPT
 
@@ -85,12 +96,15 @@ Geth v1.3.6 Windows Bundle (Resurrection)
 This is the Homestead-era Geth for Windows.
 It will sync with the resurrected Homestead chain (block 1920000+).
 
-To run: Double-click run.bat
+SCRIPTS:
+  run.bat       - Sync only (no mining)
+  run-mine.bat  - Sync AND mine to the resurrection address
 
-This will connect only to: $ENODE
+The static peer is: $ENODE
+Mining rewards go to: $ETHERBASE
 
 The sync node is running on Vast.ai and has the extended Homestead
-chaindata with reduced difficulty (CPU-mineable once complete).
+chaindata. Discovery is enabled so multiple miners can find each other.
 EOF
 
 # Create zip
