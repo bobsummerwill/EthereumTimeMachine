@@ -5,6 +5,10 @@ services:
     image: ethereum/client-go:v1.16.7
     container_name: geth-v1-16-7
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 8G
     entrypoint: ["/bin/sh", "/watchdog/geth-self-watchdog.sh"]
     environment:
       # Head node: target is derived from `eth_syncing` (no fixed target).
@@ -233,6 +237,11 @@ services:
   lighthouse-v8-0-1:
     image: sigp/lighthouse:v8.0.1
     container_name: lighthouse-v8-0-1
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 8G
     command: |
       lighthouse beacon_node
       --datadir /data
