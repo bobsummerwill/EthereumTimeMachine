@@ -334,6 +334,32 @@ REFRESHER
   log "work refresher started (PID: $!)"
 }
 
+# DAG cleaner: Vast.ai containers often have limited root overlay space (50GB).
+# Geth generates a new ~1.2GB DAG file for each epoch, and they accumulate
+# causing disk-full crashes (SIGBUS during DAG generation). This function
+# cleans up old DAG files hourly, keeping only the 2 most recent.
+start_dag_cleaner() {
+  pkill -9 -f dag-cleaner 2>/dev/null || true
+
+  log "Starting DAG cleaner..."
+  cat > /root/dag-cleaner.sh << 'DAGCLEANER'
+#!/bin/bash
+# Clean old DAG files every hour to prevent disk-full crashes
+while true; do
+  sleep 3600
+  # Find and delete DAG files older than 2 hours
+  find /root/.ethash -name 'full-R23-*' -mmin +120 -delete 2>/dev/null
+  # Also check home dir in case geth uses different path
+  find ~/.ethash -name 'full-R23-*' -mmin +120 -delete 2>/dev/null
+  # Log disk usage
+  echo "[$(date)] DAG cleanup done. Disk: $(df -h / 2>/dev/null | tail -1 | awk '{print $5}')"
+done
+DAGCLEANER
+  chmod +x /root/dag-cleaner.sh
+  nohup /root/dag-cleaner.sh >> /root/dag-cleaner.log 2>&1 &
+  log "DAG cleaner started (PID: $!)"
+}
+
 # ============================================================================
 # Sync and Mining
 # ============================================================================
@@ -465,6 +491,9 @@ main() {
 
   # Start work refresher (keeps geth work fresh at high difficulty)
   start_work_refresher
+
+  # Start DAG cleaner (prevents disk-full crashes on Vast.ai)
+  start_dag_cleaner
 
   # Monitor until complete
   mining_monitor
