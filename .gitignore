@@ -37,5 +37,11 @@ resurrection/vast-homestead/.env.*
 # Resurrection generated files (binaries, keys, etc.)
 resurrection/generated-files/
 
+# Resurrection sensitive files (keystore, account info)
+resurrection/mining-account-keystore.json
+resurrection/MINING-ACCOUNT.md
+resurrection/*keystore*.json
+resurrection/*password*
+
 # Claude Code local settings (machine-specific permissions)
 .claude/settings.local.json

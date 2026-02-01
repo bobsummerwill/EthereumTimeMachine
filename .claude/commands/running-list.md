@@ -1,42 +1,60 @@
 # Running Instances List
 
-Quick check of all running Vast.ai mining instances.
+Quick check of all running Vast.ai instances for the resurrection project.
 
-## Instructions
+## Quick Status Check
 
 1. List all instances:
    ```bash
    resurrection/.venv/bin/vastai show instances
    ```
 
-2. For each running instance, get the current block:
+2. Get block number from an instance:
    ```bash
-   for port in 34180 34372 20870; do
-     ssh_host="ssh1.vast.ai"
-     [ "$port" = "34372" ] && ssh_host="ssh2.vast.ai"
-     [ "$port" = "20870" ] && ssh_host="ssh6.vast.ai"
-     result=$(ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p $port root@$ssh_host \
-       'curl -s http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" \
-        -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}"' 2>&1 | grep '^{')
-     block_hex=$(echo "$result" | grep -o '"result":"[^"]*"' | cut -d'"' -f4)
-     block_num=$(printf "%d" $block_hex 2>/dev/null)
-     echo "Port $port ($ssh_host): Block $block_num"
-   done
+   ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p PORT root@HOST \
+     "curl -s -X POST -H 'Content-Type: application/json' \
+      --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \
+      http://127.0.0.1:8545" | python3 -c 'import sys,json; print(int(json.load(sys.stdin)["result"], 16))'
    ```
 
-3. Check GPU utilization on mining instances:
+3. Get full block details (number, difficulty, timestamp):
    ```bash
-   ssh -o ConnectTimeout=10 -p PORT root@HOST "nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv"
+   ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p PORT root@HOST \
+     "curl -s -X POST -H 'Content-Type: application/json' \
+      --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"latest\", false],\"id\":1}' \
+      http://127.0.0.1:8545"
    ```
+
+4. Check GPU utilization:
+   ```bash
+   ssh -o ConnectTimeout=10 -p PORT root@HOST "nvidia-smi --query-gpu=name,utilization.gpu,temperature.gpu --format=csv"
+   ```
+
+## Current Sync Node
+
+The sync node serves chaindata to all miners. Get current connection details:
+
+```bash
+resurrection/.venv/bin/vastai show instances
+# Look for the running instance, note SSH host and port
+```
 
 ## Output Format
 
 Present results as a table:
 
-| ID | GPU | Host | Port | Block | GPU Util |
-|----|-----|------|------|-------|----------|
+| Instance ID | GPU | SSH Host | SSH Port | Block | Difficulty | Status |
+|-------------|-----|----------|----------|-------|------------|--------|
+
+## Mining Status Commands (via SSH to sync node)
+
+- **Check mining:** `eth_mining` RPC method
+- **Check hashrate:** `eth_hashrate` RPC method
+- **Start mining:** `miner_start` RPC method
+- **Stop mining:** `miner_stop` RPC method
 
 ## Notes
 
-- Instance IDs and ports may change - check `resurrection/STATUS.md` for current values
-- Use vastai CLI output to get current instance details before SSH
+- Instance SSH details change when instances restart - always check `vastai show instances` first
+- The sync node exposes P2P port for external miners (ThinkPads, MacBooks)
+- Static nodes file points miners to the sync node's P2P port

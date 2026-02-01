@@ -1,32 +1,76 @@
 # Resurrection Mining Status
 
-Check and manage the Homestead resurrection GPU mining operation.
+Check and manage the Homestead resurrection mining operation.
 
 ## Environment
 
 - **Vastai CLI:** `resurrection/.venv/bin/vastai`
 - **Status file:** `resurrection/STATUS.md`
 - **Deploy script:** `resurrection/deploy-vast.sh`
+- **Mining script:** `resurrection/mining-script.sh`
 
-## Instructions
+## Check Current Status
 
-1. First, read `resurrection/STATUS.md` to understand current state and available commands
-2. Use the vastai CLI to list instances:
+1. List running instances:
    ```bash
    resurrection/.venv/bin/vastai show instances
    ```
-3. SSH to instances to get live block numbers:
+
+2. Get block and difficulty from sync node:
    ```bash
    ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p PORT root@HOST \
      "curl -s -X POST -H 'Content-Type: application/json' \
-      --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \
-      http://127.0.0.1:8545" | python3 -c 'import sys,json; print(int(json.load(sys.stdin)["result"], 16))'
+      --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"latest\", false],\"id\":1}' \
+      http://127.0.0.1:8545"
    ```
-4. Report status in markdown table format with columns: Block, Status, Date/Time, Difficulty, Est. Time, Actual Time
-5. If updating STATUS.md, fetch actual difficulty values from the chain - don't rely on formula estimates
+   Parse with Python: `int(result["number"], 16)` for block, `int(result["difficulty"], 16)` for difficulty.
+
+## Mining Controls
+
+- **Start mining:** `curl -X POST -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","method":"miner_start","params":[],"id":1}' http://127.0.0.1:8545`
+- **Stop mining:** `curl -X POST -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","method":"miner_stop","params":[],"id":1}' http://127.0.0.1:8545`
+- **Check hashrate:** `eth_hashrate` RPC method
+
+## Generate Geth Bundles
+
+For desktop miners to join the resurrection chain:
+
+```bash
+cd resurrection
+
+# Generate Windows bundle with mining support
+./generate-geth-1.3.6-windows.sh
+
+# Generate macOS bundles with mining support
+./generate-geth-1.4.0-macos.sh    # First macOS version
+./generate-geth-1.4.18-macos.sh   # Better macOS compatibility
+
+# Generate node keys first if needed
+./generate-keys.sh
+```
+
+Output bundles include:
+- `run.bat`/`run.sh` - Sync only
+- `run-mine.bat`/`run-mine.sh` - Sync AND mine to resurrection address
+
+Mining address: `0x3ca943ef871bea7d0dfa34bff047b0e82be441ef`
+
+## Difficulty Charts
+
+Charts are in `resurrection/generated-files/`:
+- `resurrection_chart.png` - Difficulty vs block number (log scale)
+- `resurrection_chart_timeline.png` - Difficulty vs date/time (log scale)
 
 ## Key Metrics
 
-- Target: Block 1920316 (~10 MH = CPU-mineable)
-- Hashrate: ~1692 MH/s (2x 8x RTX 3090)
-- Difficulty reduction: ~4.83% per block (Homestead EIP-2)
+- **Current phase:** ThinkPads-only mining (~60 KH/s)
+- **Target equilibrium:** ~0.9 MH for 15-second blocks @ 60 KH/s
+- **Difficulty reduction:** ~4.83% per block (Homestead EIP-2) when block times > 1000s
+- **Plateau phase:** Slower reduction when block times < 1000s
+
+## Homestead EIP-2 Difficulty Formula
+
+```python
+diff_adj = max(1 - (block_time // 10), -99)
+new_diff = parent_diff + (parent_diff // 2048) * diff_adj
+```
