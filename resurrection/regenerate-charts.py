@@ -19,9 +19,10 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import FuncFormatter
 from datetime import datetime
-import subprocess
+import csv
 import json
 import os
+import subprocess
 
 # Color palette
 CYAN = '#00F0FF'
@@ -33,28 +34,75 @@ TEXT = '#e8e8e8'
 GRID = '#888888'
 BORDER = '#2a2a4a'
 
-# Sync node connection
-SYNC_HOST = '1.208.108.242'
-SYNC_PORT = '46761'
+# Sync node connection (override via env)
+SYNC_HOST = os.environ.get('SYNC_HOST', '1.208.108.242')
+SYNC_PORT = os.environ.get('SYNC_PORT', '46761')
+SYNC_USER = os.environ.get('SYNC_USER', 'root')
+
+# Mining constants (override via env)
+HASHRATE = float(os.environ.get('HASHRATE', '1692000000'))  # 2 x 8x RTX 3090
+REDUCTION = float(os.environ.get('REDUCTION', '0.0483'))
+
+def _rpc_call(method, params):
+    payload = {"jsonrpc": "2.0", "method": method, "params": params, "id": 1}
+    cmd = [
+        "ssh",
+        "-o",
+        "ConnectTimeout=10",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-p",
+        str(SYNC_PORT),
+        f"{SYNC_USER}@{SYNC_HOST}",
+        "curl",
+        "-s",
+        "-X",
+        "POST",
+        "-H",
+        "Content-Type: application/json",
+        "--data",
+        json.dumps(payload),
+        "http://127.0.0.1:8545",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "RPC call failed")
+    raw = result.stdout.strip()
+    if not raw:
+        raise RuntimeError("Empty RPC response")
+    start = raw.find("{")
+    if start == -1:
+        raise RuntimeError(f"Non-JSON RPC response: {raw[:200]}")
+    data = json.loads(raw[start:])
+    if "error" in data:
+        raise RuntimeError(f"RPC error: {data['error']}")
+    return data.get("result")
+
 
 def get_block(block_num):
     """Fetch block data from sync node."""
-    if block_num == "latest":
-        hex_num = "latest"
-    else:
-        hex_num = hex(block_num)
-
-    cmd = f'''ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -p {SYNC_PORT} root@{SYNC_HOST} 'curl -s -X POST -H "Content-Type: application/json" --data "{{\\"jsonrpc\\":\\"2.0\\",\\"method\\":\\"eth_getBlockByNumber\\",\\"params\\":[\\"{hex_num}\\", false],\\"id\\":1}}" http://127.0.0.1:8545' 2>/dev/null'''
-
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    data = json.loads(result.stdout)
-    block = data["result"]
-
+    hex_num = "latest" if block_num == "latest" else hex(block_num)
+    block = _rpc_call("eth_getBlockByNumber", [hex_num, False])
+    if not block:
+        raise RuntimeError(f"Missing block data for {block_num}")
+    txs = block.get("transactions") or []
     return {
         "number": int(block["number"], 16),
         "difficulty": int(block["difficulty"], 16),
-        "timestamp": int(block["timestamp"], 16)
+        "total_difficulty": int(block.get("totalDifficulty") or "0x0", 16),
+        "timestamp": int(block["timestamp"], 16),
+        "hash": block.get("hash") or "",
+        "miner": block.get("miner") or "",
+        "gas_used": int(block.get("gasUsed") or "0x0", 16),
+        "gas_limit": int(block.get("gasLimit") or "0x0", 16),
+        "size": int(block.get("size") or "0x0", 16),
+        "tx_count": len(txs),
     }
+
+
+def get_latest_block_number():
+    raw = _rpc_call("eth_blockNumber", [])
+    return int(raw, 16)
 
 def format_difficulty(x, pos):
     """Format difficulty for Y-axis labels."""
@@ -66,6 +114,41 @@ def format_difficulty(x, pos):
         return f'{x/1e6:.0f} MH'
     else:
         return f'{x:.0f}'
+
+
+def format_diff_value(value):
+    if value >= 1e12:
+        return f'{value/1e12:.2f} TH'
+    if value >= 1e9:
+        return f'{value/1e9:.2f} GH'
+    if value >= 1e6:
+        return f'{value/1e6:.2f} MH'
+    return f'{value:.0f} H'
+
+
+def format_int(value):
+    return f"{int(value):,}"
+
+
+def format_time_hours(hours):
+    if hours is None:
+        return "-"
+    if hours >= 24:
+        return f"{hours/24:.1f}d"
+    if hours >= 1:
+        return f"{hours:.1f}h"
+    minutes = hours * 60
+    if minutes >= 1:
+        return f"{minutes:.1f}m"
+    return f"{hours*3600:.1f}s"
+
+
+def short_hash(value):
+    if not value:
+        return "-"
+    if len(value) <= 12:
+        return value
+    return f"{value[:10]}...{value[-6:]}"
 
 def generate_chart(blocks_data, output_dir):
     """Generate the difficulty vs time chart."""
@@ -187,6 +270,155 @@ def generate_table(daily_blocks, output_dir):
 
     print(f"\nTable saved to {output_dir}/resurrection_table.png and .svg")
 
+
+def generate_matrix(output_dir, last_blocks, latest_block):
+    last_start = min(last_blocks)
+    needed_blocks = set(last_blocks)
+    needed_blocks.add(last_start - 1)
+
+    blocks = {}
+    for bn in sorted(needed_blocks):
+        if bn < 0:
+            continue
+        blocks[bn] = get_block(bn)
+
+    latest = blocks[latest_block]
+    last_mined_ts = latest["timestamp"]
+    last_mined_diff = latest["difficulty"]
+    current_mining_block = latest_block + 1
+
+    rows = []
+    for bn in last_blocks:
+        block = blocks.get(bn)
+        prev = blocks.get(bn - 1)
+        actual_hours = None
+        if block and prev:
+            actual_hours = (block["timestamp"] - prev["timestamp"]) / 3600
+        est_hours = block["difficulty"] / HASHRATE / 3600 if block else None
+        dt = datetime.utcfromtimestamp(block["timestamp"]).strftime("%Y-%m-%d %H:%M") if block else "-"
+        rows.append({
+            "block": bn,
+            "status": "MINED",
+            "datetime": dt,
+            "difficulty": format_diff_value(block["difficulty"]) if block else "-",
+            "total_difficulty": format_diff_value(block["total_difficulty"]) if block else "-",
+            "tx_count": format_int(block["tx_count"]) if block else "-",
+            "gas_used": format_int(block["gas_used"]) if block else "-",
+            "gas_limit": format_int(block["gas_limit"]) if block else "-",
+            "size": format_int(block["size"]) if block else "-",
+            "miner": block["miner"] if block else "-",
+            "hash": short_hash(block["hash"]) if block else "-",
+            "est_time": format_time_hours(est_hours),
+            "actual_time": format_time_hours(actual_hours),
+        })
+
+    rows.append({
+        "block": "...",
+        "status": "",
+        "datetime": "",
+        "difficulty": "",
+        "total_difficulty": "",
+        "tx_count": "",
+        "gas_used": "",
+        "gas_limit": "",
+        "size": "",
+        "miner": "",
+        "hash": "",
+        "est_time": "",
+        "actual_time": "",
+    })
+
+    cumulative_hours = 0.0
+    prev_diff = last_mined_diff
+    for i in range(1, 21):
+        bn = latest_block + i
+        diff = prev_diff * (1 - REDUCTION)
+        prev_diff = diff
+        est_hours = diff / HASHRATE / 3600
+        cumulative_hours += est_hours
+        est_dt = datetime.utcfromtimestamp(last_mined_ts + int(cumulative_hours * 3600))
+        status = "MINING" if bn == current_mining_block else "pending"
+        dt_str = "-" if status == "MINING" else f"~{est_dt.strftime('%Y-%m-%d %H:%M')}"
+        rows.append({
+            "block": bn,
+            "status": status,
+            "datetime": dt_str,
+            "difficulty": format_diff_value(diff),
+            "total_difficulty": "-",
+            "tx_count": "-",
+            "gas_used": "-",
+            "gas_limit": "-",
+            "size": "-",
+            "miner": "-",
+            "hash": "-",
+            "est_time": format_time_hours(est_hours),
+            "actual_time": "-",
+        })
+
+    md_path = os.path.join(output_dir, "mining_matrix.md")
+    csv_path = os.path.join(output_dir, "mining_matrix.csv")
+
+    headers = [
+        "Block",
+        "Status",
+        "Date/Time (UTC)",
+        "Difficulty",
+        "Total Difficulty",
+        "Tx Count",
+        "Gas Used",
+        "Gas Limit",
+        "Size (bytes)",
+        "Miner",
+        "Hash",
+        "Est. Time",
+        "Actual Time",
+    ]
+
+    with open(md_path, "w", encoding="utf-8") as md:
+        md.write("| " + " | ".join(headers) + " |\n")
+        md.write("|" + "|".join(["---"] * len(headers)) + "|\n")
+        for row in rows:
+            md.write(
+                "| {block} | {status} | {datetime} | {difficulty} | {total_difficulty} | {tx_count} | "
+                "{gas_used} | {gas_limit} | {size} | {miner} | {hash} | {est_time} | {actual_time} |\n".format(
+                    block=row["block"],
+                    status=row["status"],
+                    datetime=row["datetime"],
+                    difficulty=row["difficulty"],
+                    total_difficulty=row["total_difficulty"],
+                    tx_count=row["tx_count"],
+                    gas_used=row["gas_used"],
+                    gas_limit=row["gas_limit"],
+                    size=row["size"],
+                    miner=row["miner"],
+                    hash=row["hash"],
+                    est_time=row["est_time"],
+                    actual_time=row["actual_time"],
+                )
+            )
+
+    with open(csv_path, "w", newline="", encoding="utf-8") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(headers)
+        for row in rows:
+            writer.writerow([
+                row["block"],
+                row["status"],
+                row["datetime"],
+                row["difficulty"],
+                row["total_difficulty"],
+                row["tx_count"],
+                row["gas_used"],
+                row["gas_limit"],
+                row["size"],
+                row["miner"],
+                row["hash"],
+                row["est_time"],
+                row["actual_time"],
+            ])
+
+    print(f"\nMatrix saved to {md_path} and {csv_path}")
+
 def main():
     # Ensure output directory exists
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -194,7 +426,8 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     print("Fetching latest block from sync node...")
-    latest = get_block("latest")
+    latest_number = get_latest_block_number()
+    latest = get_block(latest_number)
     print(f"Latest: Block {latest['number']:,}, Difficulty {latest['difficulty']/1e9:.3f} GH")
     print()
 
@@ -234,11 +467,15 @@ def main():
         (1920074, "Jan 26"),
         (1920538, "Jan 27"),
         (1920581, "Jan 28"),
-        (latest['number'], "Jan 29"),
+    (latest['number'], "Jan 29"),
     ]
 
     print("\nGenerating table...")
     generate_table(daily_blocks, output_dir)
+
+    print("\nGenerating last/next 20 block matrix...")
+    last_blocks = list(range(max(0, latest['number'] - 19), latest['number'] + 1))
+    generate_matrix(output_dir, last_blocks, latest['number'])
 
     print("\nDone!")
 

@@ -520,204 +520,131 @@ TABLE_EOF
 
 ## Chart Generation
 
-Generate a difficulty curve chart showing the exponential reduction from ~59 TH to 10 MH.
+Generate two difficulty charts showing the resurrection progress.
 
 **Output files:**
-- `resurrection/generated-files/resurrection_chart.png`
-- `resurrection/generated-files/resurrection_chart.svg`
+- `resurrection/generated-files/resurrection_chart.png` - Difficulty vs Block Number
+- `resurrection/generated-files/resurrection_chart_timeline.png` - Difficulty vs Time
 
-**Python environment:** `resurrection/.venv/` (matplotlib installed via requirements.txt)
+**Python environment:** `resurrection/.venv/` (matplotlib installed)
 
-### Color Scheme (matches infographic.html)
+### Chart Style Requirements
+
+Both charts must follow this exact style:
+- **Y-axis:** Difficulty (log scale, 1 MH to 100 TH)
+- **Gridlines:** Major only (10 MH, 100 MH, 1 GH, etc.) - no minor gridlines
+- **Line:** Cyan (`#00F0FF`) connecting all data points
+- **Data points:** Magenta (`#FF55CC`) circle at EVERY block
+- **Current block:** Yellow (`#FFE739`) star marker
+- **Background:** Dark (`#1a1a2e`)
+- **Timeline chart:** Vertical day labels
+
+### Step 1: Fetch ALL Block Data from Chain
+
+Use JSON-RPC batching (100 blocks per request) to fetch all blocks efficiently:
 
 ```python
-CYAN = '#00F0FF'      # Primary accent, difficulty curve
-MAGENTA = '#FF55CC'   # Mined blocks
-YELLOW = '#FFE739'    # Highlights, current/target markers
-PURPLE = '#6245EB'    # Secondary accent
-BG_DARK = '#1a1a2e'   # Background
-BG_CELL = '#16213e'   # Cell/panel background
-GRAY = '#888888'      # Grid lines, separator rows
+import subprocess, json
+
+all_data = []
+batch_size = 100
+CURRENT = 1923350  # Update this
+
+for start in range(1920000, CURRENT + 1, batch_size):
+    end = min(start + batch_size, CURRENT + 1)
+    requests = [{"jsonrpc": "2.0", "method": "eth_getBlockByNumber",
+                 "params": [hex(b), False], "id": b} for b in range(start, end)]
+    batch_json = json.dumps(requests).replace('"', '\\"')
+    cmd = f'''ssh -p 20870 root@ssh6.vast.ai 'curl -s -X POST -H "Content-Type: application/json" --data "{batch_json}" http://127.0.0.1:8545' '''
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
+    responses = json.loads(result.stdout)
+    for resp in responses:
+        if resp.get("result"):
+            r = resp["result"]
+            all_data.append((int(r["number"], 16), int(r["difficulty"], 16), int(r["timestamp"], 16)))
+
+# Save to CSV
+with open('/tmp/all_blocks.csv', 'w') as f:
+    for block, diff, ts in sorted(all_data):
+        f.write(f"{block},{diff},{ts}\n")
 ```
 
-### Chart Layout
-
-- **Top chart:** Difficulty vs Block (log scale)
-  - X-axis: Block number (1919995 to 1920325)
-  - Y-axis: Difficulty (log scale, 1 MH to 100 TH)
-  - Cyan line for projected difficulty curve
-  - **Magenta scatter dots for each mined block**
-  - Yellow star for current block, green line for target
-
-- **Bottom chart:** Time per block (LINE GRAPH, not bar chart)
-  - Cyan line with fill for projected block times
-  - **Magenta scatter dots for each mined block** (same as top chart)
-  - Yellow vertical line for current position
-  - Use `ax.scatter()` for mined blocks in BOTH panels
-
-### Key Annotations
-
-| Block | Label | Color |
-|-------|-------|-------|
-| 1919999 | "Last Homestead Block" | Gray |
-| 1920000 | "RESURRECTION!" | Magenta |
-| Current | "MINING NOW" | Yellow |
-| 1920316 | "CPU-MINEABLE!" | Yellow |
-
-### To Generate the Chart
+### Step 2: Generate Charts
 
 ```bash
 source resurrection/.venv/bin/activate && python3 << 'CHART_EOF'
 import matplotlib.pyplot as plt
-import numpy as np
-from datetime import datetime, timedelta
+from matplotlib.lines import Line2D
+from matplotlib.dates import DayLocator, DateFormatter
+from datetime import datetime, timezone
 
-# Constants
-HASHRATE = 1692e6  # 2x 8x RTX 3090
-REDUCTION = 0.0483
-TARGET = 10e6
-START_DIFF = 59.36e12
-
-# Color scheme (matches infographic)
 CYAN, MAGENTA, YELLOW = '#00F0FF', '#FF55CC', '#FFE739'
 BG_DARK = '#1a1a2e'
 
-# UPDATE THIS: Historical mined blocks (actual values from chain)
-actual_blocks = {
-    1920000: {"diff": 59.36e12, "date": datetime(2026, 1, 15, 7, 38), "label": "RESURRECTION!"},
-    1920001: {"diff": 56.49e12, "date": datetime(2026, 1, 16, 18, 29)},
-    1920002: {"diff": 53.76e12, "date": datetime(2026, 1, 17, 8, 22)},
-    1920003: {"diff": 51.16e12, "date": datetime(2026, 1, 17, 20, 3)},
-    1920004: {"diff": 48.69e12, "date": datetime(2026, 1, 18, 5, 17)},
-    1920005: {"diff": 46.34e12, "date": datetime(2026, 1, 18, 10, 19)},
-    1920006: {"diff": 44.10e12, "date": datetime(2026, 1, 18, 15, 32)},
-    1920007: {"diff": 41.96e12, "date": datetime(2026, 1, 18, 16, 6)},
-    1920008: {"diff": 39.93e12, "date": datetime(2026, 1, 19, 6, 57)},
-    1920009: {"diff": 38.00e12, "date": datetime(2026, 1, 19, 18, 17)},
-    1920010: {"diff": 36.17e12, "date": datetime(2026, 1, 19, 22, 57)},
-    1920011: {"diff": 34.42e12, "date": datetime(2026, 1, 20, 2, 11)},
-    1920012: {"diff": 32.75e12, "date": datetime(2026, 1, 20, 5, 44)},
-    1920013: {"diff": 31.17e12, "date": datetime(2026, 1, 20, 8, 8)},
-    1920014: {"diff": 30.88e12, "date": datetime(2026, 1, 20, 8, 11)},
-    1920015: {"diff": 29.39e12, "date": datetime(2026, 1, 20, 19, 27)},
-    1920016: {"diff": 27.97e12, "date": datetime(2026, 1, 21, 1, 30)},
-    1920017: {"diff": 26.62e12, "date": datetime(2026, 1, 21, 6, 50)},
-    1920018: {"diff": 25.33e12, "date": datetime(2026, 1, 21, 11, 16)},
-    1920019: {"diff": 24.10e12, "date": datetime(2026, 1, 21, 15, 58)},
-    1920020: {"diff": 22.94e12, "date": datetime(2026, 1, 22, 0, 52)},
-    1920021: {"diff": 21.87e12, "date": datetime(2026, 1, 22, 1, 8)},
-    1920022: {"diff": 20.81e12, "date": datetime(2026, 1, 22, 20, 21)},
-    1920023: {"diff": 19.80e12, "date": datetime(2026, 1, 23, 2, 49)},
-    1920024: {"diff": 18.85e12, "date": datetime(2026, 1, 23, 14, 3)},
-    1920025: {"diff": 17.94e12, "date": datetime(2026, 1, 23, 17, 0)},
-    1920026: {"diff": 17.07e12, "date": datetime(2026, 1, 23, 17, 20)},
-    1920027: {"diff": 16.24e12, "date": datetime(2026, 1, 23, 21, 59)},
-    1920028: {"diff": 15.46e12, "date": datetime(2026, 1, 24, 0, 10)},
-    1920029: {"diff": 14.71e12, "date": datetime(2026, 1, 24, 3, 41)},
-    1920030: {"diff": 14.00e12, "date": datetime(2026, 1, 24, 12, 23)},
-    1920031: {"diff": 13.32e12, "date": datetime(2026, 1, 24, 15, 58)},
-}
+# Load all blocks from CSV
+data = []
+with open('/tmp/all_blocks.csv', 'r') as f:
+    for line in f:
+        parts = line.strip().split(',')
+        if len(parts) == 3:
+            data.append((int(parts[0]), int(parts[1]), int(parts[2])))
 
-# UPDATE THIS: Current block being mined
-current_mining_block = 1920032
+data.sort()
+blocks = [d[0] for d in data]
+diffs = [d[1] for d in data]
+dates = [datetime.fromtimestamp(d[2], tz=timezone.utc) for d in data]
+current_block = blocks[-1]
 
-# Generate difficulty curve
-blocks, difficulties = [], []
-diff = START_DIFF
-for b in range(1920000, 1920320):
-    blocks.append(b)
-    difficulties.append(actual_blocks[b]["diff"] if b in actual_blocks else diff)
-    diff *= (1 - REDUCTION)
+legend_elements = [
+    Line2D([0], [0], color=CYAN, linewidth=2, label='Difficulty curve'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor=MAGENTA, markersize=6, linestyle='None', label='Blocks'),
+    Line2D([0], [0], marker='*', color='w', markerfacecolor=YELLOW, markersize=12, linestyle='None', label=f'Current ({current_block})'),
+]
 
-target_idx = next(i for i, d in enumerate(difficulties) if d <= TARGET)
-target_block = blocks[target_idx]
-
-# Create figure
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 12), gridspec_kw={'height_ratios': [2, 1]})
-fig.patch.set_facecolor(BG_DARK)
-
-# Top: Log-scale difficulty curve
+# Chart 1: Block Number vs Difficulty
+fig1, ax1 = plt.subplots(figsize=(16, 9))
+fig1.patch.set_facecolor(BG_DARK)
 ax1.set_facecolor('#16213e')
-ax1.semilogy(blocks, difficulties, color=CYAN, linewidth=2.5)
-ax1.axhline(y=TARGET, color=YELLOW, linestyle='--', linewidth=2, alpha=0.8)
-ax1.scatter([target_block], [TARGET], color=YELLOW, s=200, marker='D', edgecolors='white', zorder=6)
-
-# Mark mined blocks
-mined = [b for b in blocks if b in actual_blocks]
-ax1.scatter(mined, [actual_blocks[b]["diff"] for b in mined], color=MAGENTA, s=120, zorder=5, edgecolors='white')
-
-# Add annotations
-ax1.annotate('RESURRECTION!\nBlock 1920000', xy=(1920000, 59.36e12),
-             xytext=(1920030, 59.36e12), fontsize=10, color=MAGENTA, fontweight='bold',
-             arrowprops=dict(arrowstyle='->', color=MAGENTA, lw=1.5),
-             bbox=dict(boxstyle='round,pad=0.3', facecolor='#16213e', edgecolor=MAGENTA, alpha=0.9))
-
-ax1.annotate(f'CPU-MINEABLE!\nBlock {target_block}\n10 MH', xy=(target_block, TARGET),
-             xytext=(target_block - 60, 1e8), fontsize=10, color=YELLOW, fontweight='bold',
-             arrowprops=dict(arrowstyle='->', color=YELLOW, lw=1.5),
-             bbox=dict(boxstyle='round,pad=0.3', facecolor='#16213e', edgecolor=YELLOW, alpha=0.9))
-
-ax1.set_xlabel('Block Number', fontsize=12, color='white')
-ax1.set_ylabel('Difficulty', fontsize=12, color='white')
-ax1.set_title('ETHEREUM TIME MACHINE: Homestead Resurrection\nDifficulty Reduction Progress',
-              fontsize=16, color=CYAN, fontweight='bold')
-ax1.tick_params(colors='white')
-ax1.grid(True, alpha=0.3)
-ax1.set_xlim(1919995, 1920325)
-ax1.set_ylim(1e6, 1e14)
+ax1.semilogy(blocks, diffs, color=CYAN, linewidth=1.5, zorder=1)
+ax1.scatter(blocks, diffs, color=MAGENTA, s=8, zorder=2, alpha=0.7)
+ax1.scatter([current_block], [diffs[-1]], color=YELLOW, s=200, marker='*', zorder=3, edgecolors='white')
+ax1.set_xlabel('Block Number', fontsize=14, color='white')
+ax1.set_ylabel('Difficulty', fontsize=14, color='white')
+ax1.set_title('Resurrection: Difficulty vs Block Number', fontsize=18, color=CYAN, fontweight='bold')
 ax1.set_yticks([1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13])
 ax1.set_yticklabels(['1 MH', '10 MH', '100 MH', '1 GH', '10 GH', '100 GH', '1 TH', '10 TH'])
+ax1.tick_params(colors='white')
+ax1.grid(True, alpha=0.3, which='major')
+ax1.minorticks_off()
 for spine in ax1.spines.values(): spine.set_color(CYAN)
-
-# Legend
-legend_elements = [
-    plt.Line2D([0], [0], color=CYAN, linewidth=2.5, label='Difficulty Curve'),
-    plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=MAGENTA, markersize=10, label='Mined Blocks', linestyle='None'),
-    plt.Line2D([0], [0], marker='D', color='w', markerfacecolor=YELLOW, markersize=10, label='Target (CPU-mineable)', linestyle='None'),
-]
-ax1.legend(handles=legend_elements, loc='upper right', facecolor='#16213e', edgecolor=CYAN,
-           labelcolor='white', fontsize=9)
-
-# Bottom: Time per block line graph
-ax2.set_facecolor('#16213e')
-times = [d / HASHRATE / 3600 for d in difficulties]
-
-# Plot continuous line for all blocks
-ax2.plot(blocks, times, color=CYAN, linewidth=2, label='Est. Mining Time')
-
-# Mark mined blocks
-mined_blocks_list = [b for b in blocks if b in actual_blocks]
-mined_times = [times[b - 1920000] for b in mined_blocks_list]
-ax2.scatter(mined_blocks_list, mined_times, color=MAGENTA, s=60, zorder=5, edgecolors='white', label='Mined')
-
-# Mark current mining block
-ax2.scatter([current_mining_block], [times[current_mining_block - 1920000]],
-            color=YELLOW, s=120, marker='*', zorder=6, edgecolors='white', label='Mining Now')
-
-# Mark target block
-ax2.scatter([target_block], [times[target_block - 1920000]],
-            color=YELLOW, s=120, marker='D', zorder=6, edgecolors='white', label='CPU Target')
-
-ax2.set_xlabel('Block Number', fontsize=12, color='white')
-ax2.set_ylabel('Hours to Mine', fontsize=12, color='white')
-ax2.set_title('Estimated Mining Time per Block (2x 8x RTX 3090 = 1692 MH/s)', fontsize=12, color=CYAN)
-ax2.tick_params(colors='white')
-ax2.grid(True, alpha=0.3)
-ax2.set_xlim(1919995, 1920325)
-ax2.legend(loc='upper right', facecolor='#16213e', edgecolor=CYAN, labelcolor='white', fontsize=9)
-for spine in ax2.spines.values(): spine.set_color(CYAN)
-
-# Summary stats at bottom
-total_hours = sum(times[:target_idx])
-total_days = total_hours / 24
-stats_text = f"Total blocks: {target_block - 1920000} | Est. total time: {total_hours:.0f}h ({total_days:.1f} days) | Target: ~Jan 24, 2026"
-fig.text(0.5, 0.02, stats_text, ha='center', fontsize=11, color=YELLOW,
-         fontweight='bold', bbox=dict(boxstyle='round,pad=0.5', facecolor='#16213e', edgecolor=YELLOW))
-
-plt.tight_layout(rect=[0, 0.05, 1, 1])
+ax1.legend(handles=legend_elements, loc='upper right', facecolor='#16213e', edgecolor=CYAN, labelcolor='white')
+plt.tight_layout()
 plt.savefig('resurrection/generated-files/resurrection_chart.png', dpi=150, facecolor=BG_DARK, bbox_inches='tight')
-plt.savefig('resurrection/generated-files/resurrection_chart.svg', facecolor=BG_DARK, bbox_inches='tight')
-print(f"Chart saved. Target: block {target_block}")
+plt.close()
+
+# Chart 2: Time vs Difficulty (vertical day labels)
+fig2, ax2 = plt.subplots(figsize=(16, 9))
+fig2.patch.set_facecolor(BG_DARK)
+ax2.set_facecolor('#16213e')
+ax2.semilogy(dates, diffs, color=CYAN, linewidth=1.5, zorder=1)
+ax2.scatter(dates, diffs, color=MAGENTA, s=8, zorder=2, alpha=0.7)
+ax2.scatter([dates[-1]], [diffs[-1]], color=YELLOW, s=200, marker='*', zorder=3, edgecolors='white')
+ax2.set_xlabel('Date (UTC)', fontsize=14, color='white')
+ax2.set_ylabel('Difficulty', fontsize=14, color='white')
+ax2.set_title('Resurrection: Difficulty vs Time', fontsize=18, color=CYAN, fontweight='bold')
+ax2.set_yticks([1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13])
+ax2.set_yticklabels(['1 MH', '10 MH', '100 MH', '1 GH', '10 GH', '100 GH', '1 TH', '10 TH'])
+ax2.tick_params(colors='white')
+ax2.grid(True, alpha=0.3, which='major')
+ax2.minorticks_off()
+ax2.xaxis.set_major_locator(DayLocator())
+ax2.xaxis.set_major_formatter(DateFormatter('%b %d'))
+plt.setp(ax2.xaxis.get_majorticklabels(), rotation=90, ha='center', color='white')
+for spine in ax2.spines.values(): spine.set_color(CYAN)
+ax2.legend(handles=legend_elements, loc='upper right', facecolor='#16213e', edgecolor=CYAN, labelcolor='white')
+plt.tight_layout()
+plt.savefig('resurrection/generated-files/resurrection_chart_timeline.png', dpi=150, facecolor=BG_DARK, bbox_inches='tight')
+print(f"Charts saved. Current: Block {current_block}, Difficulty {diffs[-1]/1e6:.2f} MH")
 CHART_EOF
 ```
 
@@ -776,8 +703,9 @@ actual_time_for_1920010 = timestamp[1920010] - timestamp[1920009]
 
 ## Files
 
-- **Table image:** `resurrection/generated-files/resurrection_table.png` and `.svg`
-- **Chart image:** `resurrection/generated-files/resurrection_chart.png` and `.svg`
+- **Chart 1:** `resurrection/generated-files/resurrection_chart.png` - Difficulty vs Block Number
+- **Chart 2:** `resurrection/generated-files/resurrection_chart_timeline.png` - Difficulty vs Time
+- **Matrix:** `resurrection/generated-files/sync_mining_status.png` - Last 20 + Next 20 blocks
 - **Infographic:** `infographic.html` (open in browser) - **UPDATE when chart/table updated**
 - **Logs:** SSH to instances, see `/root/geth.log` and `/root/ethminer.log`
 - **Deploy script:** `resurrection/deploy-vast.sh`

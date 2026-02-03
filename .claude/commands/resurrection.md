@@ -58,8 +58,30 @@ Mining address: `0x3ca943ef871bea7d0dfa34bff047b0e82be441ef`
 ## Difficulty Charts
 
 Charts are in `resurrection/generated-files/`:
-- `resurrection_chart.png` - Difficulty vs block number (log scale)
-- `resurrection_chart_timeline.png` - Difficulty vs date/time (log scale)
+- `resurrection_chart.png` - Difficulty vs Block Number (log scale Y-axis)
+- `resurrection_chart_timeline.png` - Difficulty vs Time (log scale Y-axis)
+- `sync_mining_status.png` - Last 20 + Next 20 blocks matrix
+
+### Chart Style (ALWAYS follow this)
+
+1. **Fetch ALL blocks from chain** - use JSON-RPC batching (100 blocks per request)
+2. **Two separate chart files** - one by block number, one by time
+3. **Visual style:**
+   - Cyan (`#00F0FF`) line connecting data points
+   - Magenta (`#FF55CC`) circle at EVERY block
+   - Yellow (`#FFE739`) star at current block
+   - Log scale Y-axis with major gridlines only (10 MH, 100 MH, 1 GH, etc.)
+   - Dark background (`#1a1a2e`)
+   - Timeline chart: vertical day labels
+
+### Generate Charts Workflow
+
+See `resurrection/STATUS.md` "Chart Generation" section for full code.
+
+Quick steps:
+1. Get current block number
+2. Batch fetch ALL blocks using JSON-RPC batching (100/request)
+3. Generate charts with matplotlib - circle for every block
 
 ## Key Metrics
 
