@@ -33,6 +33,12 @@ Optional env overrides:
 - `REFRESH_PULSE` (default 1 second)
 - `POLL_INTERVAL` (default 5 seconds)
 
+`/root/DELAY_MODE` can optionally include three numbers:
+`<gap_hi> <target_diff> <gap_lo>`
+
+Example: `1000 2400000 15`
+- Use 1000s gaps until difficulty <= 2.4 MH, then switch to 15s gaps.
+
 ## Usage
 
 ```bash

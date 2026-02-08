@@ -25,12 +25,19 @@ get_latest_ts() {
         python3 -c "import sys,json; b=json.load(sys.stdin).get('result',{}); print(int(b.get('timestamp','0x0'),16))" 2>/dev/null || echo 0
 }
 
+get_latest_diff() {
+    curl -s -X POST -H "Content-Type: application/json" \
+        --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"latest\",false],\"id\":1}" \
+        http://127.0.0.1:8545 | \
+        python3 -c "import sys,json; b=json.load(sys.stdin).get('result',{}); print(int(b.get('difficulty','0x0'),16))" 2>/dev/null || echo 0
+}
+
 get_delay_gap() {
     if [ -f "$DELAY_FILE" ]; then
-        local val
-        val="$(tr -dc '0-9' < "$DELAY_FILE" | head -c 10)"
-        if [ -n "$val" ]; then
-            echo "$val"
+        local nums
+        nums="$(tr -cd '0-9 \n' < "$DELAY_FILE" | tr '\n' ' ' | xargs)"
+        if [ -n "$nums" ]; then
+            echo "$nums"
             return
         fi
         echo "${MIN_BLOCK_GAP:-1000}"
@@ -45,9 +52,23 @@ log() {
 
 last_refresh=0
 while true; do
-    delay_gap="$(get_delay_gap)"
+    delay_cfg="$(get_delay_gap)"
     now_ts="$(date +%s)"
-    if [ -n "$delay_gap" ]; then
+    if [ -n "$delay_cfg" ]; then
+        # Parse config: "gap_hi [target_diff] [gap_lo]"
+        set -- $delay_cfg
+        gap_hi="$1"
+        target_diff="${2:-0}"
+        gap_lo="${3:-$gap_hi}"
+
+        delay_gap="$gap_hi"
+        if [ "$target_diff" -gt 0 ]; then
+            cur_diff="$(get_latest_diff)"
+            if [ "$cur_diff" -le "$target_diff" ]; then
+                delay_gap="$gap_lo"
+            fi
+        fi
+
         latest_ts="$(get_latest_ts)"
         if [ "$latest_ts" -gt 0 ]; then
             since=$((now_ts - latest_ts))
