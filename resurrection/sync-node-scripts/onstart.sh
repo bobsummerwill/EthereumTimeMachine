@@ -15,7 +15,11 @@ sleep 5
 
 # Check mode
 if [ -f /root/MINE_MODE ]; then
-    echo "MINE_MODE enabled - starting work-refresher"
+    if [ -f /root/DELAY_MODE ]; then
+        echo "MINE_MODE + DELAY_MODE enabled - starting work-refresher with gap"
+    else
+        echo "MINE_MODE enabled - starting work-refresher"
+    fi
     nohup /root/work-refresher.sh > /root/work-refresher.log 2>&1 &
 else
     echo "SYNC_MODE (default) - mining disabled"
