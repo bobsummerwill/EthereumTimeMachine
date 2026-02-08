@@ -116,6 +116,7 @@ if [ "$geth_dir" = "$tmp" ]; then
   mv "$tmp/geth" "$tmp/$bundle_name/" 2>/dev/null || true
   mv "$tmp/data" "$tmp/$bundle_name/" 2>/dev/null || true
   mv "$tmp/run.sh" "$tmp/$bundle_name/" 2>/dev/null || true
+  mv "$tmp/run-mine.sh" "$tmp/$bundle_name/" 2>/dev/null || true
   mv "$tmp/README.txt" "$tmp/$bundle_name/" 2>/dev/null || true
 else
   # Rename the extracted directory
