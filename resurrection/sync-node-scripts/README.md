@@ -16,6 +16,7 @@ The sync node operates in two modes:
 
 ### onstart.sh
 Runs on container startup. Checks for `MINE_MODE` file and conditionally starts mining.
+Logs to `/root/onstart.log` and ignores SIGHUP so it can be run safely over SSH.
 
 ### start-sync-node.sh
 Starts geth WITHOUT the `--mine` flag. Used for sync-only mode.
@@ -23,7 +24,14 @@ Starts geth WITHOUT the `--mine` flag. Used for sync-only mode.
 ### work-refresher.sh
 Cycles `miner_stop`/`miner_start` every 60 seconds to prevent work expiration.
 Only runs when `MINE_MODE` is enabled.
-If `/root/DELAY_MODE` exists, enforces a minimum block gap (seconds) before mining.
+If `/root/DELAY_MODE` exists, enforces a minimum block gap (seconds) before mining,
+while still pulsing `miner_start`/`miner_stop` to keep work fresh.
+
+Optional env overrides:
+- `MIN_BLOCK_GAP` (default 1000 when DELAY_MODE exists)
+- `REFRESH_INTERVAL` (default 60)
+- `REFRESH_PULSE` (default 1 second)
+- `POLL_INTERVAL` (default 5 seconds)
 
 ## Usage
 

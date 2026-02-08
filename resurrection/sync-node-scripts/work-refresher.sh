@@ -6,6 +6,8 @@
 set -euo pipefail
 
 REFRESH_INTERVAL="${REFRESH_INTERVAL:-60}"
+POLL_INTERVAL="${POLL_INTERVAL:-5}"
+REFRESH_PULSE="${REFRESH_PULSE:-1}"
 DELAY_FILE="/root/DELAY_MODE"
 
 rpc_call() {
@@ -41,27 +43,46 @@ log() {
     echo "$(date): $*" >> /root/work-refresher.log
 }
 
+last_refresh=0
 while true; do
     delay_gap="$(get_delay_gap)"
+    now_ts="$(date +%s)"
     if [ -n "$delay_gap" ]; then
         latest_ts="$(get_latest_ts)"
-        now_ts="$(date +%s)"
         if [ "$latest_ts" -gt 0 ]; then
             since=$((now_ts - latest_ts))
-            if [ "$since" -lt "$delay_gap" ]; then
-                rpc_call miner_stop
-                remaining=$((delay_gap - since))
-                if [ "$remaining" -gt 30 ]; then
-                    sleep 30
-                else
-                    sleep "$remaining"
-                fi
-                continue
-            fi
+        else
+            since="$delay_gap"
         fi
+
+        if [ "$since" -lt "$delay_gap" ]; then
+            # Enforce minimum gap: keep mining stopped, but pulse start/stop to refresh work.
+            rpc_call miner_stop
+            if [ $((now_ts - last_refresh)) -ge "$REFRESH_INTERVAL" ]; then
+                rpc_call miner_start "[1]"
+                sleep "$REFRESH_PULSE"
+                rpc_call miner_stop
+                last_refresh="$now_ts"
+                log "Delay mode refresh (since=${since}s < gap=${delay_gap}s)"
+            fi
+            sleep "$POLL_INTERVAL"
+            continue
+        fi
+
+        # Gap satisfied: allow mining, keep work fresh.
         rpc_call miner_start "[1]"
+        if [ $((now_ts - last_refresh)) -ge "$REFRESH_INTERVAL" ]; then
+            rpc_call miner_stop
+            sleep 1
+            rpc_call miner_start "[1]"
+            last_refresh="$now_ts"
+            log "Work refreshed (delay mode, gap met)"
+        fi
+        sleep "$POLL_INTERVAL"
+        continue
     fi
 
+    # No delay mode: normal refresher cadence.
     sleep "$REFRESH_INTERVAL"
     rpc_call miner_stop
     sleep 1
