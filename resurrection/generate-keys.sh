@@ -318,7 +318,7 @@ enode://${SYNC_PUBKEY}@<IP>:30303
   echo "  Miner account: hardcoded (embedded in chaindata)"
   echo "  Frontier miner (v1.0.2): seed '$FRONTIER_SEED'"
   echo "  Homestead miner (v1.3.6): seed '$HOMESTEAD_SEED'"
-  echo "  Sync node: seed '$SYNC_SEED'"
+  echo "  Sync node: hardcoded (matches deployed Vast.ai instance)"
   echo ""
   log "Enode IDs (public keys):"
   echo "  Frontier miner:  $FRONTIER_PUBKEY"
