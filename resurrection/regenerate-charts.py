@@ -60,11 +60,11 @@ def _rpc_call(method, params):
         "POST",
         "-H",
         "Content-Type: application/json",
-        "--data",
-        json.dumps(payload),
+        "--data-binary",
+        "@-",
         "http://127.0.0.1:8545",
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, input=json.dumps(payload), capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "RPC call failed")
     raw = result.stdout.strip()
@@ -103,6 +103,58 @@ def get_block(block_num):
 def get_latest_block_number():
     raw = _rpc_call("eth_blockNumber", [])
     return int(raw, 16)
+
+def fetch_block_range(start_block, end_block):
+    """Fetch block number + difficulty (and timestamp) in a single SSH session."""
+    remote_py = r'''
+import json, urllib.request, sys
+
+def rpc(method, params):
+    payload={"jsonrpc":"2.0","method":method,"params":params,"id":1}
+    data=json.dumps(payload).encode()
+    resp=urllib.request.urlopen("http://127.0.0.1:8545", data=data).read()
+    obj=json.loads(resp)
+    return obj.get("result")
+
+start=int(sys.argv[1]); end=int(sys.argv[2])
+for n in range(start, end + 1):
+    b = rpc("eth_getBlockByNumber", [hex(n), False])
+    if not b:
+        continue
+    out = {
+        "number": int(b["number"], 16),
+        "difficulty": int(b["difficulty"], 16),
+        "timestamp": int(b["timestamp"], 16),
+    }
+    print(json.dumps(out))
+'''
+    cmd = [
+        "ssh",
+        "-o",
+        "ConnectTimeout=10",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-p",
+        str(SYNC_PORT),
+        f"{SYNC_USER}@{SYNC_HOST}",
+        "python3",
+        "-",
+        str(start_block),
+        str(end_block),
+    ]
+    result = subprocess.run(cmd, input=remote_py, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "RPC call failed")
+    blocks = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            blocks.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return blocks
 
 def format_difficulty(x, pos):
     """Format difficulty for Y-axis labels."""
@@ -198,6 +250,44 @@ def generate_chart(blocks_data, output_dir):
     plt.close()
 
     print(f"Chart saved to {output_dir}/resurrection_chart.png and .svg")
+
+def generate_block_chart(blocks_data, output_dir):
+    """Generate difficulty vs block number chart."""
+    numbers = [b['number'] for b in blocks_data]
+    diffs = [b['difficulty'] for b in blocks_data]
+
+    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(14, 10))
+    fig.patch.set_facecolor(BACKGROUND)
+    ax.set_facecolor(BACKGROUND)
+
+    ax.semilogy(numbers, diffs, color=CYAN, linewidth=2.0)
+
+    # Latest point
+    ax.semilogy(numbers[-1], diffs[-1], color=YELLOW, marker='*', markersize=18,
+                markeredgecolor=YELLOW, markeredgewidth=1, zorder=10,
+                label=f'Current: {diffs[-1]/1e6:.2f} MH')
+
+    # Target lines
+    ax.axhline(y=1e9, color=YELLOW, linestyle='--', linewidth=1.5, label='1 GH (GPU target)')
+    ax.axhline(y=46e6, color=PINK, linestyle='--', linewidth=1.5, label='46 MH (CPU equilibrium)')
+
+    ax.set_ylabel('Difficulty', color=TEXT, fontsize=14)
+    ax.set_xlabel('Block Number', color=TEXT, fontsize=14)
+    ax.set_title('Ethereum Homestead Resurrection - Difficulty vs Block Number',
+                 color=CYAN, fontsize=16, fontweight='bold')
+
+    ax.grid(True, alpha=0.3, color=GRID)
+    ax.tick_params(colors=TEXT)
+    ax.legend(loc='upper right', facecolor=BACKGROUND, edgecolor=BORDER)
+    ax.yaxis.set_major_formatter(FuncFormatter(format_difficulty))
+
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/resurrection_chart_blocks.png', dpi=150, facecolor=BACKGROUND)
+    plt.savefig(f'{output_dir}/resurrection_chart_blocks.svg', facecolor=BACKGROUND)
+    plt.close()
+
+    print(f"Chart saved to {output_dir}/resurrection_chart_blocks.png and .svg")
 
 def generate_table(daily_blocks, output_dir):
     """Generate the daily progress table."""
@@ -425,57 +515,60 @@ def main():
     output_dir = os.path.join(script_dir, 'generated-files')
     os.makedirs(output_dir, exist_ok=True)
 
+    only_block_chart = os.environ.get("ONLY_BLOCK_CHART", "").lower() in {"1", "true", "yes"}
+
     print("Fetching latest block from sync node...")
     latest_number = get_latest_block_number()
     latest = get_block(latest_number)
     print(f"Latest: Block {latest['number']:,}, Difficulty {latest['difficulty']/1e9:.3f} GH")
     print()
 
-    # Sample blocks for chart
-    sample_blocks = [
-        1920000, 1920001, 1920003, 1920007, 1920010, 1920015, 1920019,
-        1920022, 1920027, 1920031, 1920044, 1920074, 1920200, 1920400,
-        1920538, 1920581, 1920700, 1920810, 1920850, 1920900, latest['number']
-    ]
+    start_block = int(os.environ.get("START_BLOCK", "1919999"))
+    if start_block < 0:
+        start_block = 0
 
-    print("Fetching block data for chart...")
-    blocks_data = []
-    for bn in sample_blocks:
-        if bn <= latest['number']:
+    print("\nFetching block data for full-range charts...")
+    use_bulk = os.environ.get("BLOCK_CHART_BULK", "1") not in {"0", "false", "no"}
+    if use_bulk:
+        block_chart_data = fetch_block_range(start_block, latest['number'])
+    else:
+        block_chart_data = []
+        for bn in range(start_block, latest['number'] + 1):
             try:
                 b = get_block(bn)
-                blocks_data.append(b)
+                block_chart_data.append(b)
             except Exception as e:
                 print(f"Error fetching block {bn}: {e}")
+    if block_chart_data:
+        if not only_block_chart:
+            print(f"\nGenerating time chart with {len(block_chart_data)} data points...")
+            generate_chart(block_chart_data, output_dir)
 
-    print(f"\nGenerating chart with {len(blocks_data)} data points...")
-    generate_chart(blocks_data, output_dir)
+        print(f"Generating block-number chart with {len(block_chart_data)} data points...")
+        generate_block_chart(block_chart_data, output_dir)
+    else:
+        print("No block data available for charts.")
 
-    # Daily blocks for table (last block of each day)
-    daily_blocks = [
-        (1920000, "Jan 15"),
-        (1920001, "Jan 16"),
-        (1920003, "Jan 17"),
-        (1920007, "Jan 18"),
-        (1920010, "Jan 19"),
-        (1920015, "Jan 20"),
-        (1920019, "Jan 21"),
-        (1920022, "Jan 22"),
-        (1920027, "Jan 23"),
-        (1920031, "Jan 24"),
-        (1920044, "Jan 25"),
-        (1920074, "Jan 26"),
-        (1920538, "Jan 27"),
-        (1920581, "Jan 28"),
-    (latest['number'], "Jan 29"),
-    ]
+    if not only_block_chart:
+        # Daily blocks for table (last block of each UTC day, last 15 days)
+        daily_blocks = []
+        if block_chart_data:
+            by_day = {}
+            for b in block_chart_data:
+                day = datetime.utcfromtimestamp(b["timestamp"]).strftime("%Y-%m-%d")
+                by_day[day] = b["number"]
+            days = sorted(by_day.keys())
+            for day in days[-15:]:
+                daily_blocks.append((by_day[day], day))
+        else:
+            daily_blocks = [(latest['number'], datetime.utcfromtimestamp(latest["timestamp"]).strftime("%Y-%m-%d"))]
 
-    print("\nGenerating table...")
-    generate_table(daily_blocks, output_dir)
+        print("\nGenerating table...")
+        generate_table(daily_blocks, output_dir)
 
-    print("\nGenerating last/next 20 block matrix...")
-    last_blocks = list(range(max(0, latest['number'] - 19), latest['number'] + 1))
-    generate_matrix(output_dir, last_blocks, latest['number'])
+        print("\nGenerating last/next 20 block matrix...")
+        last_blocks = list(range(max(0, latest['number'] - 19), latest['number'] + 1))
+        generate_matrix(output_dir, last_blocks, latest['number'])
 
     print("\nDone!")
 
