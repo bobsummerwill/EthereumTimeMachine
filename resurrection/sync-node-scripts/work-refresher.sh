@@ -77,14 +77,11 @@ while true; do
         fi
 
         if [ "$since" -lt "$delay_gap" ]; then
-            # Enforce minimum gap: keep mining stopped, but pulse start/stop to refresh work.
+            # Enforce minimum gap: keep mining stopped (no pulses).
             rpc_call miner_stop
             if [ $((now_ts - last_refresh)) -ge "$REFRESH_INTERVAL" ]; then
-                rpc_call miner_start "[1]"
-                sleep "$REFRESH_PULSE"
-                rpc_call miner_stop
                 last_refresh="$now_ts"
-                log "Delay mode refresh (since=${since}s < gap=${delay_gap}s)"
+                log "Delay mode hold (since=${since}s < gap=${delay_gap}s)"
             fi
             sleep "$POLL_INTERVAL"
             continue
