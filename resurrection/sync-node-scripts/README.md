@@ -39,6 +39,16 @@ Optional env overrides:
 Example: `1000 2400000 15`
 - Use 1000s gaps until difficulty <= 2.4 MH, then switch to 15s gaps.
 
+**Note:** Controlled 1000s-gap mining can only reduce difficulty to the bomb floor
+(~2.71 MH at block ~1.92M). See STATUS.md "Lessons Learned" for details.
+
+### work-refresher-nogap.sh
+Work refresher for flat-out GPU mining (no gap enforcement). Cycles
+`miner_stop`/`miner_start` every 60 seconds solely to prevent the 84-second work
+expiration bug in geth 1.3.6. Use alongside ethminer for continuous GPU mining.
+This is a safety net - if difficulty ever spikes and block time exceeds 84 seconds,
+mining would stall permanently without it.
+
 ## Usage
 
 ```bash

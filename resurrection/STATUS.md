@@ -1,6 +1,6 @@
 # Homestead Resurrection Status
 
-GPU mining operation to extend the historical Ethereum Homestead chain beyond block 1,919,999, reducing difficulty from 62.38 TH to CPU-mineable levels (~10 MH).
+GPU mining operation to extend the historical Ethereum Homestead chain beyond block 1,919,999, reducing difficulty from 62.38 TH and achieving sustainable block times.
 
 **For Claude:** When user asks about vast.ai instances, mining status, current block, difficulty, or resurrection progress, use this file as the reference. Run the status check commands below to get current data, then generate the table and/or chart as needed. **ALWAYS fetch actual block data from the chain** - don't rely on formula estimates which can drift from actual values.
 
@@ -8,31 +8,73 @@ GPU mining operation to extend the historical Ethereum Homestead chain beyond bl
 
 ## Current Status
 
-**Last Updated:** 2026-01-27 06:15 UTC
+**Last Updated:** 2026-02-16
+
+**Mode:** Flat-out GPU mining on GTX 1080 sync node (instance 29980870). Difficulty climbing toward ~500 MH equilibrium with ~20s block times.
 
 | Metric | Value |
 |--------|-------|
-| Current Block | 1920188 (mining 1920189) |
-| Target Block | ~1920320 |
-| Blocks Remaining | ~128 |
-| Current Difficulty | 261 GH |
-| Target Difficulty | 10 MH (CPU-mineable) |
-| Progress | 59% (188/316 blocks) |
-| ETA to CPU-mineable | ~53 min (Mon 2026-01-27 ~07:10 UTC) |
+| Mining Mode | Flat-out GPU (ethminer + OpenCL) |
+| Mining Node | Instance 29980870, GTX 1080 |
+| Expected Equilibrium | ~500 MH difficulty, ~20s blocks |
+| Work Refresher | `work-refresher-nogap.sh` (84s expiry safety net) |
 
 ## Mining Instances (Vast.ai)
 
-| ID | GPU | Status | Utilization | Role | SSH |
-|----|-----|--------|-------------|------|-----|
-| 30034181 | 8x RTX 3090 | Running | 100% | Mining | `ssh -p 19693 root@175.155.64.142` |
-| 30034372 | 8x RTX 3090 | Running | 100% | Mining | `ssh -p 19034 root@175.155.64.234` |
-| 29980870 | 1x GTX 1080 | Running | 0% | Idle sync | `ssh -p 46761 root@1.208.108.242` |
-
-**Combined Hashrate:** ~1692 MH/s (2 × 846 MH/s)
+| ID | GPU | Status | Role | SSH |
+|----|-----|--------|------|-----|
+| 29980870 | 1x GTX 1080 | Running | GPU mining (ethminer) | `ssh -p 20870 root@ssh6.vast.ai` |
+| 31512513 | 1x Quadro P4000 | Stopped | Idle (isolated, no peers) | `ssh -p 32512 root@ssh2.vast.ai` |
 
 **Vastai CLI:** `resurrection/.venv/bin/vastai`
 
-**Note:** SSH addresses are direct IPs. Use `vastai ssh-url <instance_id>` to get current addresses if they change.
+## Lessons Learned: The Wasted Two Weeks (Jan 30 - Feb 16)
+
+### What happened
+
+After the initial GPU mining phase (Jan 15-29) successfully reduced difficulty from 62.38 TH to ~1.26 GH using 16x RTX 3090s, the big GPU instances were shut down. The sync node (GTX 1080) continued mining using `work-refresher.sh` with a 1000s minimum gap between blocks, aiming to drive difficulty to CPU-mineable levels.
+
+Difficulty dropped from 1.26 GH (Jan 29) through 29 MH (Feb 1) to ~2.9 MH (Feb 13), where it stalled and stopped dropping. **Two weeks were spent getting from 29 MH to 2.9 MH with no further progress possible.**
+
+### Why it stalled: the difficulty bomb floor
+
+The Homestead difficulty formula includes a "difficulty bomb":
+```
+bomb = 2^(floor(block_number / 100000) - 2)
+```
+
+At block ~1.92M: `bomb = 2^17 = 131,072` added to every block's difficulty.
+
+The controlled mining with 1000s gaps achieves the maximum EIP-2 reduction of ~4.83% per block (`adjustment = parent_diff // 2048 * -99`). At the floor, this reduction exactly equals the bomb addition:
+```
+parent_diff // 2048 * 99 = 131,072  →  floor ≈ 2.71 MH
+```
+
+**No mining strategy can push difficulty below ~2.71 MH at these block numbers.** The bomb is an absolute floor. On mainnet this was invisible because the bomb (131K) was negligible against 62 TH of difficulty. But after grinding difficulty down by 23,000x, the bomb dominates.
+
+### Why CPU mining doesn't work at the floor
+
+At 2.71 MH with ~90 KH/s (4 laptops), blocks average ~30 seconds. But once natural mining starts, the bomb pushes difficulty up rapidly:
+
+- At 15s block times: `adj_factor = 0`, bomb adds 131K/block unopposed
+- Difficulty rockets from 2.7 MH to ~16-23 MH within hours
+- Equilibrium for 90 KH/s: ~16 MH difficulty, ~3 minute blocks
+
+The 2.71 MH floor **only holds with artificial 1000s gaps**. Natural mining at any hashrate finds a much higher equilibrium.
+
+### The solution: keep a GPU mining
+
+Even a single GPU (~25 MH/s) maintains ~20s blocks at equilibrium (~500 MH). The difficulty is higher but the GPU hashrate more than compensates. The bomb's 131K/block contribution is negligible at 500 MH.
+
+| Setup | Equilibrium Difficulty | Block Time |
+|-------|----------------------|------------|
+| CPUs only (90 KH/s) | 16 MH | ~3 min |
+| GTX 1080 (25 MH/s) | 500 MH | ~20s |
+| Quadro P4000 (22 MH/s) | 440 MH | ~20s |
+| 1x RTX 3090 (106 MH/s) | 2.1 GH | ~20s |
+| 4x RTX 3090 (424 MH/s) | 6.7 GH | ~16s |
+
+All GPU setups snap to the adj=-1 equilibrium band (~20s blocks). The difficulty scales linearly with hashrate, but block time stays constant. Even the cheapest single-GPU Vast.ai instance (~$0.05-0.10/hr) is sufficient.
 
 ## Block History (Mined)
 
