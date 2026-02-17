@@ -45,7 +45,7 @@ Output: `generated-files/geth-windows-v1.3.6.zip`
 
 Create `.env` from `.env.example`:
 ```bash
-VM_IP=35.173.251.232
+VM_IP=44.199.189.113
 VM_USER=ubuntu
 SSH_KEY_PATH=$HOME/Downloads/chain-of-geths-keys.pem
 ```
