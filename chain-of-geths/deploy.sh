@@ -91,6 +91,16 @@ for version in v1.11.6 v1.10.8 v1.9.25 v1.3.6 v1.0.2; do
     docker save ethereumtimemachine/geth:$version > "$DOCKER_IMAGES_DIR/geth-$version.tar"
 done
 
+echo "Copying resurrection charts for slideshow UI..."
+CHARTS_DIR="$SCRIPT_DIR/generated-files/charts"
+mkdir -p "$CHARTS_DIR"
+RESURRECTION_DIR="$SCRIPT_DIR/../resurrection/generated-files"
+for chart in resurrection_chart_blocks.png resurrection_chart.png; do
+    if [ -f "$RESURRECTION_DIR/$chart" ]; then
+        cp "$RESURRECTION_DIR/$chart" "$CHARTS_DIR/"
+    fi
+done
+
 echo "Copying files to VM..."
 
 # Ensure remote directory exists before copying.

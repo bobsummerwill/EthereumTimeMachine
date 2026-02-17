@@ -341,6 +341,25 @@ services:
     networks:
       - ethereum
 
+  # Slideshow UI: cycles between multiple views (sync progress, charts) every 10 seconds.
+  slideshow-ui:
+    build:
+      context: ./monitoring/slideshow-ui
+    container_name: slideshow-ui
+    environment:
+      SYNC_UI_URL: http://sync-ui:8088
+      CHARTS_DIR: /charts
+      PORT: "8089"
+      CYCLE_SECONDS: "10"
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./generated-files/charts:/charts:ro
+    depends_on:
+      - sync-ui
+    networks:
+      - ethereum
+
   grafana:
     image: grafana/grafana:11.3.0
     container_name: grafana
