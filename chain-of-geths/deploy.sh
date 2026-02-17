@@ -264,7 +264,7 @@ echo "Starting base services (top node + monitoring)..."
 # IMPORTANT: compose interpolates environment variables (e.g. HIDE_PROGRESS_NODES_REGEX) when
 # parsing docker-compose.yml. Since we run compose via sudo, explicitly preserve/pass the variable.
 sudo env HIDE_PROGRESS_NODES_REGEX="$HIDE_PROGRESS_NODES_REGEX" \
-  "${COMPOSE[@]}" up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui
+  "${COMPOSE[@]}" up -d --build geth-v1-16-7 lighthouse-v8-0-1 geth-exporter prometheus grafana sync-ui slideshow-ui
 
 # Optional: post-deploy healthcheck.
 #
