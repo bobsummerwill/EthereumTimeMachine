@@ -32,7 +32,7 @@ app.get("/sync", async (req, res) => {
     // `zoom` scales all elements + text uniformly AND reduces the layout box (no scrollbar).
     const fit = `<style>
       html, body { overflow: hidden !important; }
-      .diagram { zoom: 0.72; overflow: hidden !important; }
+      .diagram { zoom: 0.85; overflow: hidden !important; }
     </style>`;
     html = html.replace("</head>", fit + "</head>");
     res.type("html").send(html);
@@ -120,7 +120,10 @@ app.get("/", (req, res) => {
       <iframe src="/sync"></iframe>
     </div>
     <div id="slide-1" class="slide slide-chart">
-      <img src="/charts/resurrection_chart_blocks.png" alt="Resurrection Chart" />
+      <img src="/charts/resurrection_chart.png" alt="Resurrection Chart (Time)" />
+    </div>
+    <div id="slide-2" class="slide slide-chart">
+      <img src="/charts/resurrection_chart_blocks.png" alt="Resurrection Chart (Blocks)" />
     </div>
 
     <div id="indicator"></div>

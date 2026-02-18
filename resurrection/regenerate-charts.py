@@ -281,6 +281,8 @@ def generate_block_chart(blocks_data, output_dir):
     ax.tick_params(colors=TEXT)
     ax.legend(loc='upper right', facecolor=BACKGROUND, edgecolor=BORDER)
     ax.yaxis.set_major_formatter(FuncFormatter(format_difficulty))
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{int(x):,}'))
+    ax.tick_params(axis='x', rotation=30)
 
     plt.tight_layout()
     plt.savefig(f'{output_dir}/resurrection_chart_blocks.png', dpi=150, facecolor=BACKGROUND)
