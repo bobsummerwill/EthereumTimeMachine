@@ -40,21 +40,21 @@ def generate():
             fontfamily='monospace')
 
     specs = [
-        ('ThinkPad T410', 'Intel Core i5, 4 GB memory'),
-        ('Windows 7', 'Authentic 2010-era hardware'),
-        ('Mist Wallet 0.7.4', 'Beta 18 — released 17 May 2016'),
+        ('ThinkPad T410 — Intel Core i5, 4 GB', 'Released 7 January 2010'),
+        ('Windows 7', 'Released 22 October 2009'),
+        ('Mist Wallet 0.7.4', 'Released 17 May 2016'),
         ('Geth 1.3.6', 'Released 25 March 2016'),
     ]
 
     y = specs_title_y - 0.05
     for label, desc in specs:
-        ax.text(0.07, y, '›', fontsize=14, color=CYAN, ha='left', va='top',
+        ax.text(0.07, y, '›', fontsize=18, color=CYAN, ha='left', va='top',
                 transform=ax.transAxes, fontfamily='monospace', fontweight='bold')
-        ax.text(0.10, y, label, fontsize=13, color=TEXT, ha='left', va='top',
+        ax.text(0.11, y, f'{label}  ', fontsize=16, color=TEXT, ha='left', va='top',
                 transform=ax.transAxes, fontfamily='monospace', fontweight='bold')
-        ax.text(0.10, y - 0.030, desc, fontsize=11, color=DIM, ha='left', va='top',
+        ax.text(0.11, y - 0.035, desc, fontsize=13, color=DIM, ha='left', va='top',
                 transform=ax.transAxes, fontfamily='monospace')
-        y -= 0.070
+        y -= 0.075
 
     # What can you do - right column
     ax.text(0.55, specs_title_y, 'TRY IT YOURSELF', fontsize=12, fontweight='bold',
@@ -62,53 +62,37 @@ def generate():
             fontfamily='monospace')
 
     steps = [
-        ('1.', 'Click', 'Send'),
-        ('2.', 'Choose an amount of ETH to send', ''),
-        ('3.', 'Paste the receiver address from', 'Addresses.txt on the desktop'),
-        ('4.', 'Scroll to the bottom and click', 'Send'),
-        ('5.', 'Enter the password:', 'museum'),
+        ('1.', 'Click Send'),
+        ('2.', 'Choose an amount of ETH'),
+        ('3.', 'Paste address from Addresses.txt file'),
+        ('4.', 'Scroll down and click Send'),
+        ('5.', 'Enter password: museum'),
+        ('6.', 'Scroll down to see transactions'),
     ]
 
     y = specs_title_y - 0.05
-    for num, line1, line2 in steps:
-        ax.text(0.57, y, num, fontsize=13, color=CYAN, ha='left', va='top',
+    for num, text in steps:
+        ax.text(0.57, y, num, fontsize=18, color=CYAN, ha='left', va='top',
                 transform=ax.transAxes, fontfamily='monospace', fontweight='bold')
-        ax.text(0.61, y, line1, fontsize=12, color=TEXT, ha='left', va='top',
+        ax.text(0.63, y, text, fontsize=16, color=TEXT, ha='left', va='top',
                 transform=ax.transAxes, fontfamily='monospace')
-        if line2:
-            ax.text(0.61, y - 0.030, line2, fontsize=12, color=YELLOW, ha='left', va='top',
-                    transform=ax.transAxes, fontfamily='monospace', fontweight='bold')
-        y -= 0.070
-
-    # Pending transactions note
-    ax.text(0.55, 0.355, 'Pending and completed transactions are shown',
-            fontsize=10, color=DIM, ha='left', va='top', transform=ax.transAxes,
-            fontfamily='monospace')
-    ax.text(0.55, 0.325, 'at the very bottom of the page if you scroll down.',
-            fontsize=10, color=DIM, ha='left', va='top', transform=ax.transAxes,
-            fontfamily='monospace')
+        y -= 0.075
 
     # Divider line
     ax.plot([0.05, 0.95], [0.26, 0.26], color=BORDER, linewidth=1,
             transform=ax.transAxes)
 
-    # MacBooks section
-    ax.text(0.05, 0.22, 'WHITE MACBOOKS', fontsize=12, fontweight='bold',
-            color=PURPLE, ha='left', va='top', transform=ax.transAxes,
-            fontfamily='monospace')
-    ax.text(0.05, 0.18, 'Browse the early history of Ethereum at',
-            fontsize=12, color=TEXT, ha='left', va='top', transform=ax.transAxes,
-            fontfamily='monospace')
-    ax.text(0.05, 0.145, 'earlydaysofeth.org',
-            fontsize=14, color=CYAN, ha='left', va='top', transform=ax.transAxes,
+    # Password reminder — large centered yellow text
+    ax.text(0.5, 0.17, 'All passwords are "museum"',
+            fontsize=28, color=YELLOW, ha='center', va='center', transform=ax.transAxes,
             fontfamily='monospace', fontweight='bold')
 
     # Footer with repo link
     ax.plot([0.05, 0.95], [0.09, 0.09], color=BORDER, linewidth=1,
             transform=ax.transAxes)
 
-    ax.text(0.5, 0.05, 'Try this at home    github.com/bobsummerwill/EthereumTimeMachine',
-            fontsize=12, color=DIM, ha='center', va='top', transform=ax.transAxes,
+    ax.text(0.5, 0.05, 'Try this at home    https://github.com/bobsummerwill/EthereumTimeMachine',
+            fontsize=12, color=CYAN, ha='center', va='top', transform=ax.transAxes,
             fontfamily='monospace')
 
     plt.tight_layout(pad=1.0)

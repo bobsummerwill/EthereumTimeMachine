@@ -6,7 +6,6 @@ const app = express();
 const PORT = Number.parseInt(process.env.PORT || "8089", 10);
 const SYNC_UI_URL = (process.env.SYNC_UI_URL || "http://sync-ui:8088").replace(/\/+$/, "");
 const CHARTS_DIR = process.env.CHARTS_DIR || "/charts";
-const CYCLE_SECONDS = Number.parseInt(process.env.CYCLE_SECONDS || "20", 10);
 
 // Serve static chart images.
 app.use("/charts", express.static(CHARTS_DIR));
@@ -129,7 +128,8 @@ app.get("/", (req, res) => {
     <div id="indicator"></div>
 
     <script>
-      const CYCLE_MS = ${CYCLE_SECONDS} * 1000;
+      // Per-slide durations in ms: sync=30s, chart=30s, museum=60s
+      const DURATIONS = [30000, 30000, 60000];
       const slides = document.querySelectorAll('.slide');
       const indicator = document.getElementById('indicator');
       let current = 0;
@@ -143,22 +143,25 @@ app.get("/", (req, res) => {
         indicator.appendChild(dot);
       }
 
+      function scheduleNext() {
+        clearTimeout(timer);
+        timer = setTimeout(next, DURATIONS[current]);
+      }
+
       function goTo(idx) {
         slides[current].classList.remove('active');
         indicator.children[current].classList.remove('active');
         current = idx;
         slides[current].classList.add('active');
         indicator.children[current].classList.add('active');
-        // Reset timer on manual navigation.
-        clearInterval(timer);
-        timer = setInterval(next, CYCLE_MS);
+        scheduleNext();
       }
 
       function next() {
         goTo((current + 1) % slides.length);
       }
 
-      timer = setInterval(next, CYCLE_MS);
+      scheduleNext();
     </script>
   </body>
 </html>`);

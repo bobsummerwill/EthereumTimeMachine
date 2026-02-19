@@ -594,7 +594,7 @@ app.get("/", async (req, res) => {
     </style>
   </head>
   <body>
-    <h1>Sync progress</h1>
+    <h1>Chain of Geths – Feeding blocks from newer to older client software</h1>
     <div class="meta">
       Source: Prometheus at <code>${escapeHtml(PROMETHEUS_URL)}</code>
       <span class="links">
