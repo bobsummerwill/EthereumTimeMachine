@@ -204,8 +204,10 @@ def short_hash(value):
 
 def generate_chart(blocks_data, output_dir):
     """Generate the difficulty vs time chart."""
-    times = [datetime.fromtimestamp(b['timestamp']) for b in blocks_data]
-    diffs = [b['difficulty'] for b in blocks_data]
+    # Filter to resurrection-era blocks only (1920000+) to avoid 10-year gap from pre-fork block
+    resurrection_data = [b for b in blocks_data if b['number'] >= 1920000]
+    times = [datetime.fromtimestamp(b['timestamp']) for b in resurrection_data]
+    diffs = [b['difficulty'] for b in resurrection_data]
 
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(14, 10))
@@ -223,6 +225,55 @@ def generate_chart(blocks_data, output_dir):
     # Target lines
     ax.axhline(y=1e9, color=YELLOW, linestyle='--', linewidth=1.5, label='1 GH (GPU target)')
     ax.axhline(y=46e6, color=PINK, linestyle='--', linewidth=1.5, label='46 MH (CPU equilibrium)')
+
+    # --- Mining phase annotations ---
+    from datetime import timedelta
+
+    arrow_style = dict(arrowstyle='->', color=YELLOW, lw=1.5)
+    bbox_style = dict(boxstyle='round,pad=0.3', facecolor=BACKGROUND, edgecolor=YELLOW, alpha=0.9)
+    label_kwargs = dict(fontsize=9, color=YELLOW, fontfamily='monospace', fontweight='bold',
+                        ha='center', va='center', bbox=bbox_style)
+
+    # Helper: find the data point closest to a given date
+    def _closest(target_date):
+        best_idx = 0
+        best_delta = abs(times[0] - target_date)
+        for i, t in enumerate(times):
+            d = abs(t - target_date)
+            if d < best_delta:
+                best_delta = d
+                best_idx = i
+        return times[best_idx], diffs[best_idx]
+
+    # Phase 1: 16 x 3090 GPUs — up to ~Jan 28
+    p1_x, p1_y = _closest(datetime(2026, 1, 22))
+    ax.annotate('16 x 3090 GPUs', xy=(p1_x, p1_y),
+                xytext=(p1_x - timedelta(days=5), p1_y * 0.02),
+                arrowprops=arrow_style, **label_kwargs)
+
+    # Phase 2: 8 x 3090 GPUs — ~Jan 28 to ~Jan 30
+    p2_x, p2_y = _closest(datetime(2026, 1, 29))
+    ax.annotate('8 x 3090 GPUs', xy=(p2_x, p2_y),
+                xytext=(p2_x - timedelta(days=7), p2_y * 0.15),
+                arrowprops=arrow_style, **label_kwargs)
+
+    # Phase 3: 1 x GTX 1080 GPU — ~Jan 30 to ~Feb 9
+    p3_x, p3_y = _closest(datetime(2026, 2, 4))
+    ax.annotate('1 x GTX 1080 GPU', xy=(p3_x, p3_y),
+                xytext=(p3_x - timedelta(days=3), p3_y * 50),
+                arrowprops=arrow_style, **label_kwargs)
+
+    # Phase 4: 1 x Xeon 12-core CPU — ~Feb 9 to ~Feb 13
+    p4_x, p4_y = _closest(datetime(2026, 2, 11))
+    ax.annotate('1 x Xeon 12-core CPU', xy=(p4_x, p4_y),
+                xytext=(p4_x - timedelta(days=5), p4_y * 0.1),
+                arrowprops=arrow_style, **label_kwargs)
+
+    # Phase 5: 1 x GTX 1080 GPU — from ~Feb 17
+    p5_x, p5_y = _closest(datetime(2026, 2, 18))
+    ax.annotate('1 x GTX 1080 GPU (current)', xy=(p5_x, p5_y),
+                xytext=(p5_x - timedelta(days=5), p5_y * 30),
+                arrowprops=arrow_style, **label_kwargs)
 
     # Formatting
     ax.set_ylabel('Difficulty', color=TEXT, fontsize=14)

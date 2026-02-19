@@ -95,7 +95,7 @@ echo "Copying resurrection charts for slideshow UI..."
 CHARTS_DIR="$SCRIPT_DIR/generated-files/charts"
 mkdir -p "$CHARTS_DIR"
 RESURRECTION_DIR="$SCRIPT_DIR/../resurrection/generated-files"
-for chart in resurrection_chart_blocks.png resurrection_chart.png; do
+for chart in resurrection_chart_blocks.png resurrection_chart.png museum_info.png; do
     if [ -f "$RESURRECTION_DIR/$chart" ]; then
         cp "$RESURRECTION_DIR/$chart" "$CHARTS_DIR/"
     fi

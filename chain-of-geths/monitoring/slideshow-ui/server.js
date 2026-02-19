@@ -6,7 +6,7 @@ const app = express();
 const PORT = Number.parseInt(process.env.PORT || "8089", 10);
 const SYNC_UI_URL = (process.env.SYNC_UI_URL || "http://sync-ui:8088").replace(/\/+$/, "");
 const CHARTS_DIR = process.env.CHARTS_DIR || "/charts";
-const CYCLE_SECONDS = Number.parseInt(process.env.CYCLE_SECONDS || "10", 10);
+const CYCLE_SECONDS = Number.parseInt(process.env.CYCLE_SECONDS || "20", 10);
 
 // Serve static chart images.
 app.use("/charts", express.static(CHARTS_DIR));
@@ -120,10 +120,10 @@ app.get("/", (req, res) => {
       <iframe src="/sync"></iframe>
     </div>
     <div id="slide-1" class="slide slide-chart">
-      <img src="/charts/resurrection_chart.png" alt="Resurrection Chart (Time)" />
+      <img src="/charts/resurrection_chart.png" alt="Resurrection Chart" />
     </div>
     <div id="slide-2" class="slide slide-chart">
-      <img src="/charts/resurrection_chart_blocks.png" alt="Resurrection Chart (Blocks)" />
+      <img src="/charts/museum_info.png" alt="Museum Info" />
     </div>
 
     <div id="indicator"></div>
